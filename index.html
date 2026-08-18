@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Mesa de trabajo · Bosques de Agua</title>
+</head>
+<body>
+  <div id="login-screen" class="login-screen">
+    <div class="login-box">
+      <span class="mark"><svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true"><path d="M16 3c-5.6 6.9-8.6 10.2-8.6 14.6A8.6 8.6 0 1 0 24.6 17.6C24.6 13.2 21.6 9.9 16 3Z" fill="#fff"/><path d="M16 5.2 19.6 10.4 12.4 10.4Z" fill="#238374"/><path d="M16 5.2 17.2 6.9 14.8 6.9Z" fill="#fff"/><g fill="#238374"><circle cx="16" cy="15.1" r="2.1"/><circle cx="13.9" cy="15.9" r="1.7"/><circle cx="18.1" cy="15.9" r="1.7"/><circle cx="14.9" cy="13.9" r="1.5"/><circle cx="17.1" cy="13.9" r="1.5"/></g><rect x="15.5" y="16.2" width="1" height="6" rx=".3" fill="#238374"/></svg></span>
+      <h1>Mesa de trabajo</h1>
+      <p>Bosques de Agua · Boscora. Ingresá con tu email de equipo — te mandamos un enlace de acceso, sin contraseña.</p>
+      <form id="login-form">
+        <input type="email" id="login-email" placeholder="tu@email.com" autocomplete="email" required />
+        <button type="submit" class="btn btn-primary enter-btn">Enviar enlace de acceso</button>
+      </form>
+      <div class="status" id="login-status"></div>
+    </div>
+  </div>
+
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="mark"><svg viewBox="0 0 32 32" width="20" height="20" aria-hidden="true"><path d="M16 3c-5.6 6.9-8.6 10.2-8.6 14.6A8.6 8.6 0 1 0 24.6 17.6C24.6 13.2 21.6 9.9 16 3Z" fill="#fff"/><path d="M16 5.2 19.6 10.4 12.4 10.4Z" fill="var(--wood-deep)"/><path d="M16 5.2 17.2 6.9 14.8 6.9Z" fill="#fff"/><g fill="var(--wood-deep)"><circle cx="16" cy="15.1" r="2.1"/><circle cx="13.9" cy="15.9" r="1.7"/><circle cx="18.1" cy="15.9" r="1.7"/><circle cx="14.9" cy="13.9" r="1.5"/><circle cx="17.1" cy="13.9" r="1.5"/></g><rect x="15.5" y="16.2" width="1" height="6" rx=".3" fill="var(--wood-deep)"/></svg></span><b>Mesa de trabajo</b></div>
+    <nav class="nav" id="nav">
+      <button class="navtab" data-tab="panel"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>Panel</button>
+      <button class="navtab" data-tab="tareas"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="4.5" height="14" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="4.5" height="9" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="3" width="2" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Tareas</button>
+      <button class="navtab" data-tab="chat"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6A1.5 1.5 0 0 1 14.5 13H8l-3.5 3v-3H5.5A1.5 1.5 0 0 1 4 11.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Chat</button>
+      <button class="navtab" data-tab="archivo"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 8v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8M8 11h4" stroke="currentColor" stroke-width="1.5"/></svg>Archivo</button>
+    </nav>
+    <span class="navdiv"></span>
+    <nav class="nav feat" id="navFeat" title="Vistas del proyecto">
+      <button class="navtab" data-tab="mapa"><svg viewBox="0 0 20 20" fill="none"><circle cx="5" cy="6" r="2.2" stroke="currentColor" stroke-width="1.5"/><circle cx="15" cy="6" r="2.2" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="15" r="2.2" stroke="currentColor" stroke-width="1.5"/><path d="M6.6 7.4 9 13M13.4 7.4 11 13M7 6h6" stroke="currentColor" stroke-width="1.4"/></svg>Mapa</button>
+      <button class="navtab" data-tab="estructura"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5h12M7 10h9M10 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Estructura</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="filters">
+      <div class="filt" id="filtPersona"><label>Persona</label><select id="fPerson"><option value="">Todas</option></select></div>
+      <div class="filt" id="filtEstado"><label>Estado</label><select id="fStatus"><option value="">Todos</option><option value="curso">En curso</option><option value="espera">En espera</option><option value="sin">Sin empezar</option><option value="listo">Terminado</option><option value="bloq">Bloqueado</option></select></div>
+      <div class="filt" id="filtSos"><label>Sos</label><select id="meSel"><option value="">—</option></select></div>
+      <button class="btn btn-icon" id="themeBtn" title="Tema" aria-label="Tema"><svg viewBox="0 0 20 20" fill="none"><path d="M15 11a5 5 0 0 1-6-6 5 5 0 1 0 6 6Z" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button class="btn btn-icon" id="openData" title="Guardar / compartir" aria-label="Datos"><svg viewBox="0 0 20 20" fill="none"><path d="M4 4h9l3 3v9H4z" stroke="currentColor" stroke-width="1.5"/><path d="M7 4v4h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="tab" id="tab-panel"><div class="wrap">
+      <h1 class="h1">Mi panel</h1><p class="lead">Tu día: el calendario arriba, y abajo lo que tenés asignado. Solo lo tuyo.</p>
+      <div id="calMount"></div>
+      <div id="upcoming" style="margin-top:22px"></div>
+      <div id="myTasks" style="margin-top:22px"></div>
+      <div id="myNotes" style="margin-top:22px"></div>
+    </div></section>
+
+    <section class="tab nopad" id="tab-mapa">
+      <div class="viewport" id="viewport">
+        <div class="grid"></div>
+        <div class="maptools">
+          <button class="btn" id="linkMode"><svg viewBox="0 0 20 20" fill="none"><path d="M8 12l4-4M7 13a3 3 0 0 1 0-4l1-1M13 7a3 3 0 0 1 0 4l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Vincular</button>
+          <button class="btn" id="editMode"><svg viewBox="0 0 20 20" fill="none"><path d="M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Editar</button>
+          <button class="btn btn-primary" id="addNode"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="addLabel">Nuevo tema</span></button>
+        </div>
+        <div class="world" id="world"><div class="worldInner" id="worldInner"><svg class="synapses" id="synapses" width="6000" height="4000"></svg><div class="handles" id="handles"></div></div></div>
+        <div class="toast hide" id="toast"></div>
+        <div class="zoomctl"><button class="btn btn-icon" id="zin">＋</button><button class="btn btn-icon" id="zout">－</button><button class="btn btn-icon" id="zfit" title="Ver todo">⤢</button></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-estructura"><div class="wrap"><div class="estree" id="estree"></div></div></section>
+
+    <section class="tab" id="tab-tareas"><div class="wrap" style="max-width:1200px">
+      <h1 class="h1">Tareas</h1><p class="lead">Todo lo que hay que hacer. Arrastrá para cambiar. Agrupá como te sirva.</p>
+      <div class="weekgoals"><div class="wglab">🎯 Objetivos de la semana</div><textarea id="weekGoals" placeholder="Escriban acá los objetivos de esta semana, a la vista de todo el equipo…"></textarea></div>
+      <div class="tbar"><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="tema">Por tema</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span></div>
+      <div class="kanban" id="kanban"></div>
+    </div></section>
+
+    <section class="tab nopad" id="tab-chat">
+      <div class="chatwrap">
+        <div class="chanlist" id="chanList"></div>
+        <div class="chatmain">
+          <div class="chathead" id="chatHead"></div>
+          <div class="msgs" id="msgs"></div>
+          <div class="composer"><input id="msgInput" placeholder="Escribí un mensaje…"><button class="btn btn-primary" id="sendMsg">Enviar</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-archivo"><div class="wrap">
+      <h1 class="h1">Archivo</h1><p class="lead">Tareas terminadas hace más de 10 días. Se archivan solas; podés restaurarlas.</p>
+      <div id="archivoBody"></div>
+    </div></section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="phead">
+    <button class="btn btn-icon close" id="closePanel" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="ey"><span class="dot" id="pDot"></span><span id="pKind">Tema</span></div>
+    <input class="title" id="pTitle" aria-label="Nombre">
+    <div class="pctl">
+      <div class="c"><label>Importancia</label><select class="pick" id="pPrio"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
+      <div class="c"><label>Encargado del tema</label><input class="txt" id="pEnc" list="peopleList" placeholder="— nadie —"></div>
+    </div>
+    <button class="btn enter-btn" id="enterBtn"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>Ver en el mapa</button>
+  </div>
+  <div class="pbody">
+    <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="pObj" rows="2" placeholder="¿Qué busca este tema?"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Estado actual</h3></div><textarea class="txt" id="pCtx" rows="3" placeholder="¿En qué se está trabajando ahora?"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Sub-temas</h3><button class="mini-add" id="addSub">＋ sub-tema</button></div><div id="subList"></div></div>
+    <div class="sec"><div class="sh"><h3>Tareas</h3><button class="mini-add" id="addTaskBtn">＋ tarea</button></div><div id="itemList"></div></div>
+    <div class="sec"><div class="sh"><h3>Vínculos</h3><button class="mini-add" id="addLink">＋ vincular</button></div><div style="position:relative"><div class="picker" id="picker"><input class="txt" id="pickSearch" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
+  </div>
+  <div class="pfoot"><button class="btn danger" id="delNode">Eliminar tema</button></div>
+</aside>
+
+<div class="modal" id="modal"><div class="box">
+  <h2>Datos</h2>
+  <p>Esto ahora se guarda en vivo y en la nube — lo que edite cualquiera del equipo aparece al instante para los demás. Este cuadro es solo para respaldos manuales o para pegar/reemplazar todo el contenido.</p>
+  <textarea id="jsonArea" spellcheck="false"></textarea>
+  <div class="row"><button class="btn" id="copyJson">Copiar</button><button class="btn" id="loadJson">Cargar desde el texto</button><button class="btn" id="dlJson">Descargar respaldo</button><div style="flex:1"></div><button class="btn danger" id="resetDemo">Borrar todo y volver al ejemplo</button></div>
+  <div class="row"><div style="flex:1"></div><button class="btn btn-primary" id="closeModal">Listo</button></div>
+</div></div>
+
+<div class="modal" id="evModal"><div class="box" id="evBox"></div></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
