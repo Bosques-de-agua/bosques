@@ -4,12 +4,29 @@ import { supabase } from "./supabaseClient.js";
 // La identidad de cada persona es su EMAIL: el nombre es solo la etiqueta
 // que se muestra, y puede cambiarse sin romper nada.
 
+// Cuando la tabla todavía no se creó en la base, no es un fallo transitorio:
+// es que falta correr el schema. Se distingue para que la app pueda arrancar
+// igual en modo compatible en vez de dejar a todos afuera.
+export class TablaFaltante extends Error {}
+
+function esTablaFaltante(error) {
+  return (
+    error &&
+    (error.code === "42P01" || // Postgres: relation does not exist
+      error.code === "PGRST205" || // PostgREST: no encontró la tabla en el esquema
+      /does not exist|schema cache/i.test(error.message || ""))
+  );
+}
+
 export async function fetchTeam() {
   const { data, error } = await supabase
     .from("team_members")
     .select("email,name,color,avatar")
     .order("name");
-  if (error) throw error;
+  if (error) {
+    if (esTablaFaltante(error)) throw new TablaFaltante(error.message);
+    throw error;
+  }
   return data || [];
 }
 

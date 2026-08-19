@@ -2,7 +2,7 @@ import "./style.css";
 import { supabase } from "./supabaseClient.js";
 import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail } from "./sync.js";
 import { fetchPrivateState, pushPrivateState } from "./private.js";
-import { fetchTeam, upsertMe, inviteEmail } from "./team.js";
+import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
 
@@ -80,13 +80,26 @@ async function launchApp(session) {
   // Si es tu primera vez, se crea tu ficha con la parte antes del @.
   let team = [];
   let teamOk = true;
+  let sinTablaEquipo = false;
   try {
     team = await fetchTeam();
   } catch (err) {
-    console.error("No se pudo leer el equipo:", err);
-    teamOk = false;
+    if (err instanceof TablaFaltante) {
+      // Todavía no se corrió el schema: la app arranca igual, derivando el
+      // nombre del correo, y todo se acomoda solo cuando la tabla exista.
+      console.warn("Falta la tabla team_members. Arrancando en modo compatible.");
+      sinTablaEquipo = true;
+    } else {
+      console.error("No se pudo leer el equipo:", err);
+      teamOk = false;
+    }
   }
   let yo = team.find((m) => m.email === email) || null;
+  if (!yo && sinTablaEquipo) {
+    const n = email.split("@")[0].replace(/[._-]+/g, " ").trim() || email;
+    yo = { email, name: n.charAt(0).toUpperCase() + n.slice(1) };
+    team = [yo];
+  }
   // Solo se crea la ficha si de verdad pudimos leer el equipo. Si la lectura
   // falló, "no está" no significa "es nuevo": crearla le cambiaría el nombre
   // a alguien que ya existe y lo desconectaría de sus tareas.
