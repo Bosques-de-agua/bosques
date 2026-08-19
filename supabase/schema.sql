@@ -63,3 +63,19 @@ begin
     alter publication supabase_realtime add table app_state;
   end if;
 end $$;
+
+-- 5) Notificaciones push: suscripciones del navegador de cada persona.
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  email text not null,
+  subscription jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+alter table push_subscriptions enable row level security;
+
+drop policy if exists "team manages own push sub" on push_subscriptions;
+create policy "team manages own push sub" on push_subscriptions
+  for all
+  using (is_allowed() and email = auth.jwt() ->> 'email')
+  with check (is_allowed() and email = auth.jwt() ->> 'email');

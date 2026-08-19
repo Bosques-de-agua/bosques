@@ -23,7 +23,21 @@ Login sin contraseña (magic link / email OTP) vía Supabase Auth. Solo los emai
 
 ## Deploy
 
-Conectado a Vercel (free) sobre este repo — cada push a `main` deploya solo. Variables de entorno a configurar en Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+Conectado a Vercel (free) sobre este repo — cada push a `main` deploya solo. Variables de entorno a configurar en Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY`.
+
+## App en el celular + notificaciones push
+
+La app es instalable (PWA): "Agregar a pantalla de inicio" desde el navegador del celular le da ícono propio y pantalla completa.
+
+La función `notify-chat` cubre dos casos: mensaje nuevo en el chat de equipo (avisa a todos los suscriptos) y tarea recién asignada a alguien (avisa solo a esa persona — requiere mantener actualizado el mapa `NAME_TO_EMAIL` dentro de `index.ts` si cambia el equipo). No hay pantalla de preferencias por tipo de notificación; el botón "🔔 Activar notificaciones" activa/desactiva las dos a la vez.
+
+Para las notificaciones push falta, del lado de Supabase:
+1. Correr de nuevo `supabase/schema.sql` (agregó la tabla `push_subscriptions`).
+2. Deployar la función `supabase/functions/notify-chat` (Edge Functions → Deploy a new function → pegar el contenido de `index.ts`).
+3. Configurar los secrets de la función: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (ver `.env.local`, la privada NO va en el repo), `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API), `SUPABASE_URL`.
+4. Crear un Database Webhook: tabla `app_state`, evento `UPDATE`, que llame a la función `notify-chat`.
+
+Con eso activado, cada mensaje nuevo en el chat de equipo dispara una notificación a todos los que tengan las notificaciones activadas (botón "🔔 Activar notificaciones" dentro de la app).
 
 ## Arquitectura (por qué está armado así)
 

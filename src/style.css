@@ -363,3 +363,6 @@
   .login-box .status.err{color:var(--s-bloq)}
   .signout-pill{position:fixed;right:14px;top:9px;z-index:35;font-size:11.5px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;display:flex;align-items:center;gap:7px}
   .signout-pill:hover{border-color:var(--wood);color:var(--ink)}
+  .push-pill{top:44px}
+  .push-pill[data-on="1"]{border-color:var(--wood);color:var(--wood-deep)}
+  .push-pill:disabled{opacity:.6;cursor:default}

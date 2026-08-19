@@ -2,6 +2,13 @@ import "./style.css";
 import { supabase } from "./supabaseClient.js";
 import { fetchRemoteState, pushRemoteState, subscribeRemoteState } from "./sync.js";
 import { startApp } from "./app.js";
+import { initPush } from "./push.js";
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch((err) => {
+    console.error("No se pudo registrar el service worker:", err);
+  });
+}
 
 const loginScreen = document.getElementById("login-screen");
 const appRoot = document.getElementById("app");
@@ -41,6 +48,7 @@ async function launchApp(session) {
   launched = true;
   showApp();
   addSignOutPill(session.user.email);
+  initPush();
 
   let seed = null;
   try {

@@ -1,0 +1,7 @@
+# Guardar todo con LF en el repo, sin importar el sistema de quien edite.
+# Sin esto, un checkout en Windows puede reescribir archivos enteros y hacer
+# ilegible cualquier diff.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
