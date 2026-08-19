@@ -18,7 +18,15 @@ function saveLocalPrefs(state){
 function stripLocal(state){ const o=Object.assign({},state); LOCAL_KEYS.forEach(k=>delete o[k]); return o; }
 function stripShared(state){ const o=stripLocal(state); PRIV_KEYS.forEach(k=>delete o[k]); return o; }
 
-export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
+export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam }){
+  // El equipo viene de la base (tabla team_members), no del estado compartido.
+  // Cada persona ES su email; el nombre es solo la etiqueta que se muestra.
+  let equipo = Array.isArray(team) ? team.slice() : [];
+  const miEmail = yo && yo.email ? yo.email : "";
+  const miembroPorNombre = n => equipo.find(m => m.name === n) || null;
+  const miembroPorEmail  = e => equipo.find(m => m.email === e) || null;
+  const nombresEquipo = () => equipo.map(m => m.name).filter(Boolean);
+
   const DAY=86400000, ARCH_DAYS=7;
   const STATUS={curso:{l:"En curso",v:"--s-curso"},espera:{l:"En espera",v:"--s-espera"},sin:{l:"Sin empezar",v:"--s-sin"},listo:{l:"Terminado",v:"--s-listo"}};
   const STORD=["sin","curso","espera","listo"];
@@ -26,8 +34,10 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   const PRORD=["alta","media","baja"]; // la prioridad es opcional: "" = sin prioridad
   const prioOf=k=>PRIO[k.prio]||null;
   const LVL=["--l1","--l2","--l3","--l4","--l5","--l6"];
-  // personas: familia violeta/magenta, aparte de estados (azul/verde/amarillo), jerarquía (teal) y prioridad (rojo)
-  const AV=["#7b5ea7","#b0559b","#6d54b5","#a9628f","#8a6cc4","#c06a9b","#5a4a8c","#94577d"];
+  // Colores de persona: tonos profundos y bien distintos entre sí. Van siempre
+  // dentro de círculos con iniciales o foto, así que la forma ya los separa de
+  // las otras paletas (estado, prioridad, nivel) aunque compartan familia.
+  const AV=["#5b53c4","#a8358f","#0f7d8c","#b0563a","#6b7a1f","#8e4bc9","#1b6b4f","#a63d5e","#3f6fb5","#8a5a2b"];
   const OX=3000,OY=2000;
 
   let state=null, active="mapa", selId=null, cam={tx:0,ty:0,s:1}, linking=false, linkSrc=null, editing=false, taskGroup="estado", cal={y:null,m:null};
@@ -42,9 +52,14 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim()||"#888";
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const initials=n=>{ if(!n)return"?"; const p=n.trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); };
-  const avColor=n=>{ const c=state&&state.userColors&&state.userColors[n]; if(c)return c;
+  // El color y la foto salen de la ficha del equipo; lo del estado compartido
+  // queda solo como respaldo para datos anteriores a esa tabla.
+  const avColor=n=>{ const m=miembroPorNombre(n); if(m&&m.color)return m.color;
+    const c=state&&state.userColors&&state.userColors[n]; if(c)return c;
     let h=0; for(const ch of (n||"")) h=(h*31+ch.charCodeAt(0))>>>0; return AV[h%AV.length]; };
-  function avatarMarkup(name,cls,withTitle){ const t=withTitle?` title="${esc(name)}"`:""; const ph=(state&&state.avatars)?state.avatars[name]:null; if(ph)return `<span class="${cls} hasimg" style="background-image:url('${ph}')"${t}></span>`; return `<span class="${cls}" style="background:${avColor(name)}"${t}>${esc(initials(name))}</span>`; }
+  const avFoto=n=>{ const m=miembroPorNombre(n); if(m&&m.avatar)return m.avatar;
+    return (state&&state.avatars)?state.avatars[n]:null; };
+  function avatarMarkup(name,cls,withTitle){ const t=withTitle?` title="${esc(name)}"`:""; const ph=avFoto(name); if(ph)return `<span class="${cls} hasimg" style="background-image:url('${ph}')"${t}></span>`; return `<span class="${cls}" style="background:${avColor(name)}"${t}>${esc(initials(name))}</span>`; }
   function loadAvatar(file,cb){ const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>{ const S=80,c=document.createElement("canvas"); c.width=S;c.height=S; const x=c.getContext("2d"); const m=Math.min(img.width,img.height); x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S); cb(c.toDataURL("image/jpeg",0.82)); }; img.src=r.result; }; r.readAsDataURL(file); }
   function depthOf(n){ let d=1,x=n; while(x&&x.parent){ d++; x=N(x.parent); } return d; }
   function accentOf(node){ if(node.hue!=null) return `hsl(${node.hue} 45% 52%)`; return cssv(LVL[Math.min(depthOf(node),LVL.length)-1]); }
@@ -74,6 +89,19 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
     askCb=o.cb||null; m.classList.add("on"); if(o.input)setTimeout(()=>inp.focus(),40); else setTimeout(()=>yes.focus(),40); }
   function closeAsk(){ document.getElementById("askModal").classList.remove("on"); askCb=null; }
   function note(msg,title){ dialog({title:title||"Aviso",msg,onlyOk:true}); }
+  // Deshacer un borrado. A propósito NO guarda una copia del estado entero:
+  // restaurarla pisaría lo que otra persona hizo mientras tanto. Guarda solo
+  // lo borrado y lo vuelve a insertar sobre el estado del momento.
+  let undoT=null;
+  function ofrecerDeshacer(texto,rehacer){
+    const bar=document.getElementById("undoBar"); if(!bar){ return; }
+    document.getElementById("undoMsg").innerHTML=texto;
+    bar.classList.add("on"); clearTimeout(undoT);
+    const btn=document.getElementById("undoBtn");
+    const cerrar=()=>{ bar.classList.remove("on"); btn.onclick=null; clearTimeout(undoT); };
+    btn.onclick=()=>{ cerrar(); try{ rehacer(); }catch(e){ note("No se pudo deshacer."); } save(); refreshChrome(); renderActive(); };
+    undoT=setTimeout(cerrar,9000);
+  }
   function confirmar(msg,cb,o){ dialog(Object.assign({title:"¿Confirmás?",msg,yes:"Sí, dale",cb:()=>cb()},o||{})); }
   function pedirTexto(title,placeholder,cb){ dialog({title,msg:"",input:true,placeholder,yes:"Agregar",cb:v=>{ if(v&&v.trim())cb(v.trim()); }}); }
   // ---------- archivos de Drive (vínculos, no copias) ----------
@@ -103,7 +131,13 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   const privL=who=>privList(who)||[];   // para leer sin riesgo de escribir en un array descartable
   function allItems(){ const out=[]; Object.values(state.nodes).forEach(n=>(n.items||[]).forEach(k=>out.push({k,node:n}))); return out; }
   function activeItems(){ return allItems().filter(x=>!x.k.archived); }
-  function allPeople(){ const s=new Set(state.members||[]); Object.values(state.nodes).forEach(n=>{ encsOf(n).forEach(o=>s.add(o)); (n.items||[]).forEach(k=>{ ownersOf(k).forEach(o=>s.add(o)); }); }); Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>ownersOf(k).forEach(o=>s.add(o)))); return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
+  // La lista del equipo manda; se le suman nombres sueltos que hayan quedado
+  // asignados en tareas viejas, para no hacerlos desaparecer.
+  function allPeople(){ const s=new Set(nombresEquipo());
+    if(!s.size)(state.members||[]).forEach(p=>s.add(p));
+    Object.values(state.nodes).forEach(n=>{ encsOf(n).forEach(o=>s.add(o)); (n.items||[]).forEach(k=>{ ownersOf(k).forEach(o=>s.add(o)); }); });
+    Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>ownersOf(k).forEach(o=>s.add(o))));
+    return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
   function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
   function archiveTask(k){ if(k.status!=="listo")setStatus(k,"listo"); if(!k.doneAt)k.doneAt=nowMs(); k.archived=true; k.archivedAt=nowMs(); }
   function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; }
@@ -195,7 +229,7 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
     d.taskFilters.status=d.taskFilters.status.filter(s=>STATUS[s]);
     d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
     d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
-    if(!Array.isArray(d.panelFilter))d.panelFilter=[]; d.panelFilter=d.panelFilter.filter(s=>STATUS[s]);
+    if(!Array.isArray(d.panelFilter))d.panelFilter=[]; d.panelFilter=d.panelFilter.filter(p=>p==="__none"||PRIO[p]);
     if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc=""; });
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
     // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
@@ -274,21 +308,31 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   }
 
   const viewport=document.getElementById("viewport"),world=document.getElementById("world"),worldInner=document.getElementById("worldInner"),svg=document.getElementById("synapses"),handles=document.getElementById("handles");
-  const fPerson=document.getElementById("fPerson"),fStatus=document.getElementById("fStatus"),meSel=document.getElementById("meSel");
+  const fPerson=document.getElementById("fPerson"),fStatus=document.getElementById("fStatus");
   function matches(node){ const p=fPerson.value,s=fStatus.value; if(!p&&!s)return true; const a=agg(node); return (!p||a.owners.has(p))&&(!s||a.st.has(s)); }
   function isOff(node){ let x=node; while(x){ if(off.has(x.id))return true; x=N(x.parent); } return false; }
   function isBright(node){ return !isOff(node)&&matches(node); }
 
-  // "Sos" define casi todo (panel, chat, privadas): tiene que estar siempre a mano
-  function applyTabControls(name){ const P=name==="mapa"; const E=name==="mapa"; const S=true;
-    document.getElementById("filtPersona").style.display=P?"":"none"; document.getElementById("filtEstado").style.display=E?"":"none"; document.getElementById("filtSos").style.display=S?"":"none"; }
+  // Ya no hay selector de identidad: sos quien entró con su correo.
+  function applyTabControls(name){ const P=name==="mapa"||name==="estructura"; const E=P;
+    document.getElementById("filtPersona").style.display=P?"":"none"; document.getElementById("filtEstado").style.display=E?"":"none";
+    const s=document.getElementById("filtSos"); if(s)s.style.display="none"; }
   function showTab(name){ active=name; applyTabControls(name);
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
     document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
-    renderActive(); if(name==="mapa"){ requestAnimationFrame(()=>{ if(!cam._init){ fit(); cam._init=1; } applyCam(); }); } save(); }
+    renderActive(); save(); }
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   function renderActive(){ refreshChrome();
-    if(active==="mapa")renderMap(); else if(active==="estructura")renderEstructura(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); }
+    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); }
+  // Estructura tiene dos vistas del mismo árbol: en columnas o como mapa.
+  function estView(){ return state.estView==="mapa"?"mapa":"arbol"; }
+  function renderEstructuraTab(){ const esMapa=estView()==="mapa";
+    const seg=document.getElementById("estViewSeg"); if(seg)seg.querySelectorAll("[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===(esMapa?"mapa":"arbol")));
+    const wrap=document.getElementById("estMapaWrap"); if(wrap)wrap.hidden=!esMapa;
+    const arbol=document.getElementById("estree"); if(arbol)arbol.hidden=esMapa;
+    const srch=document.querySelector("#tab-estructura .srchbar"); if(srch)srch.style.display=esMapa?"none":"";
+    if(esMapa){ renderMap(); requestAnimationFrame(()=>{ if(!cam._init){ fit(); cam._init=1; } applyCam(); }); }
+    else renderEstructura(); }
   // qué ramas dejaste abiertas: se recuerda entre sesiones
   function saveTreeOpen(){ state.treeOpen=[...treeOpen]; save(); }
   function loadTreeOpen(){ treeOpen.clear(); (state.treeOpen||[]).forEach(id=>{ if(N(id))treeOpen.add(id); }); }
@@ -298,8 +342,9 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
       if(!pick){ let h=0; for(const c of p) h=(h*31+c.charCodeAt(0))>>>0; pick=AV[h%AV.length]; }
       state.userColors[p]=pick; used.add(pick); ch=true; });
     return ch; }
-  function refreshChrome(){ if(ensureUserColors())save(); const cur=fPerson.value; fPerson.innerHTML='<option value="">Todas</option>'+allPeople().map(p=>`<option${p===cur?" selected":""}>${esc(p)}</option>`).join("");
-    const m=state.me||""; meSel.innerHTML='<option value="">—</option>'+allPeople().map(p=>`<option${p===m?" selected":""}>${esc(p)}</option>`).join(""); updateChatBadge(); }
+  function refreshChrome(){ if(ensureUserColors())save(); const cur=fPerson.value;
+    fPerson.innerHTML='<option value="">Todas</option>'+allPeople().map(p=>`<option${p===cur?" selected":""}>${esc(p)}</option>`).join("");
+    updateChatBadge(); updateAvisos(); }
 
   // ---------- MAPA ----------
   function edgeList(){ const list=[],seen=new Set();
@@ -394,7 +439,7 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   const estree=document.getElementById("estree");
   function moveTask(itemId,fromId,toId,beforeId){ if(beforeId===itemId)return; // soltarla sobre sí misma no hace nada
     const from=N(fromId),to=N(toId); if(!from||!to)return; const idx=(from.items||[]).findIndex(x=>x.id===itemId); if(idx<0)return; const [it]=from.items.splice(idx,1); to.items=to.items||[]; let j=to.items.length; if(beforeId){ const bi=to.items.findIndex(x=>x.id===beforeId); if(bi>=0)j=bi; } to.items.splice(j,0,it); save(); }
-  function quickTask(node){ node.items=node.items||[]; const k=newTask(); node.items.push(k); treeOpen.add(node.id); saveTreeOpen(); renderEstructura(); openTask(node.id,k.id); }
+  function quickTask(node){ treeOpen.add(node.id); saveTreeOpen(); openNewTask({nodeId:node.id}); }
   function encChip(node){ return encsOf(node).map(p=>`<span class="encchip">${avatarMarkup(p,"av")}${esc(p)}</span>`).join(" "); }
   function renderEstBusqueda(){ const q=norm(estQuery.trim()); const info=document.getElementById("estSearchInfo"), clr=document.getElementById("estSearchClear");
     clr.hidden=!estQuery.trim();
@@ -526,15 +571,14 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg)wg.value=state.weekGoals||"";
     renderFilterBar(); const f=tfil(); const items=filteredItems(); kanban.innerHTML="";
     document.getElementById("taskCount").textContent=items.length+(items.length===1?" tarea":" tareas");
-    if(taskGroup==="estado"){ STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); }
-    else if(taskGroup==="prioridad"){ PRORD.filter(p=>!f.prio.length||f.prio.includes(p)).forEach(p=>kanban.appendChild(makeCol(PRIO[p].l,cssv(PRIO[p].v),items.filter(x=>x.k.prio===p),{prio:p})));
+    // Agrupar por tema se sacó: generaba una columna por cada tema con tareas
+    // (quince con los datos reales) y para eso ya está la pestaña Estructura.
+    if(taskGroup==="prioridad"){ PRORD.filter(p=>!f.prio.length||f.prio.includes(p)).forEach(p=>kanban.appendChild(makeCol(PRIO[p].l,cssv(PRIO[p].v),items.filter(x=>x.k.prio===p),{prio:p})));
       if(!f.prio.length||f.prio.includes("__none")) kanban.appendChild(makeCol("Sin prioridad",cssv("--ink-faint"),items.filter(x=>!x.k.prio),{prio:""})); }
     else if(taskGroup==="persona"){ const people=allPeople(); const groups={}; people.forEach(p=>groups[p]=[]); const sinA=[]; items.forEach(x=>{ const os=ownersOf(x.k).filter(o=>groups[o]); if(os.length)os.forEach(o=>groups[o].push(x)); else sinA.push(x); });
       people.forEach(p=>{ if(f.people.length&&!f.people.includes(p))return; kanban.appendChild(makeCol(p,avColor(p),groups[p],{person:p})); });
       if(!f.people.length||f.people.includes("__none")) kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
-    else { const byNode={}; items.forEach(x=>{ (byNode[x.node.id]=byNode[x.node.id]||[]).push(x); }); const nids=Object.keys(byNode);
-      if(!nids.length){ kanban.innerHTML='<div class="empty">Sin tareas en esta selección.</div>'; return; }
-      nids.forEach(nid=>{ const n=N(nid); const p=pathOf(nid).map(z=>z.name); const label=p.pop(); kanban.appendChild(makeCol(label,accentOf(n),byNode[nid],{pth:p.join(" › "),node:nid})); }); } }
+    else { STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); } }
   function inSubtree(nodeId,ancId){ let x=N(nodeId); while(x){ if(x.id===ancId)return true; x=N(x.parent); } return false; }
   function makeCol(title,color,items,meta){ const col=document.createElement("div"); col.className="kcol"; col.dataset.status=meta.status||""; col.dataset.person=meta.person==null?"__none":meta.person; col.dataset.node=meta.node||""; if(meta.prio!=null)col.dataset.prio=meta.prio;
     const archAll=(meta.status==="listo"&&items.length)?`<button class="colact" data-archall>archivar todas</button>`:"";
@@ -547,7 +591,6 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
       if(!p||p==="__none"){ x.k.owners=[]; }
       else { const from=x.fromPerson; if(from&&from!==p){ const i=os.indexOf(from); if(i>=0)os.splice(i,1); }
         if(!os.includes(p))os.push(p); } }
-    else if(taskGroup==="tema"&&col.dataset.node){ if(col.dataset.node!==x.node.id)moveTask(x.k.id,x.node.id,col.dataset.node,null); }
     save(); renderTareas(); refreshChrome(); }
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
@@ -755,7 +798,7 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const DOWL=["lun","mar","mié","jue","vie","sáb","dom"];
   function ymdLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderProfile(); renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); }
+  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderProfile(); renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); renderConfig(); }
   function renderProfile(){ const box=document.getElementById("profile"); if(!box)return; const me=state.me;
     if(!me){ box.innerHTML=""; return; }
     const mine=avColor(me); const hasPhoto=!!(state.avatars&&state.avatars[me]);
@@ -770,6 +813,115 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
     box.querySelector(".myname").addEventListener("dblclick",()=>{ const cp=box.querySelector("#colorPick"); cp.hidden=!cp.hidden; });
     box.querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click",()=>{ state.userColors=state.userColors||{}; state.userColors[me]=b.dataset.c; save(); renderActive(); }));
     box.querySelector("#photoInput").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; loadAvatar(f,uri=>{ state.avatars=state.avatars||{}; state.avatars[me]=uri; save(); renderActive(); }); }); }
+
+  // ---------- CONFIGURACIÓN ----------
+  // Todo lo tuyo en un solo lugar: quién sos, cómo se ve la app, avisos,
+  // el equipo y el respaldo.
+  let cfgAbierta=false;
+  function renderConfig(){ const box=document.getElementById("config"); if(!box)return;
+    if(!cfgAbierta){ box.innerHTML=`<button class="rowbtn" id="cfgOpen">⚙️ Configuración</button>`;
+      document.getElementById("cfgOpen").addEventListener("click",()=>{ cfgAbierta=true; renderConfig(); }); return; }
+    const me=state.me||""; const yoM=miembroPorEmail(miEmail);
+    const paleta=state.palette||"bosque";
+    const temaActual=state.theme||"";
+    box.innerHTML=`<div class="cfg">
+      <div class="cfgsec"><div class="lab">Vos</div>
+        <div class="cfgrow"><span class="lbl">Tu nombre<small>Así te ven los demás en toda la app</small></span>
+          <input class="txt" id="cfgNombre" value="${esc(me)}" maxlength="40"><button class="btn" id="cfgNombreOk">Guardar</button></div>
+        <div class="cfgrow"><span class="lbl">Tu correo<small>Con este entrás; no se puede cambiar</small></span>
+          <span style="font-size:12.5px;color:var(--ink-faint)">${esc(miEmail||"—")}</span></div>
+        <div class="cfgrow"><span class="lbl">Tu color<small>Te identifica en tarjetas, columnas y filtros</small></span>
+          <div class="colorpick">${AV.map(c=>`<button class="sw2 ${c===avColor(me)?"on":""}" data-cfgc="${c}" style="background:${c}"></button>`).join("")}</div></div>
+      </div>
+      <div class="cfgsec"><div class="lab">Cómo se ve</div>
+        <div class="cfgrow"><span class="lbl">Tema</span>
+          <div class="segpal" id="cfgTema">
+            <button data-t="" class="${temaActual===""?"on":""}">Automático</button>
+            <button data-t="light" class="${temaActual==="light"?"on":""}">Claro</button>
+            <button data-t="dark" class="${temaActual==="dark"?"on":""}">Oscuro</button></div></div>
+        <div class="cfgrow"><span class="lbl">Paleta de fondo</span>
+          <div class="segpal" id="cfgPal">${Object.entries(PALETAS).map(([k,l])=>`<button data-p="${k}" class="${paleta===k?"on":""}">${l}</button>`).join("")}</div></div>
+      </div>
+      <div class="cfgsec"><div class="lab">Avisos</div>
+        <div class="cfgrow"><span class="lbl">Notificaciones en este dispositivo<small>Te avisa cuando te asignan una tarea o te escriben, aunque tengas la app cerrada</small></span>
+          <span id="cfgPush"></span></div>
+      </div>
+      <div class="cfgsec"><div class="lab">Equipo</div>
+        <div id="cfgTeam"></div>
+        <div class="cfgrow"><span class="lbl">Sumar a alguien<small>Recibe acceso con su propio correo</small></span>
+          <input class="txt" id="cfgInvitar" placeholder="correo@ejemplo.com" type="email"><button class="btn" id="cfgInvitarOk">Habilitar</button></div>
+      </div>
+      <div class="cfgsec"><div class="lab">Respaldo</div>
+        <div class="cfgrow"><span class="lbl">Descargar una copia<small>Todo el contenido del equipo en un archivo</small></span>
+          <button class="btn" id="cfgBackup">Descargar</button></div>
+        <div class="cfgrow"><span class="lbl">Importar una copia<small>Reemplaza el contenido de todo el equipo</small></span>
+          <button class="btn danger" id="cfgRestore">Importar…</button></div>
+      </div>
+      <button class="rowbtn" id="cfgClose">Cerrar configuración</button>
+    </div>`;
+    document.getElementById("cfgClose").addEventListener("click",()=>{ cfgAbierta=false; renderConfig(); });
+    const inp=document.getElementById("cfgNombre");
+    const guardarNombre=()=>{ const nuevo=inp.value.trim();
+      if(!nuevo){ note("El nombre no puede quedar vacío."); inp.value=me; return; }
+      if(nuevo===me)return;
+      if(nuevo.includes(" ~ ")){ note('El nombre no puede contener " ~ ".'); inp.value=me; return; }
+      if(allPeople().some(p=>p!==me&&p.toLowerCase()===nuevo.toLowerCase())){ note("Ya hay alguien con ese nombre."); inp.value=me; return; }
+      confirmar(`Vas a pasar a llamarte "${nuevo}" en toda la app, para todo el equipo.`,()=>renombrarme(nuevo),{title:"Cambiar tu nombre",yes:"Cambiar"}); };
+    document.getElementById("cfgNombreOk").addEventListener("click",guardarNombre);
+    inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); guardarNombre(); } });
+    box.querySelectorAll("[data-cfgc]").forEach(b=>b.addEventListener("click",()=>{ const c=b.dataset.cfgc;
+      state.userColors=state.userColors||{}; state.userColors[me]=c;
+      if(saveMember)saveMember({email:miEmail,name:me,color:c}).catch(()=>{});
+      const m=miembroPorEmail(miEmail); if(m)m.color=c;
+      save(); renderActive(); }));
+    document.getElementById("cfgTema").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{
+      const t=b.dataset.t; state.theme=t||null; applyTheme(state.theme); save(); renderActive(); }));
+    document.getElementById("cfgPal").querySelectorAll("[data-p]").forEach(b=>b.addEventListener("click",()=>{
+      state.palette=b.dataset.p; applyPalette(state.palette); save(); renderActive(); }));
+    document.getElementById("cfgBackup").addEventListener("click",descargarRespaldo);
+    document.getElementById("cfgRestore").addEventListener("click",()=>{
+      dialog({title:"Importar respaldo",msg:"Pegá el contenido del archivo de respaldo.",input:true,placeholder:"{ … }",yes:"Importar",cb:t=>{ if(t&&t.trim())importarRespaldo(t.trim()); }}); });
+    const inv=document.getElementById("cfgInvitar");
+    const invitar=()=>{ const v=inv.value.trim(); if(!v)return;
+      if(!inviteEmail){ note("Todavía no se puede invitar desde acá."); return; }
+      inviteEmail(v).then(mail=>{ inv.value=""; note(`Listo. ${mail} ya puede entrar con su correo desde la pantalla de acceso.`,"Persona habilitada"); renderTeamList(); })
+        .catch(err=>note(String(err&&err.message||err),"No se pudo habilitar")); };
+    document.getElementById("cfgInvitarOk").addEventListener("click",invitar);
+    inv.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); invitar(); } });
+    renderTeamList();
+    const ph=document.getElementById("cfgPush"); if(ph&&window.__mesaPushControl)window.__mesaPushControl(ph);
+  }
+  function renderTeamList(){ const t=document.getElementById("cfgTeam"); if(!t)return;
+    t.innerHTML=equipo.length
+      ? equipo.map(m=>`<div class="teamrow">${avatarMarkup(m.name,"av2")}<span class="tinfo"><b>${esc(m.name)}</b><span>${esc(m.email)}</span></span>${m.email===miEmail?'<span class="yo">vos</span>':""}</div>`).join("")
+      : `<div class="empty">Todavía no hay fichas del equipo.</div>`; }
+  // Renombrarse: hay que reescribir el nombre en TODOS lados donde se guardó
+  // como texto, incluidas las dos mitades de cada conversación privada.
+  function renombrarme(nuevo){ const viejo=state.me; if(!viejo||viejo===nuevo)return;
+    const cambia=a=>a.map(x=>x===viejo?nuevo:x);
+    const mueveClave=o=>{ if(o&&o[viejo]!==undefined){ o[nuevo]=o[viejo]; delete o[viejo]; } };
+    state.members=cambia(state.members||[]);
+    if(!state.members.includes(nuevo))state.members.push(nuevo);
+    Object.values(state.nodes).forEach(n=>{ n.encargados=cambia(encsOf(n));
+      (n.items||[]).forEach(k=>{ k.owners=cambia(ownersOf(k)); });
+      filesOf(n).forEach(f=>{ if(f.addedBy===viejo)f.addedBy=nuevo; }); });
+    [state.privTasks,state.myNotes,state.avatars,state.userColors,state.tasksSeen].forEach(mueveClave);
+    (state.events||[]).forEach(ev=>mueveClave(ev.rsvp));
+    // conversaciones privadas: la clave son los dos nombres ordenados
+    const dm=state.chat.dm||{}; const nuevoDm={};
+    Object.keys(dm).forEach(k=>{ const partes=k.split(" ~ ").map(p=>p===viejo?nuevo:p);
+      const nk=partes.sort((a,b)=>a.localeCompare(b)).join(" ~ ");
+      (nuevoDm[nk]=nuevoDm[nk]||[]).push(...(dm[k]||[])); });
+    Object.keys(nuevoDm).forEach(k=>nuevoDm[k].sort((a,b)=>(a.ts||0)-(b.ts||0)));
+    state.chat.dm=nuevoDm;
+    Object.values(state.chat.groups||{}).forEach(g=>{ g.members=cambia(g.members||[]); if(g.by===viejo)g.by=nuevo;
+      (g.msgs||[]).forEach(m=>{ if(m.from===viejo)m.from=nuevo; }); });
+    (state.chat.team||[]).forEach(m=>{ if(m.from===viejo)m.from=nuevo; });
+    if(state.taskFilters)state.taskFilters.people=cambia(state.taskFilters.people||[]);
+    const m=miembroPorEmail(miEmail); if(m)m.name=nuevo;
+    state.me=nuevo;
+    if(saveMember)saveMember({email:miEmail,name:nuevo}).catch(()=>{});
+    save(); refreshChrome(); renderActive(); note(`Ahora sos "${nuevo}" para todo el equipo.`,"Nombre actualizado"); }
   function renderMyNotes(){ const box=document.getElementById("myNotes"); if(!box)return; const me=state.me;
     if(document.activeElement&&document.activeElement.id==="myNotesArea")return;
     if(!me){ box.innerHTML=""; return; }
@@ -808,10 +960,13 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
     // el panel muestra SIEMPRE todo lo tuyo salvo que vos filtres acá mismo
     if(!Array.isArray(state.panelFilter))state.panelFilter=[];
     const pf=state.panelFilter;
-    const groups=STORD.filter(s=>!pf.length||pf.includes(s)).map(s=>({s,arr:allMine.filter(x=>x.k.status===s)})).filter(g=>g.arr.length);
-    const allPriv=privL(me).filter(k=>!k.archived); const privs=pf.length?allPriv.filter(k=>pf.includes(k.status)):allPriv;
-    const filtBtn=`<div class="fdrop" id="panelFilt"><button class="${pf.length?"act":""}">Filtrar${pf.length?`<span class="cnum">${pf.length}</span>`:""}<span class="car">▼</span></button><div class="fmenu">`
-      +STORD.map(s=>`<label class="fopt"><input type="checkbox" data-pf="${s}"${pf.includes(s)?" checked":""}><span class="sd" style="background:${cssv(STATUS[s].v)}"></span><span class="lbl">${STATUS[s].l}</span></label>`).join("")
+    // El filtro del panel es por PRIORIDAD: el estado ya se ve en los grupos.
+    const pasa=k=>!pf.length||pf.includes(k.prio||"__none");
+    const groups=STORD.map(s=>({s,arr:allMine.filter(x=>x.k.status===s&&pasa(x.k))})).filter(g=>g.arr.length);
+    const allPriv=privL(me).filter(k=>!k.archived); const privs=allPriv.filter(pasa);
+    const filtBtn=`<div class="fdrop" id="panelFilt"><button class="${pf.length?"act":""}">Prioridad${pf.length?`<span class="cnum">${pf.length}</span>`:""}<span class="car">▼</span></button><div class="fmenu">`
+      +PRORD.map(p=>`<label class="fopt"><input type="checkbox" data-pf="${p}"${pf.includes(p)?" checked":""}><span class="sd" style="background:${cssv(PRIO[p].v)}"></span><span class="lbl">${PRIO[p].l}</span></label>`).join("")
+      +`<label class="fopt"><input type="checkbox" data-pf="__none"${pf.includes("__none")?" checked":""}><span class="sd" style="background:${cssv("--ink-faint")}"></span><span class="lbl">Sin prioridad</span></label>`
       +(pf.length?`<button class="fclear">Ver todas</button>`:"")+`</div></div>`;
     box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">🔒 ＋ tarea privada</button>${filtBtn}</span></div>`+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>🔒 Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
@@ -880,7 +1035,7 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
     if(!k)return; selTaskNode=nodeId; selTaskId=taskId; taskOpen=true;
     // al abrirla deja de contar como "nueva" para vos
     if(state.me&&ownersOf(k).includes(state.me)){ state.tasksSeen=state.tasksSeen||{};
-      const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); } }
+      const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); updateAvisos(); } }
     drawer.classList.remove("on"); panelOpen=false;
     tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
@@ -930,11 +1085,26 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   pCtx.addEventListener("change",()=>renderActive());
   document.getElementById("enterBtn").addEventListener("click",()=>{ if(selId){ showTab("mapa"); focusNode(selId); } });
   document.getElementById("addSub").addEventListener("click",()=>{ if(selId)addSubTo(selId); });
-  document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; n.items=n.items||[]; const k=newTask(); n.items.push(k); save(); openTask(n.id,k.id); });
+  document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; closePanel(); openNewTask({nodeId:n.id}); });
   document.getElementById("delNode").addEventListener("click",()=>{ const n=N(selId); if(!n)return; if(n.kind==="project"&&state.roots.length<=1){ note("Tiene que quedar al menos un proyecto."); return; }
-    confirmar(`Se elimina "${n.name}" con todos sus sub-temas y tareas. No se puede deshacer.`,()=>{
+    const a=agg(n); const cuantas=a.ic, cuantos=a.nc;
+    const detalle=[cuantos?`${cuantos} sub-tema${cuantos===1?"":"s"}`:"",cuantas?`${cuantas} tarea${cuantas===1?"":"s"}`:""].filter(Boolean).join(" y ");
+    confirmar(`Se elimina "${n.name}"${detalle?` con ${detalle}`:""}. Vas a poder deshacerlo por unos segundos.`,()=>{
+      // Se guarda el subárbol completo para poder reponerlo tal cual estaba.
+      const copia={}; const juntar=id=>{ const x=N(id); if(!x)return; copia[id]=JSON.parse(JSON.stringify(x)); (x.children||[]).forEach(juntar); };
+      juntar(n.id);
+      const padre=N(n.parent); const posicion=padre?padre.children.indexOf(n.id):state.roots.indexOf(n.id);
       const rm=id=>{ const x=N(id); if(!x)return; (x.children||[]).slice().forEach(rm); (x.links||[]).slice().forEach(l=>removeLink(id,l)); const par=N(x.parent); if(par)par.children=par.children.filter(c=>c!==id); state.roots=state.roots.filter(r=>r!==id); delete state.nodes[id]; off.delete(id); };
-      rm(n.id); selId=null; save(); closePanel(); renderActive(); },{title:"Eliminar tema",yes:"Eliminar",danger:true}); });
+      rm(n.id); selId=null; save(); closePanel(); renderActive();
+      ofrecerDeshacer(`Se eliminó <b>${esc(n.name)}</b>`,()=>{
+        Object.keys(copia).forEach(id=>{ state.nodes[id]=copia[id]; });
+        // los vínculos se reponen en ambos sentidos, si el otro extremo sigue existiendo
+        Object.values(copia).forEach(x=>{ (x.links||[]).forEach(l=>{ const o=N(l); if(o&&!(o.links||[]).includes(x.id))(o.links=o.links||[]).push(x.id); }); });
+        const p=N(copia[n.id].parent);
+        if(p){ if(!p.children.includes(n.id))p.children.splice(posicion<0?p.children.length:posicion,0,n.id); }
+        else if(!state.roots.includes(n.id))state.roots.splice(posicion<0?state.roots.length:posicion,0,n.id);
+      });
+    },{title:"Eliminar tema",yes:"Eliminar",danger:true}); });
   document.getElementById("closePanel").addEventListener("click",closePanel);
   scrim.addEventListener("click",()=>{ closePanel(); closeTask(); });
   document.getElementById("closeTask").addEventListener("click",closeTask);
@@ -947,7 +1117,16 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   tDue.addEventListener("change",()=>{ const k=curTask(); if(k){k.due=tDue.value;save();renderActive();} });
   tObj.addEventListener("input",()=>{ const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
   tNotas.addEventListener("input",()=>{ const k=curTask(); if(k){k.notas=tNotas.value;save();} });
-  document.getElementById("tDel").addEventListener("click",()=>{ if(isPriv()){ const arr=privList(); if(!arr){ note("Elegí quién sos para poder borrarla."); return; } const i=arr.findIndex(x=>x.id===selTaskId); if(i<0){ note("Esa tarea ya no existe."); closeTask(); renderActive(); return; } arr.splice(i,1); } else { const nd=N(selTaskNode); if(!nd)return; nd.items=(nd.items||[]).filter(x=>x.id!==selTaskId); } save(); closeTask(); renderActive(); });
+  document.getElementById("tDel").addEventListener("click",()=>{ const k=curTask(); if(!k)return;
+    const titulo=k.title||"Tarea"; const copia=JSON.parse(JSON.stringify(k)); const nodoId=selTaskNode;
+    if(isPriv()){ const arr=privList(); if(!arr){ note("No pudimos identificarte para borrarla."); return; }
+      const i=arr.findIndex(x=>x.id===selTaskId); if(i<0){ note("Esa tarea ya no existe."); closeTask(); renderActive(); return; }
+      arr.splice(i,1); save(); closeTask(); renderActive();
+      ofrecerDeshacer(`Se eliminó <b>${esc(titulo)}</b>`,()=>{ const a=privList(); if(a)a.splice(Math.min(i,a.length),0,copia); });
+    } else { const nd=N(nodoId); if(!nd)return; const i=(nd.items||[]).findIndex(x=>x.id===selTaskId);
+      nd.items=(nd.items||[]).filter(x=>x.id!==selTaskId); save(); closeTask(); renderActive();
+      ofrecerDeshacer(`Se eliminó <b>${esc(titulo)}</b>`,()=>{ const n2=N(nodoId); if(!n2){ note("El tema donde estaba ya no existe."); return; } n2.items=n2.items||[]; n2.items.splice(i<0?n2.items.length:Math.min(i,n2.items.length),0,copia); });
+    } });
   const picker=document.getElementById("picker"),pickSearch=document.getElementById("pickSearch"),pickList=document.getElementById("pickList");
   document.getElementById("addLink").addEventListener("click",()=>{ picker.classList.toggle("on"); if(picker.classList.contains("on")){pickSearch.value="";renderPick("");pickSearch.focus();} });
   pickSearch.addEventListener("input",()=>renderPick(pickSearch.value));
@@ -966,10 +1145,14 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
       else { const pad="　".repeat(depth-2)+(depth>2?"› ":""); out.push(`<option value="${n.id}"${n.id===sel?" selected":""}>${esc(pad+n.name)}</option>`); }
       (n.children||[]).forEach(c=>walk(c,depth+1)); };
     state.roots.forEach(r=>walk(r,1)); return out.join(""); }
-  function openNewTask(priv){ const f=tfil();
-    if(priv===true&&!state.me){ note('Primero elegí quién sos en el campo "Sos" (arriba) para tener tareas privadas.'); return; }
+  // Único camino para crear una tarea. Antes había tres, y dos creaban una
+  // tarea vacía al instante: si cerrabas sin escribir, quedaba una tarjeta
+  // llamada "Tarea" para siempre.
+  function openNewTask(opts){ const f=tfil(); const o=(opts===true)?{priv:true}:(opts||{});
+    const priv=o.priv===true;
+    if(priv&&!state.me){ note("No pudimos identificarte para crear una tarea privada."); return; }
     document.getElementById("ntTitle").value="";
-    const preT=priv===true?"__priv":(f.temas.length===1?f.temas[0]:(N(state.estFocus)?state.estFocus:""));
+    const preT=priv?"__priv":(o.nodeId&&N(o.nodeId)?o.nodeId:(f.temas.length===1?f.temas[0]:(N(state.estFocus)?state.estFocus:"")));
     document.getElementById("ntNode").innerHTML=nodeOptionsHTML(preT);
     const preP=(f.people.length===1&&f.people[0]!=="__none")?f.people[0]:(state.me||"");
     ntOwnersArr=preP?[preP]:[]; renderNtOwners();
@@ -1007,7 +1190,9 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   document.getElementById("taskSearch").addEventListener("input",e=>{ taskQuery=e.target.value; renderTareas(); });
   document.getElementById("estSearch").addEventListener("input",e=>{ estQuery=e.target.value; renderEstructura(); });
   document.getElementById("estSearchClear").addEventListener("click",()=>{ estQuery=""; document.getElementById("estSearch").value=""; renderEstructura(); });
-  document.getElementById("newTaskBtn").addEventListener("click",openNewTask);
+  document.getElementById("estViewSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return;
+    state.estView=b.dataset.v; save(); renderEstructuraTab(); });
+  document.getElementById("newTaskBtn").addEventListener("click",()=>openNewTask());
   document.getElementById("ntCancel").addEventListener("click",closeNT);
   document.getElementById("ntCreate").addEventListener("click",createNT);
   document.getElementById("ntTitle").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); createNT(); } });
@@ -1021,34 +1206,69 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg(); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });
   // cambiar de identidad afecta panel, chat, privadas y archivo: hay que refrescar todo y soltar lo que estaba abierto
-  meSel.addEventListener("change",()=>{ state.me=meSel.value;
-    if(taskOpen)closeTask(); if(panelOpen)closePanel();
-    closeAsk(); closeNT(); closeFM(); closeGM(); closeEv();
-    save(); refreshChrome(); renderActive(); updateChatBadge(); });
+  // ---------- avisos (campanita) ----------
+  // Las tareas que te asignaron y todavía no abriste. Se calcula acá, no se guarda:
+  // así el contador es de este dispositivo y no le escribe nada al equipo.
+  function pendientes(){ const me=state.me; if(!me)return [];
+    const vistas=new Set((state.tasksSeen||{})[me]||[]);
+    return activeItems().filter(x=>ownersOf(x.k).includes(me)&&!vistas.has(x.k.id)); }
+  function updateAvisos(){ const b=document.getElementById("avisosBadge"); if(!b)return;
+    const n=pendientes().length; if(n>0){ b.textContent=n>9?"9+":n; b.hidden=false; } else b.hidden=true; }
+  function renderAvisos(){ const box=document.getElementById("avisosMenu"); if(!box)return;
+    const ps=pendientes();
+    box.innerHTML=ps.length
+      ? ps.slice(0,12).map(x=>`<div class="aviso" data-av="${x.node.id}|${x.k.id}"><span class="sd" style="background:${cssv(STATUS[x.k.status].v)}"></span><span class="at"><b>${esc(x.k.title||"Tarea")}</b><span>${esc(pathOf(x.node.id).map(z=>z.name).slice(-1)[0]||"")}</span></span></div>`).join("")
+        +(ps.length>12?`<div class="empty">…y ${ps.length-12} más</div>`:"")
+        +`<button class="fclear" id="avisosOk">Marcar todo como visto</button>`
+      : `<div class="empty">No tenés tareas nuevas.</div>`;
+    box.querySelectorAll("[data-av]").forEach(el=>el.addEventListener("click",()=>{ const [nid,iid]=el.dataset.av.split("|"); box.classList.remove("on"); openTask(nid,iid); }));
+    const ok=document.getElementById("avisosOk");
+    if(ok)ok.addEventListener("click",()=>{ const me=state.me; if(!me)return; state.tasksSeen=state.tasksSeen||{};
+      state.tasksSeen[me]=activeItems().filter(x=>ownersOf(x.k).includes(me)).map(x=>x.k.id);
+      save(); box.classList.remove("on"); updateAvisos(); if(active==="panel")renderPanel(); }); }
   function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
   // Paleta de fondo, aparte del claro/oscuro: cada una define sus tonos en ambos modos.
   const PALETAS={bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
   function applyPalette(p){ if(p&&PALETAS[p])document.documentElement.setAttribute("data-palette",p); else document.documentElement.removeAttribute("data-palette"); }
+  document.getElementById("avisosBtn").addEventListener("click",e=>{ e.stopPropagation();
+    const m=document.getElementById("avisosMenu");
+    if(m.classList.contains("on")){ m.classList.remove("on"); return; }
+    renderAvisos(); m.classList.add("on"); });
+  // Cerrar al tocar fuera. Se mira dónde cayó el clic en vez de confiar en
+  // detener la propagación, que es frágil cuando hay varios menús.
+  document.addEventListener("click",e=>{ if(e.target.closest&&e.target.closest(".avisos"))return;
+    const m=document.getElementById("avisosMenu"); if(m)m.classList.remove("on"); });
   document.getElementById("themeBtn").addEventListener("click",()=>{ let cur=document.documentElement.getAttribute("data-theme");
     if(!cur)cur=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; // sin esto, el 1er clic no hacía nada
     const next=cur==="dark"?"light":"dark"; state.theme=next; applyTheme(next); save(); renderActive(); });
-  const modal=document.getElementById("modal"),jsonArea=document.getElementById("jsonArea");
-  document.getElementById("openData").addEventListener("click",()=>{ jsonArea.value=JSON.stringify(state,null,2); modal.classList.add("on"); });
-  function closeModal(){ modal.classList.remove("on"); }
-  document.getElementById("closeModal").addEventListener("click",closeModal);
-  modal.addEventListener("click",e=>{ if(e.target===modal)closeModal(); });
-  document.getElementById("copyJson").addEventListener("click",async()=>{ try{await navigator.clipboard.writeText(jsonArea.value);}catch(e){jsonArea.select();document.execCommand("copy");} flashBtn("copyJson","¡Copiado!"); });
-  document.getElementById("loadJson").addEventListener("click",()=>{ try{ const d=JSON.parse(jsonArea.value);
-    if(!d||typeof d!=="object"||!d.nodes||typeof d.nodes!=="object")throw 0;
+  // Respaldo e importación: viven en Configuración, no en un botón de la barra.
+  // El volcado del estado completo salía en pantalla y exponía datos de todos.
+  function descargarRespaldo(){
+    const data=JSON.stringify(stripShared(state),null,2);
+    const fecha=new Date().toISOString().slice(0,10);
+    try{ const b=new Blob([data],{type:"application/json"}); const a=document.createElement("a");
+      a.href=URL.createObjectURL(b); a.download=`mesa-de-trabajo-${fecha}.json`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+    catch(e){ note("No se pudo descargar el respaldo."); }
+  }
+  function importarRespaldo(texto){
+    let d; try{ d=JSON.parse(texto); }catch(e){ note("Ese texto no es un respaldo válido."); return; }
+    if(!d||typeof d!=="object"||!d.nodes||typeof d.nodes!=="object"){ note("Ese respaldo no tiene el árbol de temas."); return; }
     if(!Array.isArray(d.roots))d.roots=Object.values(d.nodes).filter(n=>n&&!n.parent).map(n=>n.id);
-    d.roots=d.roots.filter(r=>d.nodes[r]); if(!d.roots.length)throw 0;   // sin raíces la app queda inutilizable
-    state=normalize(d); if(typeof state.seq!=="number")state.seq=9999; applyTheme(state.theme||null); selId=null; off.clear(); treeOpen.clear(); closePops(); cam._init=0; save(); renderActive(); if(active==="mapa"){fit();cam._init=1;} closeModal(); }catch(e){ note("Ese texto no es un respaldo válido."); } });
-  document.getElementById("dlJson").addEventListener("click",async()=>{ const data=JSON.stringify(state,null,2),fname="mesa-bosques.json"; if(window.claude&&window.claude.downloads){ try{ await window.claude.downloads.save({filename:fname,data}); flashBtn("dlJson","Descargado"); return; }catch(err){ if(err&&err.code==="declined")return; } } try{ const b=new Blob([data],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }catch(e){ note("No se pudo descargar. Usá el botón Copiar."); } });
-  document.getElementById("resetDemo").addEventListener("click",()=>{ closeModal(); confirmar("Se reemplaza TODO el contenido actual por los datos de ejemplo. Se pierde lo que hayan cargado.",()=>{ state=normalize(demo()); applyTheme(null); selId=null; off.clear(); treeOpen.clear(); cam._init=0; save(); renderActive(); fit(); cam._init=1; },{title:"Volver al ejemplo",yes:"Reemplazar todo",danger:true}); });
+    d.roots=d.roots.filter(r=>d.nodes[r]);
+    if(!d.roots.length){ note("Ese respaldo no tiene ningún proyecto."); return; }
+    confirmar("Se reemplaza el contenido de TODO el equipo por el del respaldo. No se puede deshacer.",()=>{
+      const prefs=loadLocalPrefs();
+      state=normalize(Object.assign(d,prefs));
+      if(typeof state.seq!=="number")state.seq=9999;
+      selId=null; off.clear(); treeOpen.clear(); closePops(); cam._init=0;
+      save(); refreshChrome(); renderActive();
+    },{title:"Importar respaldo",yes:"Reemplazar todo",danger:true});
+  }
   function flashBtn(id,t){ const b=document.getElementById(id); const o=b.textContent; b.textContent=t; setTimeout(()=>b.textContent=o,1200); }
   let toastT; const toastEl=document.getElementById("toast");
   function toast(m){ toastEl.textContent=m; toastEl.classList.remove("hide"); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.add("hide"),2600); }
-  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("askModal").classList.contains("on")){closeAsk();return;} if(document.getElementById("fileModal").classList.contains("on")){closeFM();return;} if(document.getElementById("groupModal").classList.contains("on")){closeGM();return;} if(ntModal.classList.contains("on")){closeNT();return;} if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(taskOpen){closeTask();return;} if(panelOpen){closePanel();return;} if(modal.classList.contains("on")){closeModal();return;} });
+  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("askModal").classList.contains("on")){closeAsk();return;} if(document.getElementById("fileModal").classList.contains("on")){closeFM();return;} if(document.getElementById("groupModal").classList.contains("on")){closeGM();return;} if(ntModal.classList.contains("on")){closeNT();return;} if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(taskOpen){closeTask();return;} if(panelOpen){closePanel();return;} });
 
   const dl=document.createElement("datalist"); dl.id="peopleList"; document.body.appendChild(dl);
   function syncPeopleList(){ dl.innerHTML=allPeople().map(p=>`<option value="${esc(p)}">`).join(""); }
@@ -1059,6 +1279,9 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   { const prefs=loadLocalPrefs();
     state=normalize(Object.assign(seed?seed:demo(),prefs)); }
   if(typeof state.seq!=="number")state.seq=9999; if(!state.edgeMeta)state.edgeMeta={};
+  // La identidad la manda la sesión: no se elige a mano, así nadie puede
+  // hacerse pasar por otro ni quedar con un nombre que ya no existe.
+  if(yo&&yo.name)state.me=yo.name;
   mountPrivate(priv);
   migrarMisPrivados(priv);
   applyTheme(state.theme||null); applyPalette(state.palette||null);
@@ -1067,6 +1290,12 @@ export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
   if(!seed) save();                                // base vacía: sembrar
   active=state.tab||"panel"; if(active==="personal")active="panel"; if(active==="mapa")active="estructura"; showTab(active);
   window.addEventListener("resize",()=>{ if(active==="mapa"||active==="estructura")applyCam(); });
+
+  // Si llegaste desde una notificación, abrimos esa tarea directamente.
+  try{ const q=new URLSearchParams(window.location.search); const tid=q.get("tarea");
+    if(tid){ const hit=allItems().find(x=>x.k.id===tid);
+      if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }
+      history.replaceState(null,"",window.location.pathname); } }catch(e){}
 
   return { applyRemoteState, applyPrivateState };
 }

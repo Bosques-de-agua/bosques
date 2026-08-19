@@ -2,6 +2,7 @@ import "./style.css";
 import { supabase } from "./supabaseClient.js";
 import { fetchRemoteState, pushRemoteState, subscribeRemoteState } from "./sync.js";
 import { fetchPrivateState, pushPrivateState } from "./private.js";
+import { fetchTeam, upsertMe, inviteEmail } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
 
@@ -71,6 +72,27 @@ async function launchApp(session) {
     console.error("No se pudieron leer tus datos privados:", err);
   }
 
+  // Quién sos sale del correo con el que entraste, no de un selector.
+  // Si es tu primera vez, se crea tu ficha con la parte antes del @.
+  let team = [];
+  try {
+    team = await fetchTeam();
+  } catch (err) {
+    console.error("No se pudo leer el equipo:", err);
+  }
+  let yo = team.find((m) => m.email === email) || null;
+  if (!yo) {
+    const nombre = email.split("@")[0].replace(/[._-]+/g, " ").trim() || email;
+    yo = { email, name: nombre.charAt(0).toUpperCase() + nombre.slice(1) };
+    try {
+      await upsertMe(yo);
+      team = await fetchTeam();
+      yo = team.find((m) => m.email === email) || yo;
+    } catch (err) {
+      console.error("No se pudo crear tu ficha de equipo:", err);
+    }
+  }
+
   showApp();
   addSignOutPill(email);
   initPush();
@@ -78,6 +100,11 @@ async function launchApp(session) {
   const app = startApp({
     seed,
     priv,
+    yo,
+    team,
+    saveMember: upsertMe,
+    inviteEmail,
+    refreshTeam: fetchTeam,
     pushRemoteState,
     pushPrivateState: (data) => pushPrivateState(email, data),
   });

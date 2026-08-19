@@ -108,3 +108,54 @@ create policy "own private update" on user_private
 
 -- A propósito NO se agrega a supabase_realtime: sincronizar al abrir alcanza
 -- para datos personales, y es una superficie menos donde equivocarse con permisos.
+
+-- 7) El equipo: quién es quién, y quién puede entrar.
+--    Reemplaza la lista de nombres que vivía dentro del estado compartido.
+--    La identidad se ata al EMAIL de la sesión, no a un nombre elegido a mano:
+--    así nadie puede hacerse pasar por otro y renombrarse no rompe nada.
+create table if not exists team_members (
+  email      text primary key,
+  name       text not null,
+  color      text,
+  avatar     text,                          -- foto recortada, en base64
+  created_at timestamptz not null default now()
+);
+
+alter table team_members enable row level security;
+
+-- Todo el equipo se ve entre sí (necesario para asignar tareas y chatear).
+drop policy if exists "team reads members" on team_members;
+create policy "team reads members" on team_members
+  for select using (is_allowed());
+
+-- Cada quien crea y edita SOLO su propia ficha (su nombre, su color, su foto).
+drop policy if exists "own member insert" on team_members;
+create policy "own member insert" on team_members
+  for insert with check (is_allowed() and email = auth.jwt() ->> 'email');
+
+drop policy if exists "own member update" on team_members;
+create policy "own member update" on team_members
+  for update using (is_allowed() and email = auth.jwt() ->> 'email')
+        with check (is_allowed() and email = auth.jwt() ->> 'email');
+
+-- 8) Sumar gente nueva desde la app.
+--    allowed_emails no tenía políticas, así que habilitar a alguien exigía
+--    entrar al panel de Supabase. Ahora el equipo puede hacerlo desde adentro.
+drop policy if exists "team reads allowed" on allowed_emails;
+create policy "team reads allowed" on allowed_emails
+  for select using (is_allowed());
+
+drop policy if exists "team invites" on allowed_emails;
+create policy "team invites" on allowed_emails
+  for insert with check (is_allowed());
+
+-- Nadie puede quitar a otro por accidente desde la app: dar de baja se hace
+-- desde el panel de Supabase, a propósito.
+
+-- 9) Sembrar la ficha de los cuatro que ya estaban, con sus nombres actuales.
+insert into team_members (email, name) values
+  ('nicomoner@gmail.com',    'Nico'),
+  ('juanpmoretto@gmail.com', 'Juanpi'),
+  ('lucasriachi@gmail.com',  'Lucas'),
+  ('juanhumus@gmail.com',    'Juanso')
+on conflict (email) do nothing;
