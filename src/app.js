@@ -1,17 +1,33 @@
-const LOCAL_KEYS=["me","theme","tab","estProj","estFocus"];
+// Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
+// Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
+// aparecería al resto (y además haría escribir la base sin necesidad).
+const LOCAL_KEYS=["me","theme","palette","tab","estProj","estFocus","estView","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
+// Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
+const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
-function loadLocalPrefs(){ try{ const r=localStorage.getItem(PREFS_KEY); if(r)return JSON.parse(r); }catch(e){} return {}; }
-function saveLocalPrefs(state){ try{ localStorage.setItem(PREFS_KEY,JSON.stringify({me:state.me,theme:state.theme,tab:state.tab,estProj:state.estProj,estFocus:state.estFocus})); }catch(e){} }
-function stripLocal(state){ const o=Object.assign({},state); LOCAL_KEYS.forEach(k=>delete o[k]); return o; }
 
-export function startApp({ seed, pushRemoteState }){
-  const K4="mesa-bosques-v5";
-  const DAY=86400000, ARCH_DAYS=10;
-  const STATUS={curso:{l:"En curso",v:"--s-curso"},espera:{l:"En espera",v:"--s-espera"},sin:{l:"Sin empezar",v:"--s-sin"},listo:{l:"Terminado",v:"--s-listo"},bloq:{l:"Bloqueado",v:"--s-bloq"}};
-  const STORD=["sin","curso","espera","bloq","listo"];
+function loadLocalPrefs(){
+  try{ const raw=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}"); const o={};
+    LOCAL_KEYS.forEach(k=>{ if(k in raw)o[k]=raw[k]; }); return o; }
+  catch(e){ return {}; }
+}
+function saveLocalPrefs(state){
+  try{ const o={}; LOCAL_KEYS.forEach(k=>{ if(state[k]!==undefined)o[k]=state[k]; });
+    localStorage.setItem(PREFS_KEY,JSON.stringify(o)); }catch(e){}
+}
+function stripLocal(state){ const o=Object.assign({},state); LOCAL_KEYS.forEach(k=>delete o[k]); return o; }
+function stripShared(state){ const o=stripLocal(state); PRIV_KEYS.forEach(k=>delete o[k]); return o; }
+
+export function startApp({ seed, priv, pushRemoteState, pushPrivateState }){
+  const DAY=86400000, ARCH_DAYS=7;
+  const STATUS={curso:{l:"En curso",v:"--s-curso"},espera:{l:"En espera",v:"--s-espera"},sin:{l:"Sin empezar",v:"--s-sin"},listo:{l:"Terminado",v:"--s-listo"}};
+  const STORD=["sin","curso","espera","listo"];
   const PRIO={alta:{l:"Alta",v:"--p-alta"},media:{l:"Media",v:"--p-media"},baja:{l:"Baja",v:"--p-baja"}};
+  const PRORD=["alta","media","baja"]; // la prioridad es opcional: "" = sin prioridad
+  const prioOf=k=>PRIO[k.prio]||null;
   const LVL=["--l1","--l2","--l3","--l4","--l5","--l6"];
-  const AV=["#3f9d6b","#4a86c4","#d19a34","#7a5aa8","#c15b46","#2f9e8a","#c9902f","#5f83a3"];
+  // personas: familia violeta/magenta, aparte de estados (azul/verde/amarillo), jerarquía (teal) y prioridad (rojo)
+  const AV=["#7b5ea7","#b0559b","#6d54b5","#a9628f","#8a6cc4","#c06a9b","#5a4a8c","#94577d"];
   const OX=3000,OY=2000;
 
   let state=null, active="mapa", selId=null, cam={tx:0,ty:0,s:1}, linking=false, linkSrc=null, editing=false, taskGroup="estado", cal={y:null,m:null};
@@ -19,11 +35,17 @@ export function startApp({ seed, pushRemoteState }){
   let dragTask=null, dragCard=null, colClickTimer=null, chatChan="team";
 
   const N=id=>state.nodes[id];
-  function uid(){ return "n"+(state.seq++).toString(36); }
+  // id único de verdad: un contador compartido genera choques apenas dos personas creen algo a la vez
+  function uid(){ state.seq=(state.seq||0)+1;
+    try{ if(crypto&&crypto.randomUUID)return crypto.randomUUID().slice(0,12); }catch(e){}
+    return "n"+state.seq.toString(36)+Math.floor(Math.random()*1e6).toString(36); }
   const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim()||"#888";
   const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const initials=n=>{ if(!n)return"?"; const p=n.trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); };
-  const avColor=n=>{ let h=0; for(const c of (n||"")) h=(h*31+c.charCodeAt(0))>>>0; return AV[h%AV.length]; };
+  const avColor=n=>{ const c=state&&state.userColors&&state.userColors[n]; if(c)return c;
+    let h=0; for(const ch of (n||"")) h=(h*31+ch.charCodeAt(0))>>>0; return AV[h%AV.length]; };
+  function avatarMarkup(name,cls,withTitle){ const t=withTitle?` title="${esc(name)}"`:""; const ph=(state&&state.avatars)?state.avatars[name]:null; if(ph)return `<span class="${cls} hasimg" style="background-image:url('${ph}')"${t}></span>`; return `<span class="${cls}" style="background:${avColor(name)}"${t}>${esc(initials(name))}</span>`; }
+  function loadAvatar(file,cb){ const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>{ const S=80,c=document.createElement("canvas"); c.width=S;c.height=S; const x=c.getContext("2d"); const m=Math.min(img.width,img.height); x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S); cb(c.toDataURL("image/jpeg",0.82)); }; img.src=r.result; }; r.readAsDataURL(file); }
   function depthOf(n){ let d=1,x=n; while(x&&x.parent){ d++; x=N(x.parent); } return d; }
   function accentOf(node){ if(node.hue!=null) return `hsl(${node.hue} 45% 52%)`; return cssv(LVL[Math.min(depthOf(node),LVL.length)-1]); }
   function baseSize(node){ const d=depthOf(node); const b=d===1?172:d===2?150:d===3?116:d===4?100:88; return Math.round(b*(node.scale||1)); }
@@ -32,17 +54,60 @@ export function startApp({ seed, pushRemoteState }){
   function keyFor(a,b){ return a<b?a+"|"+b:b+"|"+a; }
   function EM(){ return state.edgeMeta||(state.edgeMeta={}); }
   function setEdgeMeta(k,o){ const e=EM(); e[k]=Object.assign({},e[k],o); }
+  function ownersOf(k){ if(!Array.isArray(k.owners)) k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; return k.owners; }
+  function encsOf(n){ if(!Array.isArray(n.encargados)) n.encargados=(n.encargado&&String(n.encargado).trim())?[String(n.encargado).trim()]:[]; return n.encargados; }
+  const peopleLabel=a=>a.join(", ");
   function agg(node){ let nc=0,ic=0,dc=0; const owners=new Set(),st=new Set();
-    if(node.encargado)owners.add(node.encargado.trim());
-    (node.items||[]).forEach(k=>{ if(k.archived)return; ic++; if(k.owner)owners.add(k.owner.trim()); st.add(k.status); if(k.done)dc++; });
+    encsOf(node).forEach(o=>owners.add(o));
+    (node.items||[]).forEach(k=>{ if(k.archived)return; ic++; ownersOf(k).forEach(o=>owners.add(o)); st.add(k.status); if(k.done)dc++; });
     (node.children||[]).forEach(cid=>{ const c=N(cid); if(!c)return; nc++; const a=agg(c); nc+=a.nc; ic+=a.ic; dc+=a.dc; a.owners.forEach(o=>owners.add(o)); a.st.forEach(s=>st.add(s)); });
     return {nc,ic,dc,owners,st}; }
+  // diálogos propios: en el visor de artifacts confirm/alert/prompt están bloqueados
+  let askCb=null;
+  function dialog(o){ const m=document.getElementById("askModal");
+    document.getElementById("askTitle").textContent=o.title||"Confirmar";
+    document.getElementById("askMsg").textContent=o.msg||"";
+    const inp=document.getElementById("askInput");
+    if(o.input){ inp.style.display=""; inp.placeholder=o.placeholder||""; inp.value=o.value||""; } else inp.style.display="none";
+    const no=document.getElementById("askNo"); no.style.display=o.onlyOk?"none":""; no.textContent=o.no||"Cancelar";
+    const yes=document.getElementById("askYes"); yes.textContent=o.yes||(o.onlyOk?"Entendido":"Sí"); yes.classList.toggle("danger",!!o.danger);
+    askCb=o.cb||null; m.classList.add("on"); if(o.input)setTimeout(()=>inp.focus(),40); else setTimeout(()=>yes.focus(),40); }
+  function closeAsk(){ document.getElementById("askModal").classList.remove("on"); askCb=null; }
+  function note(msg,title){ dialog({title:title||"Aviso",msg,onlyOk:true}); }
+  function confirmar(msg,cb,o){ dialog(Object.assign({title:"¿Confirmás?",msg,yes:"Sí, dale",cb:()=>cb()},o||{})); }
+  function pedirTexto(title,placeholder,cb){ dialog({title,msg:"",input:true,placeholder,yes:"Agregar",cb:v=>{ if(v&&v.trim())cb(v.trim()); }}); }
+  // ---------- archivos de Drive (vínculos, no copias) ----------
+  const FKIND={doc:{i:"📄",l:"Documento"},sheet:{i:"📊",l:"Hoja de cálculo"},slides:{i:"📽️",l:"Presentación"},form:{i:"📋",l:"Formulario"},folder:{i:"📁",l:"Carpeta"},pdf:{i:"📕",l:"PDF"},file:{i:"📎",l:"Archivo"},link:{i:"🔗",l:"Link"}};
+  function kindOfUrl(u){ const s=String(u||"").toLowerCase();
+    if(s.includes("docs.google.com/document"))return "doc";
+    if(s.includes("docs.google.com/spreadsheets"))return "sheet";
+    if(s.includes("docs.google.com/presentation"))return "slides";
+    if(s.includes("docs.google.com/forms"))return "form";
+    if(s.includes("drive.google.com/drive/folders")||s.includes("drive.google.com/drive/u/")&&s.includes("/folders/"))return "folder";
+    if(s.endsWith(".pdf"))return "pdf";
+    if(s.includes("drive.google.com"))return "file";
+    return "link"; }
+  function filesOf(o){ if(!Array.isArray(o.files))o.files=[]; return o.files; }
+  function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
+    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${onDel?`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
+  function renderFileList(el,owner,after){ const fs=filesOf(owner);
+    el.innerHTML=fs.length?fs.map(f=>fileRow(f,true)).join(""):`<div class="empty">Sin archivos. Pegá el link de Drive con "＋ archivo de Drive".</div>`;
+    el.querySelectorAll("[data-delf]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.delf;
+      confirmar("Se saca el link de acá. El archivo sigue intacto en Drive.",()=>{ owner.files=filesOf(owner).filter(f=>f.id!==id); save(); if(after)after(); },{title:"Desvincular archivo",yes:"Desvincular"}); })); }
+  function allFiles(){ const out=[];
+    // incluye las tareas archivadas: el archivo sigue siendo del tema aunque la tarea ya esté hecha
+    Object.values(state.nodes).forEach(n=>{ filesOf(n).forEach(f=>out.push({f,node:n,task:null}));
+      (n.items||[]).forEach(k=>{ filesOf(k).forEach(f=>out.push({f,node:n,task:k,archived:!!k.archived})); }); });
+    return out; }
+  function privList(who){ if(!state.privTasks)state.privTasks={}; const w=who||state.me; if(!w)return null; return state.privTasks[w]||(state.privTasks[w]=[]); }
+  const privL=who=>privList(who)||[];   // para leer sin riesgo de escribir en un array descartable
   function allItems(){ const out=[]; Object.values(state.nodes).forEach(n=>(n.items||[]).forEach(k=>out.push({k,node:n}))); return out; }
   function activeItems(){ return allItems().filter(x=>!x.k.archived); }
-  function allPeople(){ const s=new Set(state.members||[]); Object.values(state.nodes).forEach(n=>{ if(n.encargado)s.add(n.encargado.trim()); (n.items||[]).forEach(k=>{ if(k.owner)s.add(k.owner.trim()); }); }); return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
-  function newTask(){ return {id:"i"+uid(),title:"",owner:"",status:"sin",prio:"media",due:"",notas:"",done:false,doneAt:null,archived:false}; }
-  function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargado:"",links:[],items:[]},o); return id; }
-  function setStatus(k,st){ k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; } }
+  function allPeople(){ const s=new Set(state.members||[]); Object.values(state.nodes).forEach(n=>{ encsOf(n).forEach(o=>s.add(o)); (n.items||[]).forEach(k=>{ ownersOf(k).forEach(o=>s.add(o)); }); }); Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>ownersOf(k).forEach(o=>s.add(o)))); return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
+  function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
+  function archiveTask(k){ if(k.status!=="listo")setStatus(k,"listo"); if(!k.doneAt)k.doneAt=nowMs(); k.archived=true; k.archivedAt=nowMs(); }
+  function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; }
+  function setStatus(k,st){ k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
   function setDone(k,val){ setStatus(k, val?"listo":(k.status==="listo"?"curso":k.status)); }
   function nowMs(){ return new Date().getTime(); }
 
@@ -57,9 +122,9 @@ export function startApp({ seed, pushRemoteState }){
 
   function demo(){
     let seq=1; const nodes={}; const roots=[];
-    const mk=o=>{ const id="n"+(seq++).toString(36); nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargado:"",links:[],items:[]},o); return id; };
+    const mk=o=>{ const id="n"+(seq++).toString(36); nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; };
     const link=(a,b)=>{ nodes[a].links.push(b); nodes[b].links.push(a); };
-    const t=(title,status,prio,notas,due)=>({id:"i"+(seq++),title,owner:"",status:status||"sin",prio:prio||"media",due:due||"",notas:notas||"",done:status==="listo",doneAt:null,archived:false});
+    const t=(title,status,prio,notas,due)=>({id:"i"+(seq++),title,owners:[],status:status||"sin",prio:prio||"",due:due||"",notas:notas||"",objetivo:"",done:status==="listo",doneAt:null,archived:false,archivedAt:null});
     const kids=(pid,arr)=>{ nodes[pid].children=arr; arr.forEach(c=>{nodes[c].parent=pid;}); };
 
     const P1=mk({kind:"project",name:"Bosques de Agua",prio:"alta",objetivo:"Crear el Área Natural Protegida y regenerar bosques de agua a escala.",contexto:"Varios frentes abiertos: PNP, producción, siembra directa y Achala."}); roots.push(P1);
@@ -120,20 +185,93 @@ export function startApp({ seed, pushRemoteState }){
     const _d=new Date(); _d.setDate(_d.getDate()+3); const evd=_d.getFullYear()+"-"+String(_d.getMonth()+1).padStart(2,"0")+"-"+String(_d.getDate()).padStart(2,"0");
     const events=[{id:"ev1",date:evd,title:"Reunión de equipo",time:"18:00",desc:"Repasamos avances de la semana y próximos pasos.",rsvp:{Nico:"yes"}}];
     const chat={team:[{id:"m1",from:"Juanpi",text:"Equipo, ¿cómo venimos con los informes de dominio?",ts:null},{id:"m2",from:"Nico",text:"Los del ejido ya salieron; falta Provincia.",ts:null},{id:"m3",from:"Lucas",text:"Yo sigo con el bastón, avanza bien.",ts:null},{id:"m4",from:"Juanpi",ev:"ev1",ts:null}],dm:{}};
-    return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juanpi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",_seedfix:true,_layout3:true};
+    return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juanpi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",privTasks:{},_seedfix:true,_layout3:true};
   }
 
-  function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.myNotes)d.myNotes={}; (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc=""; });
-    Object.values(d.nodes).forEach(n=>{ if(n.scale==null)n.scale=1; if(n.objetivo==null)n.objetivo=""; if(n.contexto==null)n.contexto=""; if(n.encargado==null)n.encargado=""; if(n.prio==null)n.prio="media";
-      (n.items||[]).forEach(k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due=""; if(k.done==null)k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.archived==null)k.archived=false; if(!k.title&&k.kind)k.title=""; delete k.kind; }); });
-    if(!d._seedfix){ const fix=s=>s?String(s).replace(/\bPablo\b(?! K)/g,"Pablo K").replace(/\s*Con Elixir\.?/gi,"").replace(/\s*\(Elixir\)/gi,"").replace(/\s*Canto ayuda\.?/gi,"").replace(/\bCanto\b/g,"").trim():s;
-      Object.values(d.nodes).forEach(n=>{ n.contexto=fix(n.contexto); n.objetivo=fix(n.objetivo); (n.items||[]).forEach(k=>{ k.title=fix(k.title); k.notas=fix(k.notas); }); }); d._seedfix=true; }
+  function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";
+    if(!d.taskFilters||typeof d.taskFilters!=="object")d.taskFilters={people:[],status:[],temas:[],prio:[]};
+    ["people","status","temas","prio"].forEach(kk=>{ if(!Array.isArray(d.taskFilters[kk]))d.taskFilters[kk]=[]; });
+    if(d.taskTemaFilter&&!d.taskFilters.temas.length){ d.taskFilters.temas=[d.taskTemaFilter]; d.taskTemaFilter=""; }
+    d.taskFilters.status=d.taskFilters.status.filter(s=>STATUS[s]);
+    d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
+    d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
+    if(!Array.isArray(d.panelFilter))d.panelFilter=[]; d.panelFilter=d.panelFilter.filter(s=>STATUS[s]);
+    if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc=""; });
+    if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
+    // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
+    if(!d._dmpair){ const viejo=d.chat.dm||{}, nuevo={};
+      Object.keys(viejo).forEach(k=>{ const arr=viejo[k]||[]; if(k.includes(" ~ ")){ nuevo[k]=(nuevo[k]||[]).concat(arr); return; }
+        arr.forEach(m=>{ const otro=(m&&m.from&&m.from!==k)?m.from:k; const nk=[k,otro].sort((x,y)=>x.localeCompare(y)).join(" ~ "); (nuevo[nk]=nuevo[nk]||[]).push(m); }); });
+      Object.keys(nuevo).forEach(k=>nuevo[k].sort((a,b)=>(a.ts||0)-(b.ts||0)));
+      d.chat.dm=nuevo; d._dmpair=true; }
+    // los "no leídos" son de cada persona, no del equipo
+    if(d.chatSeen&&Object.values(d.chatSeen).some(v=>typeof v==="number"))d.chatSeen={};
+    Object.keys(d.chatSeen||{}).forEach(p=>{ if(!d.chatSeen[p]||typeof d.chatSeen[p]!=="object")d.chatSeen[p]={}; });
+    const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
+      if(!Array.isArray(k.owners))k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; k.owners=k.owners.map(o=>String(o).trim()).filter(Boolean); delete k.owner;
+      if(!Array.isArray(k.files))k.files=[];
+      if(k.prio==null||!PRIO[k.prio])k.prio="";
+      if(!k.title&&k.kind)k.title=""; delete k.kind; };
+    Object.values(d.nodes).forEach(n=>{ if(n.scale==null)n.scale=1; if(n.objetivo==null)n.objetivo=""; if(n.contexto==null)n.contexto=""; if(n.prio==null)n.prio="media";
+      if(!Array.isArray(n.encargados))n.encargados=(n.encargado&&String(n.encargado).trim())?[String(n.encargado).trim()]:[]; n.encargados=n.encargados.map(o=>String(o).trim()).filter(Boolean); delete n.encargado;
+      if(!Array.isArray(n.files))n.files=[];
+      (n.items||[]).forEach(fixItem); });
+    Object.keys(d.privTasks).forEach(who=>{ if(!Array.isArray(d.privTasks[who])){ delete d.privTasks[who]; return; } d.privTasks[who].forEach(k=>{ fixItem(k); k.priv=true; }); });
+    d._seedfix=true; // (la limpieza de textos del sembrado inicial ya cumplió su función; no debe tocar texto escrito por el equipo)
     if(!d._layout3){ doLayout(d.nodes,d.roots); d._layout3=true; }
     d.version=5; return d; }
-  function sweepArchive(){ let ch=false; const now=nowMs(); Object.values(state.nodes).forEach(n=>(n.items||[]).forEach(k=>{ if(k.done&&k.doneAt&&!k.archived&&(now-k.doneAt)>=ARCH_DAYS*DAY){ k.archived=true; ch=true; } })); if(ch)save(); }
-  function load(){ try{ const r=localStorage.getItem(K4); if(r){ const d=JSON.parse(r); if(d&&d.nodes) return normalize(d); } }catch(e){} return demo(); }
-  function save(){ try{ state.tab=active; }catch(e){} saveLocalPrefs(state); syncPeopleList(); pushRemoteState(stripLocal(state)); }
-  function applyRemoteState(remoteData){ Object.keys(remoteData).forEach(k=>{ if(!LOCAL_KEYS.includes(k))state[k]=remoteData[k]; }); if(typeof state.seq!=="number")state.seq=9999; if(!state.edgeMeta)state.edgeMeta={}; sweepArchive(); syncPeopleList(); renderActive(); }
+  function sweepArchive(){ let ch=false; const now=nowMs();
+    const sweep=k=>{ if(k.done&&k.doneAt&&!k.archived&&(now-k.doneAt)>=ARCH_DAYS*DAY){ k.archived=true; k.archivedAt=now; ch=true; } };
+    Object.values(state.nodes).forEach(n=>(n.items||[]).forEach(sweep));
+    Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(sweep)); // las privadas también
+    if(ch)save(); }
+  // Todo cambio pasa por acá. El guard anti-eco evita reescribir la base
+  // cuando el contenido no cambió: sin él, el chat entra en un bucle
+  // (dibujar -> guardar -> llega por sincronización -> dibujar -> ...).
+  let lastPushed="";
+  function save(){
+    try{ state.tab=active; }catch(e){}
+    saveLocalPrefs(state); syncPeopleList();
+    const shared=stripShared(state); const js=JSON.stringify(shared);
+    if(js!==lastPushed){ lastPushed=js; pushRemoteState(shared); }
+    if(pushPrivateState){ const mine=myPrivateSlice(); if(mine)pushPrivateState(mine); }
+  }
+  // Lo que llega del equipo pasa SIEMPRE por normalize(): es la puerta por
+  // donde un cliente viejo podría inyectar el formato anterior.
+  const SKIP=new Set([...LOCAL_KEYS,...PRIV_KEYS]);
+  function applyRemoteState(remote){
+    if(!remote||!remote.nodes)return;
+    const merged=Object.assign({},remote);
+    SKIP.forEach(k=>{ if(state[k]!==undefined)merged[k]=state[k]; else delete merged[k]; });
+    state=normalize(merged);
+    lastPushed=JSON.stringify(stripShared(state));
+    if(selId&&!N(selId))closePanel();
+    if(taskOpen&&!curTask())closeTask();
+    loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
+  }
+  // Mi porción privada: es lo único que sube a la tabla con permisos.
+  function myPrivateSlice(){ const me=state.me; if(!me)return null;
+    return { privTasks:(state.privTasks||{})[me]||[], myNotes:(state.myNotes||{})[me]||"" }; }
+  function mountPrivate(p){ const me=state.me; if(!me||!p)return;
+    state.privTasks=state.privTasks||{}; state.myNotes=state.myNotes||{};
+    if(Array.isArray(p.privTasks))state.privTasks[me]=p.privTasks;
+    if(typeof p.myNotes==="string")state.myNotes[me]=p.myNotes; }
+  function applyPrivateState(p){ mountPrivate(p); if(active==="panel")renderPanel(); }
+  // Los datos privados vivían dentro de la fila compartida del equipo. La primera
+  // vez que entrás, tu porción se copia a tu tabla y se saca de ahí.
+  // Regla dura: se toca SOLO la porción propia, nunca la de otra persona.
+  function migrarMisPrivados(yaTengo){
+    const me=state.me; if(!me||yaTengo)return;
+    const notas=(state.myNotes||{})[me];
+    const tareas=(state.privTasks||{})[me];
+    const hayAlgo=(typeof notas==="string"&&notas.trim())||(Array.isArray(tareas)&&tareas.length);
+    if(!hayAlgo)return;
+    if(pushPrivateState)pushPrivateState(myPrivateSlice());
+    if(state.myNotes)delete state.myNotes[me];
+    if(state.privTasks)delete state.privTasks[me];
+    mountPrivate({privTasks:tareas||[],myNotes:notas||""});
+    save();
+  }
 
   const viewport=document.getElementById("viewport"),world=document.getElementById("world"),worldInner=document.getElementById("worldInner"),svg=document.getElementById("synapses"),handles=document.getElementById("handles");
   const fPerson=document.getElementById("fPerson"),fStatus=document.getElementById("fStatus"),meSel=document.getElementById("meSel");
@@ -141,7 +279,8 @@ export function startApp({ seed, pushRemoteState }){
   function isOff(node){ let x=node; while(x){ if(off.has(x.id))return true; x=N(x.parent); } return false; }
   function isBright(node){ return !isOff(node)&&matches(node); }
 
-  function applyTabControls(name){ const P=name==="mapa"||name==="tareas"; const E=name==="mapa"||name==="tareas"||name==="panel"; const S=name==="panel"||name==="chat";
+  // "Sos" define casi todo (panel, chat, privadas): tiene que estar siempre a mano
+  function applyTabControls(name){ const P=name==="mapa"; const E=name==="mapa"; const S=true;
     document.getElementById("filtPersona").style.display=P?"":"none"; document.getElementById("filtEstado").style.display=E?"":"none"; document.getElementById("filtSos").style.display=S?"":"none"; }
   function showTab(name){ active=name; applyTabControls(name);
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
@@ -149,9 +288,18 @@ export function startApp({ seed, pushRemoteState }){
     renderActive(); if(name==="mapa"){ requestAnimationFrame(()=>{ if(!cam._init){ fit(); cam._init=1; } applyCam(); }); } save(); }
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
   function renderActive(){ refreshChrome();
-    if(active==="mapa")renderMap(); else if(active==="estructura")renderEstructura(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="chat")renderChat(); }
-  function refreshChrome(){ const cur=fPerson.value; fPerson.innerHTML='<option value="">Todas</option>'+allPeople().map(p=>`<option${p===cur?" selected":""}>${esc(p)}</option>`).join("");
-    const m=state.me||""; meSel.innerHTML='<option value="">—</option>'+allPeople().map(p=>`<option${p===m?" selected":""}>${esc(p)}</option>`).join(""); }
+    if(active==="mapa")renderMap(); else if(active==="estructura")renderEstructura(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); }
+  // qué ramas dejaste abiertas: se recuerda entre sesiones
+  function saveTreeOpen(){ state.treeOpen=[...treeOpen]; save(); }
+  function loadTreeOpen(){ treeOpen.clear(); (state.treeOpen||[]).forEach(id=>{ if(N(id))treeOpen.add(id); }); }
+  function ensureUserColors(){ if(!state.userColors)state.userColors={}; const used=new Set(Object.values(state.userColors)); let ch=false;
+    allPeople().forEach(p=>{ if(state.userColors[p])return;
+      let pick=AV.find(c=>!used.has(c));
+      if(!pick){ let h=0; for(const c of p) h=(h*31+c.charCodeAt(0))>>>0; pick=AV[h%AV.length]; }
+      state.userColors[p]=pick; used.add(pick); ch=true; });
+    return ch; }
+  function refreshChrome(){ if(ensureUserColors())save(); const cur=fPerson.value; fPerson.innerHTML='<option value="">Todas</option>'+allPeople().map(p=>`<option${p===cur?" selected":""}>${esc(p)}</option>`).join("");
+    const m=state.me||""; meSel.innerHTML='<option value="">—</option>'+allPeople().map(p=>`<option${p===m?" selected":""}>${esc(p)}</option>`).join(""); updateChatBadge(); }
 
   // ---------- MAPA ----------
   function edgeList(){ const list=[],seen=new Set();
@@ -178,10 +326,10 @@ export function startApp({ seed, pushRemoteState }){
     Object.values(state.nodes).forEach(node=>{ const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
       const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"");
       el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
-      const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>`<span class="av" style="background:${avColor(o)}" title="${esc(o)}">${esc(initials(o))}</span>`).join("");
-      const pc=cssv(PRIO[node.prio].v); const outLinks=(node.links||[]).length;
+      const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>avatarMarkup(o,"av",true)).join("");
+      const outLinks=(node.links||[]).length;
       const sub=`${hasKids?a.nc+" sub · ":""}${a.ic} tarea${a.ic===1?"":"s"}${a.ic?` · ${a.dc}✓`:""}`;
-      el.innerHTML=`<span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}<span class="pr" style="background:${pc}">${PRIO[node.prio].l}</span>`;
+      el.innerHTML=`<span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}`;
       worldInner.appendChild(el); wireNeuron(el,node); });
     document.getElementById("addLabel").textContent=selId?"Nuevo sub-tema":"Nuevo proyecto"; }
   function applyCam(){ world.style.transform=`translate(${cam.tx}px,${cam.ty}px) scale(${cam.s})`; }
@@ -239,21 +387,40 @@ export function startApp({ seed, pushRemoteState }){
   document.getElementById("linkMode").addEventListener("click",()=>{ linking=!linking; linkSrc=null; closePops(); if(linking&&editing){ editing=false; document.getElementById("editMode").classList.remove("on"); } document.getElementById("linkMode").classList.toggle("on",linking); viewport.classList.toggle("linking",linking); toast(linking?"Vincular: tocá dos temas":"Vincular desactivado"); renderMap(); });
   document.getElementById("editMode").addEventListener("click",()=>{ editing=!editing; closePops(); if(editing&&linking){ linking=false; linkSrc=null; document.getElementById("linkMode").classList.remove("on"); viewport.classList.remove("linking"); } document.getElementById("editMode").classList.toggle("on",editing); toast(editing?"Editar: clic en un tema (color/tamaño) · clic o arrastrá una línea":"Editar desactivado"); renderMap(); });
   document.getElementById("addNode").addEventListener("click",()=>{ if(selId)addSubTo(selId); else addProject(); });
-  function addSubTo(pid){ const p=N(pid); const ang=Math.random()*6.28; const id=newNode({name:"Nuevo sub-tema",parent:p.id,x:p.x+Math.cos(ang)*200,y:p.y+Math.sin(ang)*200}); p.children.push(id); treeOpen.add(p.id); save(); openPanel(id); pTitle.select(); }
+  function addSubTo(pid){ const p=N(pid); const ang=Math.random()*6.28; const id=newNode({name:"Nuevo sub-tema",parent:p.id,x:p.x+Math.cos(ang)*200,y:p.y+Math.sin(ang)*200}); p.children.push(id); treeOpen.add(p.id); saveTreeOpen(); openPanel(id); pTitle.select(); }
   function addProject(){ const id=newNode({kind:"project",name:"Nuevo proyecto",x:(Math.random()-.5)*400,y:(Math.random()-.5)*300}); state.roots.push(id); state.estProj=id; save(); renderActive(); openPanel(id); pTitle.select(); }
 
   // ---------- ESTRUCTURA ----------
   const estree=document.getElementById("estree");
-  function moveTask(itemId,fromId,toId,beforeId){ const from=N(fromId),to=N(toId); if(!from||!to)return; const idx=(from.items||[]).findIndex(x=>x.id===itemId); if(idx<0)return; const [it]=from.items.splice(idx,1); to.items=to.items||[]; let j=to.items.length; if(beforeId){ const bi=to.items.findIndex(x=>x.id===beforeId); if(bi>=0)j=bi; } to.items.splice(j,0,it); save(); }
-  function quickTask(node){ node.items=node.items||[]; node.items.push(newTask()); treeOpen.add(node.id); save(); renderEstructura(); }
-  function encChip(node){ return node.encargado?`<span class="encchip"><span class="av" style="background:${avColor(node.encargado)}">${esc(initials(node.encargado))}</span>${esc(node.encargado)}</span>`:""; }
+  function moveTask(itemId,fromId,toId,beforeId){ if(beforeId===itemId)return; // soltarla sobre sí misma no hace nada
+    const from=N(fromId),to=N(toId); if(!from||!to)return; const idx=(from.items||[]).findIndex(x=>x.id===itemId); if(idx<0)return; const [it]=from.items.splice(idx,1); to.items=to.items||[]; let j=to.items.length; if(beforeId){ const bi=to.items.findIndex(x=>x.id===beforeId); if(bi>=0)j=bi; } to.items.splice(j,0,it); save(); }
+  function quickTask(node){ node.items=node.items||[]; const k=newTask(); node.items.push(k); treeOpen.add(node.id); saveTreeOpen(); renderEstructura(); openTask(node.id,k.id); }
+  function encChip(node){ return encsOf(node).map(p=>`<span class="encchip">${avatarMarkup(p,"av")}${esc(p)}</span>`).join(" "); }
+  function renderEstBusqueda(){ const q=norm(estQuery.trim()); const info=document.getElementById("estSearchInfo"), clr=document.getElementById("estSearchClear");
+    clr.hidden=!estQuery.trim();
+    const hl=(txt)=>{ const t=esc(txt); const i=norm(txt).indexOf(q); if(i<0)return t; const raw=String(txt); return esc(raw.slice(0,i))+"<mark>"+esc(raw.slice(i,i+q.length))+"</mark>"+esc(raw.slice(i+q.length)); };
+    const res=[];
+    Object.values(state.nodes).forEach(n=>{
+      const path=pathOf(n.id).map(z=>z.name); const label=path.pop();
+      if(norm(n.name).includes(q)||norm(n.objetivo).includes(q)||norm(n.contexto).includes(q))
+        res.push({kind:n.kind==="project"?"Proyecto":(depthOf(n)<=2?"Macro-tema":"Sub-tema"),color:accentOf(n),name:label,trail:path.join(" › ")||"raíz",go:()=>openPanel(n.id)});
+      (n.items||[]).forEach(k=>{ if(k.archived)return;
+        if(norm(k.title).includes(q)||norm(k.notas).includes(q)||norm(k.objetivo).includes(q)||norm(ownersOf(k).join(" ")).includes(q))
+          res.push({kind:"Tarea",color:cssv(STATUS[k.status].v),name:k.title||"Tarea",trail:pathOf(n.id).map(z=>z.name).join(" › "),go:()=>openTask(n.id,k.id)}); }); });
+    info.textContent=res.length?`${res.length} resultado${res.length===1?"":"s"}`:"";
+    if(!res.length){ estree.innerHTML=`<div class="ph"><div class="big">🔍</div><b>Sin resultados</b><div style="margin-top:6px;font-size:13px">No hay temas ni tareas que digan “${esc(estQuery.trim())}”.</div></div>`; return; }
+    estree.innerHTML=res.slice(0,80).map((r,i)=>`<div class="resline" data-r="${i}"><span class="rk" style="background:${r.color}">${r.kind}</span><span class="rt"><b>${hl(r.name)}</b><span>${esc(r.trail)}</span></span><span class="go" style="color:var(--ink-faint)">↗</span></div>`).join("")
+      +(res.length>80?`<div class="empty">…y ${res.length-80} más. Afiná la búsqueda.</div>`:"");
+    estree.querySelectorAll("[data-r]").forEach(el=>el.addEventListener("click",()=>res[+el.dataset.r].go())); }
   function renderEstructura(){ const roots=state.roots.map(N).filter(Boolean);
+    const sc=document.getElementById("estSearchClear"); if(sc)sc.hidden=!estQuery.trim();
+    if(estQuery.trim()){ renderEstBusqueda(); return; }
+    const si=document.getElementById("estSearchInfo"); if(si)si.textContent="";
     if(!roots.length){ estree.innerHTML='<div class="empty">Sin proyectos todavía.</div>'; return; }
     let projId=(state.estProj&&N(state.estProj))?state.estProj:roots[0].id; state.estProj=projId; const proj=N(projId);
     const macros=(proj.children||[]).map(N).filter(Boolean);
     if(state.estFocus && (!N(state.estFocus)||N(state.estFocus).parent!==projId)) state.estFocus="";
     let html=`<div class="projsel">`+roots.map(r=>`<button class="${r.id===projId?'on':''}" data-proj="${r.id}"><span style="width:9px;height:9px;border-radius:50%;background:${accentOf(r)}"></span>${esc(r.name)}</button>`).join("")+`<button class="add" data-addproj>＋ proyecto</button></div>`;
-    if(!state.estFocus && macros.length) html+=`<div class="esthint">Doble clic en un tema para verlo desplegado.</div>`;
     html+=`<div id="estbody"></div>`; estree.innerHTML=html;
     estree.querySelectorAll("[data-proj]").forEach(b=>b.addEventListener("click",()=>{ state.estProj=b.dataset.proj; state.estFocus=""; save(); renderEstructura(); }));
     estree.querySelector("[data-addproj]").addEventListener("click",addProject);
@@ -266,7 +433,7 @@ export function startApp({ seed, pushRemoteState }){
   function renderFocus(body,macro){ const wrap=document.createElement("div"); wrap.className="focusview";
     const back=document.createElement("button"); back.className="rowbtn fback"; back.textContent="← Volver a todos los temas"; back.style.marginBottom="12px"; back.addEventListener("click",()=>{ state.estFocus=""; save(); renderEstructura(); }); wrap.appendChild(back);
     const card=document.createElement("div"); card.className="focuscard"; card.style.borderTopColor=accentOf(macro);
-    card.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><h2 class="fname" style="flex:1;cursor:pointer">${esc(macro.name)}</h2><span class="chip" style="background:${cssv(PRIO[macro.prio].v)}">${PRIO[macro.prio].l}</span><button class="rowbtn fedit">Editar</button></div>`
+    card.innerHTML=`<div style="display:flex;align-items:center;gap:10px"><h2 class="fname" style="flex:1;cursor:pointer">${esc(macro.name)}</h2><button class="rowbtn fedit">Editar</button></div>`
       +`<div class="fsec"><div class="flab">Objetivo</div><div class="ftext">${macro.objetivo?esc(macro.objetivo):'<span style="color:var(--ink-faint)">— sin definir —</span>'}</div></div>`
       +`<div class="fsec"><div class="flab">Estado actual</div><div class="ftext">${macro.contexto?esc(macro.contexto):'<span style="color:var(--ink-faint)">— sin definir —</span>'}</div></div>`;
     card.querySelector(".fname").addEventListener("click",()=>openPanel(macro.id));
@@ -279,12 +446,14 @@ export function startApp({ seed, pushRemoteState }){
     add.querySelector("[data-sub]").addEventListener("click",()=>addSubTo(macro.id));
     add.querySelector("[data-task]").addEventListener("click",()=>quickTask(macro));
     sub.appendChild(add); wireDrop(sub,macro); wrap.appendChild(sub); body.appendChild(wrap); }
-  function colFor(macro){ const col=document.createElement("div"); col.className="estcol"; col.style.borderTopColor=accentOf(macro); const pc=cssv(PRIO[macro.prio].v);
+  function colFor(macro){ const col=document.createElement("div"); col.className="estcol"; col.style.borderTopColor=accentOf(macro);
     const head=document.createElement("div"); head.className="colh";
-    head.innerHTML=`<div class="top"><span class="orb" style="background:${accentOf(macro)}"></span><span class="cname">${esc(macro.name)}</span><span class="chip" style="background:${pc}">${PRIO[macro.prio].l}</span></div>${macro.contexto?`<div class="ctxline">${esc(macro.contexto)}</div>`:""}${macro.encargado?`<div style="margin-top:6px">${encChip(macro)}</div>`:""}`;
+    head.innerHTML=`<div class="top"><span class="orb" style="background:${accentOf(macro)}"></span><span class="cname">${esc(macro.name)}</span><button class="colexp" title="Desplegar este tema">⤢</button></div>${macro.contexto?`<div class="ctxline">${esc(macro.contexto)}</div>`:""}${encsOf(macro).length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${encChip(macro)}</div>`:""}`;
     head.style.cursor="pointer"; head.title="Doble clic para ver desplegado";
+    const expand=()=>{ if(colClickTimer){clearTimeout(colClickTimer);colClickTimer=null;} state.estFocus=macro.id; save(); renderEstructura(); };
+    head.querySelector(".colexp").addEventListener("click",e=>{ e.stopPropagation(); expand(); });
     head.querySelector(".cname").addEventListener("click",e=>{ e.stopPropagation(); if(colClickTimer)clearTimeout(colClickTimer); colClickTimer=setTimeout(()=>{colClickTimer=null;openPanel(macro.id);},210); });
-    head.addEventListener("dblclick",()=>{ if(colClickTimer){clearTimeout(colClickTimer);colClickTimer=null;} state.estFocus=macro.id; save(); renderEstructura(); });
+    head.addEventListener("dblclick",expand);
     col.appendChild(head);
     const body=document.createElement("div"); body.className="colbody"; body.dataset.drop=macro.id;
     (macro.items||[]).filter(k=>!k.archived).forEach(k=>body.appendChild(taskRow(macro,k)));
@@ -293,10 +462,10 @@ export function startApp({ seed, pushRemoteState }){
     const add=document.createElement("div"); add.className="coladd"; add.innerHTML=`<button class="rowbtn" data-sub>＋ sub-tema</button><button class="rowbtn" data-task>＋ tarea</button>`;
     add.querySelector("[data-sub]").addEventListener("click",()=>addSubTo(macro.id));
     add.querySelector("[data-task]").addEventListener("click",()=>quickTask(macro)); col.appendChild(add); return col; }
-  function subBlock(node,forceOpen){ const wrap=document.createElement("div"); wrap.className="subblock"; wrap.style.borderLeftColor=accentOf(node); const a=agg(node); const open=forceOpen||treeOpen.has(node.id); const pc=cssv(PRIO[node.prio].v);
-    const head=document.createElement("div"); head.className="sbh"; head.innerHTML=`<span class="car ${open?"open":""}">▶</span><span class="sname">${esc(node.name)}</span>${node.encargado?`<span class="av" style="width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:8.5px;font-weight:700;color:#fff;background:${avColor(node.encargado)}" title="${esc(node.encargado)}">${esc(initials(node.encargado))}</span>`:""}<span class="chip" style="background:${pc};font-size:9px">${PRIO[node.prio].l}</span><span class="cnt">${a.ic}</span>`;
+  function subBlock(node,forceOpen){ const wrap=document.createElement("div"); wrap.className="subblock"; wrap.style.borderLeftColor=accentOf(node); const a=agg(node); const open=forceOpen||treeOpen.has(node.id);
+    const head=document.createElement("div"); head.className="sbh"; head.innerHTML=`<span class="car ${open?"open":""}">▶</span><span class="sname">${esc(node.name)}</span>${encsOf(node).length?`<span class="avs2">${encsOf(node).map(p=>avatarMarkup(p,"av2",true)).join("")}</span>`:""}<span class="cnt">${a.ic}</span>`;
     head.querySelector(".sname").addEventListener("click",()=>openPanel(node.id));
-    head.querySelector(".car").addEventListener("click",()=>{ if(treeOpen.has(node.id))treeOpen.delete(node.id); else treeOpen.add(node.id); renderEstructura(); });
+    head.querySelector(".car").addEventListener("click",()=>{ if(treeOpen.has(node.id))treeOpen.delete(node.id); else treeOpen.add(node.id); saveTreeOpen(); renderEstructura(); });
     wrap.appendChild(head);
     if(open){ const inner=document.createElement("div"); inner.className="sbin"; inner.dataset.drop=node.id;
       if(node.contexto){ const cx=document.createElement("div"); cx.className="ctxline"; cx.style.margin="2px 0 6px"; cx.textContent=node.contexto; inner.appendChild(cx); }
@@ -308,94 +477,304 @@ export function startApp({ seed, pushRemoteState }){
       inner.appendChild(add); wireDrop(inner,node); wrap.appendChild(inner); }
     return wrap; }
   function taskRow(node,k){ const row=document.createElement("div"); row.className="taskrow"; row.draggable=true; row.dataset.item=k.id; const sc=cssv(STATUS[k.status].v);
-    row.innerHTML=`<span class="grip" title="Arrastrá para mover">⋮⋮</span><input type="checkbox" class="chk" ${k.done?"checked":""}><span class="tt" style="${k.done?'text-decoration:line-through;color:var(--ink-faint)':''}">${esc(k.title||"Tarea")}</span><span class="sdotc" style="background:${sc}" title="${STATUS[k.status].l}"></span>${k.owner?`<span class="who">${esc(k.owner)}</span>`:''}`;
+    row.innerHTML=`<span class="grip" title="Arrastrá para mover">⋮⋮</span><input type="checkbox" class="chk" ${k.done?"checked":""}><span class="tt" style="${k.done?'text-decoration:line-through;color:var(--ink-faint)':''}">${esc(k.title||"Tarea")}</span><span class="sdotc" style="background:${sc}" title="${STATUS[k.status].l}"></span>${ownersOf(k).length?`<span class="who">${esc(peopleLabel(ownersOf(k)))}</span>`:''}`;
     const chk=row.querySelector(".chk"); chk.addEventListener("click",e=>e.stopPropagation());
     chk.addEventListener("change",e=>{ setDone(k,e.target.checked); save(); renderEstructura(); });
-    row.querySelector(".tt").addEventListener("click",()=>openPanel(node.id));
+    row.querySelector(".tt").addEventListener("click",()=>openTask(node.id,k.id));
     row.addEventListener("dragstart",e=>{ dragTask={item:k,from:node}; row.classList.add("dragging"); if(e.dataTransfer)e.dataTransfer.effectAllowed="move"; });
     row.addEventListener("dragend",()=>{ dragTask=null; row.classList.remove("dragging"); document.querySelectorAll(".taskrow.over,.dropz").forEach(x=>x.classList.remove("over","dropz")); });
     row.addEventListener("dragover",e=>{ if(!dragTask)return; e.preventDefault(); e.stopPropagation(); row.classList.add("over"); });
     row.addEventListener("dragleave",()=>row.classList.remove("over"));
     row.addEventListener("drop",e=>{ if(!dragTask)return; e.preventDefault(); e.stopPropagation(); row.classList.remove("over"); moveTask(dragTask.item.id,dragTask.from.id,node.id,k.id); renderEstructura(); });
     return row; }
-  function wireDrop(el,node){ el.addEventListener("dragover",e=>{ if(!dragTask)return; if(e.target.closest(".taskrow"))return; e.preventDefault(); el.classList.add("dropz"); }); el.addEventListener("dragleave",e=>{ if(e.target===el)el.classList.remove("dropz"); }); el.addEventListener("drop",e=>{ if(!dragTask)return; if(e.target.closest(".taskrow"))return; e.preventDefault(); el.classList.remove("dropz"); moveTask(dragTask.item.id,dragTask.from.id,node.id,null); renderEstructura(); }); }
+  function wireDrop(el,node){ el.addEventListener("dragover",e=>{ if(!dragTask)return; if(e.target.closest(".taskrow"))return; e.preventDefault(); el.classList.add("dropz"); }); el.addEventListener("dragleave",e=>{ if(e.target===el)el.classList.remove("dropz"); }); el.addEventListener("drop",e=>{ if(!dragTask)return; if(e.target.closest(".taskrow"))return; e.preventDefault(); e.stopPropagation(); /* si no, el contenedor padre lo mueve de nuevo */ el.classList.remove("dropz"); moveTask(dragTask.item.id,dragTask.from.id,node.id,null); dragTask=null; renderEstructura(); }); }
 
   // ---------- TAREAS ----------
   const kanban=document.getElementById("kanban");
+  function tfil(){ const f=state.taskFilters||(state.taskFilters={people:[],status:[],temas:[],prio:[]}); ["people","status","temas","prio"].forEach(k=>{ if(!Array.isArray(f[k]))f[k]=[]; }); return f; }
+  function macroList(){ return state.roots.map(N).filter(Boolean).flatMap(r=>(r.children||[]).map(N).filter(Boolean)); }
+  const norm=s=>String(s==null?"":s).toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu,"");
+  let taskQuery="", estQuery="";
+  function filteredItems(){ const f=tfil(); let items=activeItems();
+    if(f.status.length) items=items.filter(x=>f.status.includes(x.k.status));
+    if(f.prio.length) items=items.filter(x=>f.prio.includes(x.k.prio||"__none"));
+    if(f.people.length) items=items.filter(x=>{ const os=ownersOf(x.k); return os.length?os.some(o=>f.people.includes(o)):f.people.includes("__none"); });
+    if(f.temas.length) items=items.filter(x=>f.temas.some(t=>N(t)&&inSubtree(x.node.id,t)));
+    const q=norm(taskQuery.trim());
+    if(q) items=items.filter(x=>norm(x.k.title).includes(q)||norm(x.k.notas).includes(q)||norm(x.k.objetivo).includes(q)||norm(ownersOf(x.k).join(" ")).includes(q)||norm(pathOf(x.node.id).map(z=>z.name).join(" ")).includes(q));
+    return items; }
+  let openFdrop=null;
+  function renderFilterBar(){ const bar=document.getElementById("taskFilters"); if(!bar)return; const f=tfil();
+    const grp=(key,label,opts)=>{ const sel=f[key]; const n=sel.length;
+      return `<div class="fdrop" data-g="${key}"><button class="${n?"act":""}">${label}${n?`<span class="cnum">${n}</span>`:""}<span class="car">▼</span></button><div class="fmenu${openFdrop===key?" on":""}">`
+        +(opts.length?opts.map(o=>`<label class="fopt"><input type="checkbox" data-v="${esc(o.v)}"${sel.includes(o.v)?" checked":""}><span class="sd" style="background:${o.c}"></span><span class="lbl">${esc(o.l)}</span></label>`).join(""):`<div class="empty">Nada para filtrar</div>`)
+        +(n?`<button class="fclear">Limpiar</button>`:"")+`</div></div>`; };
+    const total=f.people.length+f.status.length+f.temas.length+f.prio.length;
+    bar.innerHTML=`<span class="barlab">Filtros</span>`
+      +grp("status","Estado",STORD.map(s=>({v:s,l:STATUS[s].l,c:cssv(STATUS[s].v)})))
+      +grp("prio","Prioridad",PRORD.map(p=>({v:p,l:PRIO[p].l,c:cssv(PRIO[p].v)})).concat([{v:"__none",l:"Sin prioridad",c:cssv("--ink-faint")}]))
+      +grp("people","Persona",allPeople().map(p=>({v:p,l:p,c:avColor(p)})).concat([{v:"__none",l:"Sin asignar",c:cssv("--ink-faint")}]))
+      +grp("temas","Tema",macroList().map(m=>({v:m.id,l:m.name,c:accentOf(m)})))
+      +(total?`<button class="rowbtn" id="clearFilters">Limpiar todo</button>`:"");
+    bar.querySelectorAll(".fdrop").forEach(d=>{ const key=d.dataset.g, btn=d.querySelector("button"), menu=d.querySelector(".fmenu");
+      btn.addEventListener("click",e=>{ e.stopPropagation(); const was=menu.classList.contains("on"); bar.querySelectorAll(".fmenu").forEach(m=>m.classList.remove("on")); if(was){ openFdrop=null; } else { menu.classList.add("on"); openFdrop=key; } });
+      menu.addEventListener("click",e=>e.stopPropagation());
+      menu.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.addEventListener("change",()=>{ const arr=tfil()[key], v=cb.dataset.v, i=arr.indexOf(v); if(cb.checked){ if(i<0)arr.push(v); } else if(i>=0)arr.splice(i,1); openFdrop=key; save(); renderTareas(); }));
+      const cl=menu.querySelector(".fclear"); if(cl)cl.addEventListener("click",()=>{ tfil()[key]=[]; openFdrop=key; save(); renderTareas(); }); });
+    const ca=document.getElementById("clearFilters"); if(ca)ca.addEventListener("click",()=>{ state.taskFilters={people:[],status:[],temas:[],prio:[]}; openFdrop=null; save(); renderTareas(); }); }
+  document.addEventListener("click",()=>{ if(!openFdrop)return; document.querySelectorAll(".fmenu.on").forEach(m=>m.classList.remove("on")); openFdrop=null; });
   function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg)wg.value=state.weekGoals||"";
-    const items=activeItems().filter(x=>{ const p=fPerson.value; return !p||(x.k.owner||"").trim()===p; });
-    document.getElementById("taskCount").textContent=items.length+" tareas"; kanban.innerHTML="";
-    if(taskGroup==="estado"){ STORD.forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); }
-    else if(taskGroup==="persona"){ const people=allPeople(); const groups={}; people.forEach(p=>groups[p]=[]); const sinA=[]; items.forEach(x=>{ const o=(x.k.owner||"").trim(); if(o&&groups[o])groups[o].push(x); else sinA.push(x); });
-      people.forEach(p=>kanban.appendChild(makeCol(p,avColor(p),groups[p],{person:p}))); kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
-    else { const byNode={}; items.forEach(x=>{ (byNode[x.node.id]=byNode[x.node.id]||[]).push(x); }); Object.keys(byNode).forEach(nid=>{ const n=N(nid); const p=pathOf(nid).map(z=>z.name); const label=p.pop(); kanban.appendChild(makeCol(label,accentOf(n),byNode[nid],{pth:p.join(" › ")})); }); if(!Object.keys(byNode).length)kanban.innerHTML='<div class="empty">Sin tareas.</div>'; } }
-  function makeCol(title,color,items,meta){ const col=document.createElement("div"); col.className="kcol"; col.dataset.status=meta.status||""; col.dataset.person=meta.person==null?"__none":meta.person;
-    col.innerHTML=`<h4><span style="width:9px;height:9px;border-radius:50%;background:${color}"></span>${esc(title)}<span class="n">${items.length}</span>${meta.pth?`<span class="pth">${esc(meta.pth)}</span>`:""}</h4>`;
-    items.forEach(x=>col.appendChild(taskCard(x)));
-    if(meta.status||meta.person!=null){ col.addEventListener("dragover",e=>{ if(!dragCard)return; e.preventDefault(); col.classList.add("drop"); });
-      col.addEventListener("dragleave",()=>col.classList.remove("drop"));
-      col.addEventListener("drop",e=>{ if(!dragCard)return; e.preventDefault(); col.classList.remove("drop"); if(meta.status){ setStatus(dragCard.k,meta.status); } else if(meta.person!=null){ dragCard.k.owner=(col.dataset.person==="__none"?"":col.dataset.person); } save(); renderTareas(); refreshChrome(); }); }
-    return col; }
-  function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v); c.draggable=true;
+    renderFilterBar(); const f=tfil(); const items=filteredItems(); kanban.innerHTML="";
+    document.getElementById("taskCount").textContent=items.length+(items.length===1?" tarea":" tareas");
+    if(taskGroup==="estado"){ STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); }
+    else if(taskGroup==="prioridad"){ PRORD.filter(p=>!f.prio.length||f.prio.includes(p)).forEach(p=>kanban.appendChild(makeCol(PRIO[p].l,cssv(PRIO[p].v),items.filter(x=>x.k.prio===p),{prio:p})));
+      if(!f.prio.length||f.prio.includes("__none")) kanban.appendChild(makeCol("Sin prioridad",cssv("--ink-faint"),items.filter(x=>!x.k.prio),{prio:""})); }
+    else if(taskGroup==="persona"){ const people=allPeople(); const groups={}; people.forEach(p=>groups[p]=[]); const sinA=[]; items.forEach(x=>{ const os=ownersOf(x.k).filter(o=>groups[o]); if(os.length)os.forEach(o=>groups[o].push(x)); else sinA.push(x); });
+      people.forEach(p=>{ if(f.people.length&&!f.people.includes(p))return; kanban.appendChild(makeCol(p,avColor(p),groups[p],{person:p})); });
+      if(!f.people.length||f.people.includes("__none")) kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
+    else { const byNode={}; items.forEach(x=>{ (byNode[x.node.id]=byNode[x.node.id]||[]).push(x); }); const nids=Object.keys(byNode);
+      if(!nids.length){ kanban.innerHTML='<div class="empty">Sin tareas en esta selección.</div>'; return; }
+      nids.forEach(nid=>{ const n=N(nid); const p=pathOf(nid).map(z=>z.name); const label=p.pop(); kanban.appendChild(makeCol(label,accentOf(n),byNode[nid],{pth:p.join(" › "),node:nid})); }); } }
+  function inSubtree(nodeId,ancId){ let x=N(nodeId); while(x){ if(x.id===ancId)return true; x=N(x.parent); } return false; }
+  function makeCol(title,color,items,meta){ const col=document.createElement("div"); col.className="kcol"; col.dataset.status=meta.status||""; col.dataset.person=meta.person==null?"__none":meta.person; col.dataset.node=meta.node||""; if(meta.prio!=null)col.dataset.prio=meta.prio;
+    const archAll=(meta.status==="listo"&&items.length)?`<button class="colact" data-archall>archivar todas</button>`:"";
+    col.innerHTML=`<h4><span style="width:9px;height:9px;border-radius:50%;background:${color}"></span>${esc(title)}<span class="n">${items.length}</span>${archAll}${meta.pth?`<span class="pth">${esc(meta.pth)}</span>`:""}</h4>`;
+    const ab=col.querySelector("[data-archall]"); if(ab)ab.addEventListener("click",()=>confirmar(`Se van al Archivo ${items.length} tarea${items.length===1?"":"s"} terminada${items.length===1?"":"s"}. Podés restaurarlas cuando quieras.`,()=>{ items.forEach(x=>archiveTask(x.k)); save(); renderTareas(); refreshChrome(); },{title:"Archivar terminadas",yes:"Archivar"}));
+    items.forEach(x=>col.appendChild(taskCard(x))); return col; }
+  function colUnder(px,py){ const el=document.elementFromPoint(px,py); return el?el.closest(".kcol"):null; }
+  function applyColDrop(col,x){ if(taskGroup==="estado"&&col.dataset.status){ setStatus(x.k,col.dataset.status); } else if(taskGroup==="prioridad"&&col.dataset.prio!=null){ x.k.prio=col.dataset.prio; } else if(taskGroup==="persona"){ const p=col.dataset.person; const os=ownersOf(x.k);
+      /* a "Sin asignar" se libera; entre personas se mueve; desde otra vista se suma */
+      if(!p||p==="__none"){ x.k.owners=[]; }
+      else { const from=x.fromPerson; if(from&&from!==p){ const i=os.indexOf(from); if(i>=0)os.splice(i,1); }
+        if(!os.includes(p))os.push(p); } }
+    else if(taskGroup==="tema"&&col.dataset.node){ if(col.dataset.node!==x.node.id)moveTask(x.k.id,x.node.id,col.dataset.node,null); }
+    save(); renderTareas(); refreshChrome(); }
+  function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
-    c.innerHTML=`<div class="kt">${esc(k.title||"Tarea")}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">📅 ${esc(k.due)}</span>`:''}${k.owner?`<span class="kwho" style="background:${avColor(k.owner)}" title="${esc(k.owner)}">${esc(initials(k.owner))}</span>`:''}</div>`;
-    c.addEventListener("dragstart",()=>{ dragCard=x; c.classList.add("dragging"); });
-    c.addEventListener("dragend",()=>{ dragCard=null; c.classList.remove("dragging"); });
-    c.addEventListener("click",()=>openPanel(node.id)); return c; }
+    const pr=prioOf(k);
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?'<button class="karch" title="Mandar al archivo">🗃️</button>':""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">📅 ${esc(k.due)}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    const kchk=c.querySelector(".kchk");
+    kchk.addEventListener("pointerdown",e=>e.stopPropagation());
+    kchk.addEventListener("click",e=>e.stopPropagation());
+    kchk.addEventListener("change",e=>{ setDone(k,e.target.checked); save(); renderTareas(); refreshChrome(); });
+    const karch=c.querySelector(".karch");
+    if(karch){ karch.addEventListener("pointerdown",e=>e.stopPropagation()); karch.addEventListener("click",e=>{ e.stopPropagation(); archiveTask(k); save(); renderTareas(); refreshChrome(); }); }
+    let ds=null;
+    c.addEventListener("pointerdown",e=>{ if(e.button!==0)return; ds={sx:e.clientX,sy:e.clientY,moved:false,clone:null};
+      const oc=c.closest(".kcol"); x.fromPerson=(oc&&oc.dataset.person!=="__none")?oc.dataset.person:""; // de qué columna salió
+      c.setPointerCapture(e.pointerId); });
+    c.addEventListener("pointermove",e=>{ if(!ds)return; const dx=e.clientX-ds.sx,dy=e.clientY-ds.sy; if(!ds.moved&&Math.hypot(dx,dy)>6){ ds.moved=true; dragCard=x; c.classList.add("dragging"); const cl=c.cloneNode(true); cl.className="kcard dragclone"; cl.style.width=c.offsetWidth+"px"; document.body.appendChild(cl); ds.clone=cl; }
+      if(ds.moved){ ds.clone.style.left=e.clientX+"px"; ds.clone.style.top=e.clientY+"px"; const col=colUnder(e.clientX,e.clientY); document.querySelectorAll(".kcol.drop").forEach(z=>z.classList.remove("drop")); if(col)col.classList.add("drop"); } });
+    c.addEventListener("pointerup",e=>{ if(!ds)return; const moved=ds.moved,clone=ds.clone; ds=null; if(clone)clone.remove(); c.classList.remove("dragging"); const col=colUnder(e.clientX,e.clientY); document.querySelectorAll(".kcol.drop").forEach(z=>z.classList.remove("drop"));
+      if(!moved){ dragCard=null; openTask(node.id,k.id); return; } if(col)applyColDrop(col,x); dragCard=null; });
+    c.addEventListener("pointercancel",()=>{ if(ds&&ds.clone)ds.clone.remove(); ds=null; c.classList.remove("dragging"); dragCard=null; });
+    return c; }
   document.getElementById("groupSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; taskGroup=b.dataset.g; document.querySelectorAll("#groupSeg button").forEach(x=>x.classList.toggle("on",x===b)); renderTareas(); });
 
   // ---------- ARCHIVO ----------
-  function renderArchivo(){ const box=document.getElementById("archivoBody"); const arch=allItems().filter(x=>x.k.archived);
-    if(!arch.length){ box.innerHTML=`<div class="ph"><div class="big">🗃️</div><b>Nada archivado todavía</b><div style="margin-top:6px;font-size:13px">Cuando marques una tarea como terminada, a los 10 días se archiva sola y aparece acá.</div></div>`; return; }
-    box.innerHTML=`<div class="card">${arch.map(x=>{ const path=pathOf(x.node.id).map(p=>p.name).join(" › "); const dstr=x.k.doneAt?new Date(x.k.doneAt).toLocaleDateString():""; return `<div class="arow"><span>✓ ${esc(x.k.title||"Tarea")}</span><span class="ap">${esc(path)}${dstr?" · terminada "+esc(dstr):""}</span><button class="btn restore" data-r="${x.node.id}|${x.k.id}">Restaurar</button></div>`; }).join("")}</div>`;
-    box.querySelectorAll(".restore").forEach(b=>b.addEventListener("click",()=>{ const [nid,iid]=b.dataset.r.split("|"); const n=N(nid); if(!n)return; const k=(n.items||[]).find(x=>x.id===iid); if(!k)return; k.archived=false; setStatus(k,"curso"); save(); renderArchivo(); refreshChrome(); })); }
+  function renderArchivo(){ const box=document.getElementById("archivoBody");
+    const at=k=>k.archivedAt||k.doneAt||0;
+    const arch=allItems().filter(x=>x.k.archived).concat(privL().filter(k=>k.archived).map(k=>({k,node:null,priv:true}))).sort((a,b)=>at(b.k)-at(a.k));
+    if(!arch.length){ box.innerHTML=`<div class="ph"><div class="big">🗃️</div><b>Nada archivado todavía</b><div style="margin-top:6px;font-size:13px">Cuando marques una tarea como terminada se archiva sola a los ${ARCH_DAYS} días — o mandala vos con el botón 🗃️ de la tarjeta.</div></div>`; return; }
+    box.innerHTML=`<div class="card">${arch.map(x=>{ const path=x.priv?"🔒 Privada":pathOf(x.node.id).map(p=>p.name).join(" › "); const t=at(x.k); const dstr=t?new Date(t).toLocaleDateString():""; return `<div class="arow"><span>✓ ${esc(x.k.title||"Tarea")}</span><span class="ap">${esc(path)}${dstr?" · archivada "+esc(dstr):""}</span><button class="btn restore" data-r="${x.priv?"__priv":x.node.id}|${x.k.id}">Restaurar</button></div>`; }).join("")}</div>`;
+    box.querySelectorAll(".restore").forEach(b=>b.addEventListener("click",()=>{ const [nid,iid]=b.dataset.r.split("|"); let k=null; if(nid==="__priv")k=privL().find(x=>x.id===iid); else { const n=N(nid); k=n&&(n.items||[]).find(x=>x.id===iid); } if(!k)return; setStatus(k,"curso"); save(); renderArchivo(); refreshChrome(); })); }
+
+  // ---------- DRIVE ----------
+  let driveQuery="", fmTarget=null;
+  function openFileModal(target){ fmTarget=target; // target: {kind:"node"|"task"|"pick", node, task}
+    document.getElementById("fmUrl").value=""; const fmn=document.getElementById("fmName"); fmn.value=""; fmn.dataset.touched="";
+    const wrap=document.getElementById("fmWhereWrap"), sel=document.getElementById("fmWhere");
+    if(target.kind==="pick"){ wrap.style.display="";
+      const opts=[]; const walk=(id,depth)=>{ const n=N(id); if(!n)return; const pad=depth>1?"　".repeat(depth-1)+"› ":"";
+        opts.push(`<option value="n:${n.id}">${esc(pad+n.name)}</option>`);
+        (n.items||[]).forEach(k=>{ if(!k.archived)opts.push(`<option value="t:${n.id}:${k.id}">${esc("　".repeat(depth)+"· "+(k.title||"Tarea"))}</option>`); });
+        (n.children||[]).forEach(c=>walk(c,depth+1)); };
+      state.roots.forEach(r=>walk(r,1)); sel.innerHTML=opts.join("");
+    } else wrap.style.display="none";
+    document.getElementById("fileModal").classList.add("on"); setTimeout(()=>document.getElementById("fmUrl").focus(),40); }
+  function closeFM(){ document.getElementById("fileModal").classList.remove("on"); fmTarget=null; }
+  function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta."); return; }
+    if(!/^https?:\/\//i.test(url)){ note("El link tiene que empezar con http:// o https://"); return; }
+    const kind=kindOfUrl(url); const name=document.getElementById("fmName").value.trim()||(FKIND[kind]||FKIND.link).l;
+    const f={id:"f"+uid(),url,name,kind,addedBy:state.me||"",addedAt:nowMs()};
+    let owner=null, t=fmTarget;
+    if(t.kind==="pick"){ const v=document.getElementById("fmWhere").value; const p=v.split(":");
+      if(p[0]==="n")owner=N(p[1]); else { const n=N(p[1]); owner=n&&(n.items||[]).find(x=>x.id===p[2]); } }
+    else owner=t.kind==="task"?t.task:t.node;
+    if(!owner){ note("No encontré dónde vincularlo."); return; }
+    filesOf(owner).push(f); save(); closeFM(); renderActive();
+    if(panelOpen&&N(selId))renderPanelBody(N(selId));
+    if(taskOpen)renderTFiles(); }
+  function renderDrive(){ const box=document.getElementById("driveBody"); const q=norm(driveQuery.trim());
+    let all=allFiles();
+    if(q)all=all.filter(x=>norm(x.f.name).includes(q)||norm(x.f.url).includes(q)||norm(pathOf(x.node.id).map(z=>z.name).join(" ")).includes(q)||norm(x.task?x.task.title:"").includes(q));
+    if(!all.length){ box.innerHTML=`<div class="ph"><div class="big">📂</div><b>${driveQuery.trim()?"Sin resultados":"Todavía no hay archivos vinculados"}</b><div style="margin-top:6px;font-size:13px">${driveQuery.trim()?"Probá con otra palabra.":"Vinculá el primero con el botón de arriba, o desde la ficha de cualquier tema o tarea."}</div></div>`; return; }
+    const macros=macroList(); const groups=new Map(); const sueltos=[];
+    all.forEach(x=>{ const m=macros.find(mm=>inSubtree(x.node.id,mm.id));
+      if(m){ if(!groups.has(m.id))groups.set(m.id,[]); groups.get(m.id).push(x); } else sueltos.push(x); });
+    let html="";
+    macros.forEach(m=>{ const arr=groups.get(m.id); if(!arr||!arr.length)return;
+      html+=`<div class="drivegroup"><h3><span class="orb" style="background:${accentOf(m)}"></span>${esc(m.name)}<span class="cnt">${arr.length}</span></h3>`
+        +arr.map(x=>{ const k=FKIND[x.f.kind]||FKIND.link; const p=pathOf(x.node.id).map(z=>z.name).slice(1).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
+          return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(p)}">${esc(p)}</span><button class="x" data-go="${x.node.id}" title="Ir al tema">↗</button></div>`; }).join("")+`</div>`; });
+    if(sueltos.length) html+=`<div class="drivegroup"><h3><span class="orb" style="background:var(--ink-faint)"></span>Nivel proyecto<span class="cnt">${sueltos.length}</span></h3>`
+      +sueltos.map(x=>{ const k=FKIND[x.f.kind]||FKIND.link; const p=pathOf(x.node.id).map(z=>z.name).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
+        return `<div class="filerow"><span class="fic">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath">${esc(p)}</span><button class="x" data-go="${x.node.id}" title="Ir al tema">↗</button></div>`; }).join("")+`</div>`;
+    box.innerHTML=html;
+    box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go))); }
 
   // ---------- CHAT + EVENTOS (preview local) ----------
-  function msgsOf(chan){ if(chan==="team")return state.chat.team||(state.chat.team=[]); const n=chan.slice(3); return state.chat.dm[n]||(state.chat.dm[n]=[]); }
+  function groupsAll(){ if(!state.chat.groups)state.chat.groups={}; return state.chat.groups; }
+  function groupOf(chan){ return chan.startsWith("grp:")?groupsAll()[chan.slice(4)]:null; }
+  function myGroups(){ const me=state.me; return Object.values(groupsAll()).filter(g=>!me||(g.members||[]).includes(me)).sort((a,b)=>a.name.localeCompare(b.name)); }
+  // el canal privado se identifica por el PAR de personas, no por una sola:
+  // con una sola clave, el mensaje no le llegaba al destinatario y sí lo veían los demás
+  function dmKey(a,b){ return [String(a||""),String(b||"")].sort((x,y)=>x.localeCompare(y)).join(" ~ "); }
+  function msgsOf(chan){ if(chan==="team")return state.chat.team||(state.chat.team=[]);
+    if(chan.startsWith("grp:")){ const g=groupOf(chan); if(!g)return []; return g.msgs||(g.msgs=[]); }
+    const other=chan.slice(3), me=state.me||""; if(!me||!other||other===me)return [];
+    const k=dmKey(me,other); return state.chat.dm[k]||(state.chat.dm[k]=[]); }
+  function chanTitle(chan){ if(chan==="team")return "👥 Equipo"; const g=groupOf(chan); if(g)return "👪 "+g.name; return "💬 "+chan.slice(3); }
   function renderChat(){ const me=state.me;
+    if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
     const list=document.getElementById("chanList");
-    list.innerHTML=`<div class="chsec">Canales</div><div class="chanitem ${chatChan==="team"?"on":""}" data-ch="team"><span class="av" style="background:var(--wood)">👥</span>Equipo</div><div class="chsec">Personal</div>`+
-      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}"><span class="av" style="background:${avColor(p)}">${esc(initials(p))}</span>${esc(p)}</div>`).join("");
+    list.innerHTML=`<div class="chsec">Canales</div><div class="chanitem ${chatChan==="team"?"on":""}" data-ch="team"><span class="av" style="background:var(--wood)">👥</span>Equipo</div>`+
+      myGroups().map(g=>`<div class="chanitem ${chatChan==="grp:"+g.id?"on":""}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">👪</span><span class="chname">${esc(g.name)}</span></div>`).join("")+
+      `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
+      `<div class="chsec">Personal</div>`+
+      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}">${avatarMarkup(p,"av")}<span class="chname">${esc(p)}</span></div>`).join("");
     list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
-    const head=document.getElementById("chatHead");
-    head.innerHTML=`<span>${chatChan==="team"?"👥 Equipo":"💬 "+esc(chatChan.slice(3))}</span><span class="previewbadge">preview local</span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
+    document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
+    const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
+    head.innerHTML=`<span>${esc(chanTitle(chatChan))}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="previewbadge">preview local</span><span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
+      <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro.</li>
+      <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
+      <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
+      <li><b>"preview local"</b>: por ahora los mensajes se guardan en tu navegador, todavía no viajan entre computadoras.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
+    const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
     if(!me){ box.innerHTML=`<div class="ph"><div class="big">💬</div><b>Elegí quién sos</b><div style="margin-top:6px;font-size:13px">Usá el selector "Sos" (arriba) para chatear como vos.</div></div>`; inp.disabled=true; return; }
     inp.disabled=false; const msgs=msgsOf(chatChan);
     box.innerHTML=msgs.length?msgs.map(m=>msgHTML(m,me)).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
-    msgs.forEach(m=>{ if(!m.ev)return; const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return; row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); });
-    box.scrollTop=box.scrollHeight; }
+    msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
+      if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
+      const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id)); });
+    seenMap()[chatChan]=msgs.length; save(); updateChatBadge(); box.scrollTop=box.scrollHeight; }
+  function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   function msgHTML(m,me){ if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div><div class="evtitle" style="cursor:pointer">📅 ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div></div>`; }
-    const mm=(m.from===me); return `<div class="msg ${mm?"mine":""}">${mm?"":`<div class="who">${esc(m.from)}</div>`}<div>${esc(m.text)}</div></div>`; }
+    const mm=(m.from===me);
+    if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
+      const ic=/^image\//.test(f.type)?"🖼️":/pdf/.test(f.type)?"📕":/sheet|excel|csv/.test(f.type)?"📊":/word|document/.test(f.type)?"📄":"📎";
+      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}`
+        +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
+        +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
+        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+`</div>`; }
+    return `<div class="msg ${mm?"mine":""}">${mm?"":`<div class="who">${esc(m.from)}</div>`}<div>${esc(m.text)}</div></div>`; }
   function sendMsg(){ const inp=document.getElementById("msgInput"); const me=state.me; if(!me)return; const t=inp.value.trim(); if(!t)return; msgsOf(chatChan).push({id:"m"+uid(),from:me,text:t,ts:nowMs()}); inp.value=""; save(); renderChat(); }
+  const MAXFILE=3*1024*1024;
+  function attachFile(file){ const me=state.me; if(!me)return;
+    if(file.size>MAXFILE){ note(`"${file.name}" pesa ${(file.size/1048576).toFixed(1)} MB. Por ahora el límite es 3 MB por archivo, porque todo se guarda dentro de la app. Para algo más grande, subilo a Drive y compartí el link desde la pestaña Drive.`,"Archivo muy pesado"); return; }
+    const r=new FileReader();
+    r.onload=()=>{ msgsOf(chatChan).push({id:"m"+uid(),from:me,text:"",ts:nowMs(),file:{name:file.name,size:file.size,type:file.type||"",data:r.result}}); save(); renderChat(); };
+    r.onerror=()=>note("No se pudo leer el archivo.");
+    r.readAsDataURL(file); }
+  async function downloadMsgFile(mid){ const m=msgsOf(chatChan).find(x=>x.id===mid); if(!m||!m.file)return; const f=m.file;
+    if(window.claude&&window.claude.downloads){ try{ const b=await (await fetch(f.data)).blob(); await window.claude.downloads.save({filename:f.name,data:b}); return; }catch(err){ if(err&&err.code==="declined")return; } }
+    try{ const a=document.createElement("a"); a.href=f.data; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); }
+    catch(e){ note("No se pudo descargar el archivo."); } }
   function closeEv(){ document.getElementById("evModal").classList.remove("on"); }
-  function openEvNew(presetDate){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date()); const da0=(presetDate&&/^\d{4}-\d{2}-\d{2}$/.test(presetDate))?presetDate:today;
-    box.innerHTML=`<h2>Nuevo evento</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" placeholder="Reunión de equipo"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" rows="2" placeholder="Lugar, agenda, notas…"></textarea></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">Crear y avisar al equipo</button></div>`;
+  function openEvNew(presetDate){ evForm(null,presetDate); }
+  function openEvEdit(id){ const ev=(state.events||[]).find(e=>e.id===id); if(ev)evForm(ev); }
+  function evForm(ev,presetDate){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date());
+    const da0=ev?ev.date:((presetDate&&/^\d{4}-\d{2}-\d{2}$/.test(presetDate))?presetDate:today);
+    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar al equipo"}</button></div>`;
     document.getElementById("evModal").classList.add("on");
-    box.querySelector("#evCancel").addEventListener("click",closeEv);
+    box.querySelector("#evCancel").addEventListener("click",()=>{ if(ev)openEvView(ev.id); else closeEv(); });
     box.querySelector("#evTitle").focus();
-    box.querySelector("#evCreate").addEventListener("click",()=>{ const ti=box.querySelector("#evTitle").value.trim()||"Evento"; const da=box.querySelector("#evDate").value||da0; const ho=box.querySelector("#evTime").value||""; const de=box.querySelector("#evDesc").value.trim(); const id="ev"+uid(); const rsvp={}; if(state.me)rsvp[state.me]="yes"; state.events.push({id,date:da,title:ti,time:ho,desc:de,rsvp}); state.chat.team.push({id:"m"+uid(),from:state.me||"Equipo",ev:id,ts:nowMs()}); chatChan="team"; save(); closeEv(); renderActive(); }); }
+    box.querySelector("#evCreate").addEventListener("click",()=>{ const ti=box.querySelector("#evTitle").value.trim()||"Evento"; const da=box.querySelector("#evDate").value||da0; const ho=box.querySelector("#evTime").value||""; const de=box.querySelector("#evDesc").value.trim();
+      if(ev){ ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de; save(); renderActive(); openEvView(ev.id); return; }
+      const id="ev"+uid(); const rsvp={}; if(state.me)rsvp[state.me]="yes"; state.events.push({id,date:da,title:ti,time:ho,desc:de,rsvp}); state.chat.team.push({id:"m"+uid(),from:state.me||"Equipo",ev:id,ts:nowMs()}); chatChan="team"; save(); closeEv(); renderActive(); }); }
+  // link a Google Calendar con el evento precargado (el recordatorio lo manda Google)
+  function gcalUrl(ev){ const pad=n=>String(n).padStart(2,"0");
+    const [y,m,d]=(ev.date||"").split("-").map(Number); if(!y)return "";
+    let dates;
+    if(ev.time&&/^\d{1,2}:\d{2}$/.test(ev.time)){ const [hh,mm]=ev.time.split(":").map(Number);
+      const ini=new Date(y,m-1,d,hh,mm), fin=new Date(ini.getTime()+60*60000);
+      const f=x=>`${x.getFullYear()}${pad(x.getMonth()+1)}${pad(x.getDate())}T${pad(x.getHours())}${pad(x.getMinutes())}00`;
+      dates=f(ini)+"/"+f(fin);
+    } else { const ini=new Date(y,m-1,d), fin=new Date(y,m-1,d+1);
+      const f=x=>`${x.getFullYear()}${pad(x.getMonth()+1)}${pad(x.getDate())}`;
+      dates=f(ini)+"/"+f(fin); }
+    const p=new URLSearchParams({action:"TEMPLATE",text:ev.title||"Reunión",dates});
+    if(ev.desc)p.set("details",ev.desc);
+    return "https://calendar.google.com/calendar/render?"+p.toString(); }
   function openEvView(id){ const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; const box=document.getElementById("evBox"); const me=state.me;
     const rows=(state.members||[]).map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"✅ Voy":v==="no"?"❌ No voy":"— sin responder"}</span></div>`; }).join("");
-    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>📅 ${esc(ev.date)}${ev.time?" · ⏰ "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><button class="btn danger" id="evDel">Eliminar</button><div style="flex:1"></div><button class="btn btn-primary" id="evOk">Listo</button></div>`;
+    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>📅 ${esc(ev.date)}${ev.time?" · ⏰ "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">📅 Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelectorAll("[data-rv]").forEach(b=>b.addEventListener("click",()=>{ setRsvp(id,b.dataset.rv); openEvView(id); }));
+    box.querySelector("#evEdit").addEventListener("click",()=>openEvEdit(id));
     box.querySelector("#evOk").addEventListener("click",closeEv);
-    box.querySelector("#evDel").addEventListener("click",()=>{ if(confirm("¿Eliminar el evento?")){ state.events=state.events.filter(e=>e.id!==id); if(state.chat)state.chat.team=(state.chat.team||[]).filter(m=>m.ev!==id); save(); closeEv(); renderActive(); } }); }
-  function setRsvp(id,val){ if(!state.me){ alert("Elegí quién sos (arriba) para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
+    box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar("El evento se borra para todo el equipo.",()=>{ state.events=state.events.filter(e=>e.id!==id); if(state.chat)state.chat.team=(state.chat.team||[]).filter(m=>m.ev!==id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
+  function setRsvp(id,val){ if(!state.me){ note('Elegí quién sos en el campo "Sos" (arriba) para poder responder.'); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
+  function chatUnread(){ const c=state.chat||{team:[],dm:{}}; const seen=seenMap(); const me=state.me;
+    let u=Math.max(0,(c.team||[]).length-(seen.team||0));
+    if(me)allPeople().filter(p=>p&&p!==me).forEach(p=>{ const arr=(c.dm||{})[dmKey(me,p)]||[]; u+=Math.max(0,arr.length-(seen["dm:"+p]||0)); });
+    myGroups().forEach(g=>{ u+=Math.max(0,(g.msgs||[]).length-(seen["grp:"+g.id]||0)); });
+    return u; }
+  // ---------- grupos de chat ----------
+  let grpEditId=null, grpMembers=[];
+  function openGroupModal(gid){ const me=state.me;
+    if(!me){ note('Primero elegí quién sos en el campo "Sos" (arriba) para armar un grupo.'); return; }
+    grpEditId=gid; const g=gid?groupsAll()[gid]:null;
+    grpMembers=g?(g.members||[]).slice():[me];
+    document.getElementById("gmTitle").textContent=g?"Editar grupo":"Nuevo grupo";
+    document.getElementById("gmName").value=g?g.name:"";
+    document.getElementById("gmDel").style.display=g?"":"none";
+    renderGrpMembers();
+    document.getElementById("groupModal").classList.add("on"); setTimeout(()=>document.getElementById("gmName").focus(),40); }
+  function renderGrpMembers(){ const me=state.me;
+    document.getElementById("gmMembers").innerHTML=allPeople().map(p=>`<label class="fopt"><input type="checkbox" data-m="${esc(p)}" ${grpMembers.includes(p)?"checked":""} ${p===me?"disabled":""}><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}${p===me?" (vos)":""}</span></label>`).join("");
+    document.getElementById("gmMembers").querySelectorAll("[data-m]").forEach(cb=>cb.addEventListener("change",()=>{ const p=cb.dataset.m; const i=grpMembers.indexOf(p);
+      if(cb.checked){ if(i<0)grpMembers.push(p); } else if(i>=0)grpMembers.splice(i,1); })); }
+  function closeGM(){ document.getElementById("groupModal").classList.remove("on"); grpEditId=null; }
+  function saveGM(){ const name=document.getElementById("gmName").value.trim();
+    if(!name){ note("Ponele un nombre al grupo."); return; }
+    if(grpMembers.length<2){ note("Un grupo necesita al menos dos personas."); return; }
+    const gs=groupsAll();
+    if(grpEditId&&gs[grpEditId]){ gs[grpEditId].name=name; gs[grpEditId].members=grpMembers.slice(); }
+    else { const id="g"+uid(); gs[id]={id,name,members:grpMembers.slice(),msgs:[],by:state.me||""}; chatChan="grp:"+id; }
+    save(); closeGM(); renderChat(); }
+  function delGM(){ const gid=grpEditId, gs=groupsAll(), g=gs[gid]; if(!g)return; closeGM();
+    confirmar(`Se borra el grupo "${g.name}" y todos sus mensajes, para todos los que están adentro.`,()=>{ delete gs[gid]; if(chatChan==="grp:"+gid)chatChan="team"; save(); renderChat(); },{title:"Eliminar grupo",yes:"Eliminar",danger:true}); }
+  function updateChatBadge(){ const b=document.getElementById("chatBadge"); if(!b)return; const u=chatUnread(); if(u>0){ b.textContent=u>9?"9+":u; b.hidden=false; } else b.hidden=true; }
 
   // ---------- PANEL personal ----------
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const DOWL=["lun","mar","mié","jue","vie","sáb","dom"];
   function ymdLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); }
+  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderProfile(); renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); }
+  function renderProfile(){ const box=document.getElementById("profile"); if(!box)return; const me=state.me;
+    if(!me){ box.innerHTML=""; return; }
+    const mine=avColor(me); const hasPhoto=!!(state.avatars&&state.avatars[me]);
+    box.innerHTML=`<div class="profilerow">${avatarMarkup(me,"pav")}<div class="pinfo"><b class="myname" title="Doble clic para cambiar tu color">${esc(me)}</b>`
+      +`<button class="tinylink" id="changePhoto">${hasPhoto?"cambiar foto":"subir foto"}</button>`
+      +`${hasPhoto?`<button class="tinylink" id="dropPhoto">sacar la foto</button>`:""}</div>`
+      +`<div class="colorpick" id="colorPick" hidden><span class="cplab">Tu color</span>`
+      +AV.map(c=>`<button class="sw2 ${c===mine?"on":""}" data-c="${c}" style="background:${c}" title="Elegir este color"></button>`).join("")
+      +`</div><input type="file" id="photoInput" accept="image/*" hidden></div>`;
+    box.querySelector("#changePhoto").addEventListener("click",()=>box.querySelector("#photoInput").click());
+    const dp=box.querySelector("#dropPhoto"); if(dp)dp.addEventListener("click",()=>{ delete state.avatars[me]; save(); renderActive(); });
+    box.querySelector(".myname").addEventListener("dblclick",()=>{ const cp=box.querySelector("#colorPick"); cp.hidden=!cp.hidden; });
+    box.querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click",()=>{ state.userColors=state.userColors||{}; state.userColors[me]=b.dataset.c; save(); renderActive(); }));
+    box.querySelector("#photoInput").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; loadAvatar(f,uri=>{ state.avatars=state.avatars||{}; state.avatars[me]=uri; save(); renderActive(); }); }); }
   function renderMyNotes(){ const box=document.getElementById("myNotes"); if(!box)return; const me=state.me;
     if(document.activeElement&&document.activeElement.id==="myNotesArea")return;
     if(!me){ box.innerHTML=""; return; }
     const val=(state.myNotes&&state.myNotes[me])||"";
-    box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:8px">📝 Mis notas <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">· privadas, solo las ves vos</span></div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
+    box.innerHTML=`<div class="card notescard"><div class="lab" style="margin-bottom:8px" title="Privadas: solo las ves vos">📝 Mis notas</div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
     const ta=box.querySelector("#myNotesArea"); ta.value=val;
     ta.addEventListener("input",e=>{ state.myNotes=state.myNotes||{}; state.myNotes[me]=e.target.value; save(); }); }
   function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return; const today=ymdLocal(new Date()); const me=state.me;
@@ -407,115 +786,287 @@ export function startApp({ seed, pushRemoteState }){
     box.querySelectorAll("[data-ev]").forEach(r=>r.addEventListener("click",()=>openEvView(r.dataset.ev))); }
   function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&(k.owner||"").trim()!==me)return; push(k.due,{type:"task",label:k.title||"Tarea",color:cssv(STATUS[k.status].v),node:x.node.id}); });
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",label:k.title||"Tarea",color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",label:"🔒 "+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
     (state.events||[]).forEach(ev=>push(ev.date,{type:"event",label:ev.title,id:ev.id}));
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
       const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':''}" ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}">${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${shown}${more}`:''}</div>`; }
-    mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div><div style="font-size:11.5px;color:var(--ink-faint);margin-top:10px">Tocá un día para sumar un evento. Las tareas con fecha ${me?"tuyas ":""}aparecen solas.</div></div>`;
+    mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
     mount.querySelector('[data-cal="prev"]').addEventListener("click",()=>{ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderCalendar(); });
     mount.querySelector('[data-cal="next"]').addEventListener("click",()=>{ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(); });
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
     mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; openEvNew(ds); }));
-    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task")openPanel(c.node); else openEvView(c.id); })); }
+    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else openEvView(c.id); })); }
+  function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
-    if(!me){ box.innerHTML=`<div class="ph"><div class="big">👋</div><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Elegí tu nombre arriba (campo "Sos") para ver acá lo tuyo. Cuando migremos a cuentas, cada quien verá solo lo suyo.</div></div>`; return; }
-    const sf=fStatus.value; let mine=activeItems().filter(x=>(x.k.owner||"").trim()===me); if(sf)mine=mine.filter(x=>x.k.status===sf);
-    const groups=STORD.map(s=>({s,arr:mine.filter(x=>x.k.status===s)})).filter(g=>g.arr.length);
-    box.innerHTML=`<div class="myfoco"><b>Tu foco</b> · ${mine.length} tarea${mine.length===1?"":"s"} a tu nombre</div>`+
-      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline" data-go="${x.node.id}" style="cursor:pointer">${x.k.done?"☑":"•"} ${esc(x.k.title||"Tarea")}<span class="who">${x.k.due?"📅 "+esc(x.k.due):esc(pathOf(x.node.id).map(p=>p.name).slice(-1)[0]||"")}</span></div>`).join("")}</div>`).join(""):'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>');
-    box.querySelectorAll("[data-go]").forEach(r=>r.addEventListener("click",()=>openPanel(r.dataset.go))); }
+    if(!me){ box.innerHTML=`<div class="ph"><div class="big">👋</div><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Elegí tu nombre arriba, en el campo "Sos".</div></div>`; return; }
+    const allMine=activeItems().filter(x=>ownersOf(x.k).includes(me));
+    state.tasksSeen=state.tasksSeen||{}; const seenSet=new Set(state.tasksSeen[me]||[]); const news=allMine.filter(x=>!seenSet.has(x.k.id));
+    // el panel muestra SIEMPRE todo lo tuyo salvo que vos filtres acá mismo
+    if(!Array.isArray(state.panelFilter))state.panelFilter=[];
+    const pf=state.panelFilter;
+    const groups=STORD.filter(s=>!pf.length||pf.includes(s)).map(s=>({s,arr:allMine.filter(x=>x.k.status===s)})).filter(g=>g.arr.length);
+    const allPriv=privL(me).filter(k=>!k.archived); const privs=pf.length?allPriv.filter(k=>pf.includes(k.status)):allPriv;
+    const filtBtn=`<div class="fdrop" id="panelFilt"><button class="${pf.length?"act":""}">Filtrar${pf.length?`<span class="cnum">${pf.length}</span>`:""}<span class="car">▼</span></button><div class="fmenu">`
+      +STORD.map(s=>`<label class="fopt"><input type="checkbox" data-pf="${s}"${pf.includes(s)?" checked":""}><span class="sd" style="background:${cssv(STATUS[s].v)}"></span><span class="lbl">${STATUS[s].l}</span></label>`).join("")
+      +(pf.length?`<button class="fclear">Ver todas</button>`:"")+`</div></div>`;
+    box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">🔒 ＋ tarea privada</button>${filtBtn}</span></div>`+
+      (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>🔒 Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
+        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${prioTag(k)}</div>`).join("")+`</div>`:"")+
+      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
+    box.querySelectorAll("[data-task]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask(r.dataset.node,r.dataset.task); }));
+    box.querySelectorAll("[data-priv]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask("__priv",r.dataset.priv); }));
+    box.querySelectorAll("[data-donetask]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
+      cb.addEventListener("change",e=>{ const [nid,iid]=cb.dataset.donetask.split("|"); const nd=N(nid); const k=nd&&(nd.items||[]).find(x=>x.id===iid); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); refreshChrome(); }); });
+    box.querySelectorAll("[data-donepriv]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
+      cb.addEventListener("change",e=>{ const k=privL(me).find(x=>x.id===cb.dataset.donepriv); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); }); });
+    document.getElementById("newPrivBtn").addEventListener("click",()=>openNewTask(true));
+    const pfd=document.getElementById("panelFilt"), pfm=pfd.querySelector(".fmenu");
+    pfd.querySelector("button").addEventListener("click",e=>{ e.stopPropagation(); pfm.classList.toggle("on"); });
+    pfm.addEventListener("click",e=>e.stopPropagation());
+    pfm.querySelectorAll("[data-pf]").forEach(cb=>cb.addEventListener("change",()=>{ const v=cb.dataset.pf, i=pf.indexOf(v);
+      if(cb.checked){ if(i<0)pf.push(v); } else if(i>=0)pf.splice(i,1); save(); renderMyTasks(); document.getElementById("panelFilt").querySelector(".fmenu").classList.add("on"); }));
+    const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
+    const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); }); }
 
   // ---------- panel lateral ----------
   const drawer=document.getElementById("drawer"),scrim=document.getElementById("scrim");
-  const pTitle=document.getElementById("pTitle"),pPrio=document.getElementById("pPrio"),pEnc=document.getElementById("pEnc"),pObj=document.getElementById("pObj"),pCtx=document.getElementById("pCtx"),pKind=document.getElementById("pKind"),pDot=document.getElementById("pDot"),subList=document.getElementById("subList"),itemList=document.getElementById("itemList"),linkList=document.getElementById("linkList");
+  const pTitle=document.getElementById("pTitle"),pObj=document.getElementById("pObj"),pCtx=document.getElementById("pCtx"),pKind=document.getElementById("pKind"),pDot=document.getElementById("pDot"),subList=document.getElementById("subList"),itemList=document.getElementById("itemList"),linkList=document.getElementById("linkList");
   let panelOpen=false;
-  function openPanel(id){ const n=N(id); if(!n)return; selId=id; panelOpen=true;
-    pTitle.value=n.name; pPrio.value=n.prio; pEnc.value=n.encargado||""; pObj.value=n.objetivo||""; pCtx.value=n.contexto||"";
+  const taskDrawer=document.getElementById("taskDrawer"),tTitle=document.getElementById("tTitle"),tStatus=document.getElementById("tStatus"),tPrio=document.getElementById("tPrio"),tDue=document.getElementById("tDue"),tObj=document.getElementById("tObj"),tNotas=document.getElementById("tNotas"),tDot=document.getElementById("tDot");
+  let selTaskNode=null,selTaskId=null,taskOpen=false;
+  const isPriv=()=>selTaskNode==="__priv";
+  function curTask(){ if(isPriv())return privL().find(x=>x.id===selTaskId); const nd=N(selTaskNode); return nd&&(nd.items||[]).find(x=>x.id===selTaskId); }
+  function peoplePick(el,getArr,onChange){ const arr=getArr(); const opts=allPeople().filter(p=>!arr.includes(p));
+    el.innerHTML=(arr.length?arr.map(p=>`<span class="pchip">${avatarMarkup(p,"av")}<span>${esc(p)}</span><button type="button" class="x" data-rm="${esc(p)}" title="Sacar">✕</button></span>`).join(""):`<span class="ppnone">— nadie —</span>`)
+      +`<span class="ppadd"><button type="button" class="addp">＋ persona</button><div class="ppmenu">`
+      +opts.map(p=>`<div class="fopt" data-add="${esc(p)}"><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}</span></div>`).join("")
+      +`<div class="fopt" data-newp><span class="sd" style="background:var(--wood)"></span><span class="lbl">＋ otra persona…</span></div></div></span>`;
+    el.querySelectorAll("[data-rm]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const a=getArr(); const i=a.indexOf(b.dataset.rm); if(i>=0)a.splice(i,1); onChange(); }));
+    const addb=el.querySelector(".addp"), menu=el.querySelector(".ppmenu");
+    addb.addEventListener("click",e=>{ e.stopPropagation(); const was=menu.classList.contains("on"); document.querySelectorAll(".ppmenu.on").forEach(m=>m.classList.remove("on")); if(!was)menu.classList.add("on"); });
+    menu.addEventListener("click",e=>e.stopPropagation());
+    menu.querySelectorAll("[data-add]").forEach(o=>o.addEventListener("click",()=>{ const a=getArr(); if(!a.includes(o.dataset.add))a.push(o.dataset.add); menu.classList.remove("on"); onChange(); }));
+    menu.querySelector("[data-newp]").addEventListener("click",()=>{ menu.classList.remove("on"); pedirTexto("Sumar a alguien","Nombre de la persona",nv=>{ const a=getArr(); if(!a.includes(nv))a.push(nv); onChange(); }); }); }
+  document.addEventListener("click",()=>{ document.querySelectorAll(".ppmenu.on").forEach(m=>m.classList.remove("on")); });
+  function renderTOwners(){ const k=curTask(); if(!k)return; peoplePick(document.getElementById("tOwners"),()=>ownersOf(k),()=>{ save(); renderTOwners(); refreshChrome(); renderActive(); }); }
+  function renderTFiles(){ const k=curTask(); if(!k)return; renderFileList(document.getElementById("tFiles"),k,()=>{ renderTFiles(); renderActive(); }); }
+  function renderTBelong(){ const k=curTask(); if(!k)return; const box=document.getElementById("tBelong");
+    document.getElementById("tKind").textContent=isPriv()?"Tarea privada":"Tarea";
+    if(isPriv()){
+      box.innerHTML=`<div class="subrow" style="cursor:default;border-left:3px solid var(--accent-priv)"><span class="orb" style="background:var(--accent-priv)"></span><span class="t"><b>🔒 Tarea privada</b><span>Solo la ves vos — no aparece para el equipo</span></span></div>`
+        +`<div style="margin-top:8px"><label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:4px">Pasarla al equipo</label><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="pick" id="tMoveNode" style="flex:1 1 190px"></select><button class="btn" id="tMoveGo">Compartir</button></div></div>`;
+      document.getElementById("tMoveNode").innerHTML=nodeOptionsHTML("",true);
+      document.getElementById("tMoveGo").addEventListener("click",()=>{ const n=N(document.getElementById("tMoveNode").value); if(!n){ note("Elegí a qué tema la querés pasar."); return; }
+        const arr=privList(); if(!arr){ note('Elegí quién sos para poder mover esta tarea.'); return; }
+        const i=arr.findIndex(x=>x.id===selTaskId); if(i<0){ note("Esa tarea ya no está en tu lista privada."); closeTask(); renderActive(); return; }
+        const [it]=arr.splice(i,1); delete it.priv; n.items=n.items||[]; n.items.push(it);
+        selTaskNode=n.id; save(); refreshChrome(); renderActive(); renderTBelong(); });
+      return; }
+    const node=N(selTaskNode); if(!node)return;
+    const path=pathOf(selTaskNode); const label=path[path.length-1].name; const trail=path.map(p=>p.name).slice(0,-1).join(" › ")||"raíz";
+    box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><span class="go">↗</span></div>`
+      +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">🔒 Convertir en tarea privada</button>`;
+    document.getElementById("tGoNode").addEventListener("click",()=>{ closeTask(); openPanel(selTaskNode); });
+    document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note('Primero elegí quién sos en el campo "Sos" (arriba).'); return; }
+      confirmar("La tarea sale del tema y pasa a tu panel privado: nadie más la va a ver y queda solo a tu nombre.",()=>{
+        const n=N(selTaskNode); const i=(n.items||[]).findIndex(x=>x.id===selTaskId); if(i<0)return; const [it]=n.items.splice(i,1); it.priv=true; it.owners=[me];
+        privList(me).push(it); selTaskNode="__priv"; save(); refreshChrome(); renderActive(); renderTBelong(); renderTOwners(); },{title:"Convertir en privada",yes:"Hacerla privada"}); }); }
+  function openTask(nodeId,taskId){ let k=null;
+    if(nodeId==="__priv"){ k=privL().find(x=>x.id===taskId); } else { const node=N(nodeId); k=node&&(node.items||[]).find(x=>x.id===taskId); }
+    if(!k)return; selTaskNode=nodeId; selTaskId=taskId; taskOpen=true;
+    // al abrirla deja de contar como "nueva" para vos
+    if(state.me&&ownersOf(k).includes(state.me)){ state.tasksSeen=state.tasksSeen||{};
+      const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); } }
+    drawer.classList.remove("on"); panelOpen=false;
+    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
+    document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
+    renderTOwners(); renderTBelong(); renderTFiles();
+    taskDrawer.classList.add("on"); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
+  function closeTask(){ taskOpen=false; taskDrawer.classList.remove("on"); scrim.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); if(active==="panel")renderPanel(); }
+  function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done;
+    tTitle.classList.toggle("done",!!k.done);
+    const ab=document.getElementById("tArch"); if(ab)ab.textContent=k.done?"🗃️ Archivar":"🗃️ Terminar y archivar";
+    syncTaskDots(k); }
+  function syncTaskDots(k){ tDot.style.background=cssv(STATUS[k.status].v); tDot.title=STATUS[k.status].l;
+    const pd=document.getElementById("tPrioDot"); if(!pd)return; const pr=prioOf(k);
+    pd.classList.toggle("none",!pr); pd.style.background=pr?cssv(pr.v):"";
+    pd.title=pr?"Prioridad "+pr.l.toLowerCase():"Sin prioridad"; }
+  function openPanel(id){ const n=N(id); if(!n)return; taskDrawer.classList.remove("on"); taskOpen=false; selId=id; panelOpen=true;
+    pTitle.value=n.name; pObj.value=n.objetivo||""; pCtx.value=n.contexto||""; renderPEncs();
     const depth=depthOf(n); pKind.textContent=n.kind==="project"?"Proyecto":(depth<=2?"Macro-tema":"Sub-tema · nivel "+depth); pDot.style.background=accentOf(n);
     renderPanelBody(n); renderActive(); drawer.classList.add("on"); scrim.classList.add("on"); drawer.setAttribute("aria-hidden","false"); }
   function closePanel(){ panelOpen=false; drawer.classList.remove("on"); scrim.classList.remove("on"); drawer.setAttribute("aria-hidden","true"); document.getElementById("picker").classList.remove("on"); }
+  function renderPEncs(){ const n=N(selId); if(!n)return; peoplePick(document.getElementById("pEncs"),()=>encsOf(n),()=>{ save(); renderPEncs(); refreshChrome(); renderActive(); }); }
   function commit(){ save(); if(panelOpen&&N(selId))renderPanelBody(N(selId)); renderActive(); }
   function renderPanelBody(n){
     subList.innerHTML=(n.children||[]).length?n.children.map(cid=>{ const c=N(cid); if(!c)return""; const a=agg(c); return `<div class="subrow" data-open="${cid}"><span class="orb" style="background:${accentOf(c)}"></span><span class="t"><b>${esc(c.name)}</b><span>${(c.children||[]).length} sub · ${a.ic} tareas</span></span><span class="go">↳</span></div>`; }).join(""):`<div class="empty">Sin sub-temas.</div>`;
     subList.querySelectorAll(".subrow").forEach(r=>r.addEventListener("click",()=>openPanel(r.dataset.open)));
     const acts=(n.items||[]).filter(k=>!k.archived);
-    itemList.innerHTML=acts.length?acts.map(k=>itemHTML(k)).join(""):`<div class="empty">Sin tareas. Una tarea puede ser hacer algo o tomar una decisión.</div>`;
-    acts.forEach(k=>wireItem(n,k));
+    itemList.innerHTML=acts.length?acts.map(k=>{ const sc=cssv(STATUS[k.status].v); return `<div class="taskrow2" data-t="${k.id}"><input type="checkbox" class="chk" ${k.done?"checked":""}><span class="tt ${k.done?'done':''}">${esc(k.title||"Tarea")}</span><span class="sdotc" style="background:${sc}"></span>${ownersOf(k).length?`<span class="who">${esc(peopleLabel(ownersOf(k)))}</span>`:''}<span class="go">↗</span></div>`; }).join(""):`<div class="empty">Sin tareas. Tocá "＋ tarea" para sumar una.</div>`;
+    acts.forEach(k=>{ const row=itemList.querySelector(`[data-t="${k.id}"]`); if(!row)return; const cb=row.querySelector(".chk"); cb.addEventListener("click",e=>e.stopPropagation()); cb.addEventListener("change",e=>{ setDone(k,e.target.checked); commit(); }); row.addEventListener("click",e=>{ if(e.target.closest(".chk"))return; openTask(n.id,k.id); }); });
+    // un proyecto es raíz: no pertenece a nada, no se vincula con otros y no lleva tareas propias
+    const isRoot=!n.parent||!N(n.parent);
+    const bs=document.getElementById("pBelongSec"), bb=document.getElementById("pBelong");
+    bs.style.display=isRoot?"none":"";
+    document.getElementById("pLinksSec").style.display=isRoot?"none":"";
+    document.getElementById("pTasksSec").style.display=isRoot?"none":"";
+    if(!isRoot){ const par=N(n.parent); const p=pathOf(par.id).map(z=>z.name); const label=p.pop();
+      bb.innerHTML=`<div class="subrow" id="pGoUp"><span class="orb" style="background:${accentOf(par)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(p.join(" › ")||"proyecto")}</span></span><span class="go">↗</span></div>`;
+      document.getElementById("pGoUp").addEventListener("click",()=>openPanel(par.id)); }
+    renderFileList(document.getElementById("pFiles"),n,()=>{ renderPanelBody(n); renderActive(); });
     const ls=(n.links||[]).map(N).filter(Boolean);
     linkList.innerHTML=ls.length?ls.map(t=>{ const p=pathOf(t.id).map(x=>x.name); const label=p.pop(); return `<div class="linkrow"><span style="width:9px;height:9px;border-radius:50%;background:${accentOf(t)}"></span><span class="path" data-go="${t.id}"><b>${esc(label)}</b><span>${esc(p.join(" › ")||"raíz")}</span></span><button class="x" data-unlink="${t.id}">✕</button></div>`; }).join(""):`<div class="empty">Sin vínculos.</div>`;
     linkList.querySelectorAll("[data-go]").forEach(g=>g.addEventListener("click",()=>openPanel(g.dataset.go)));
     linkList.querySelectorAll("[data-unlink]").forEach(b=>b.addEventListener("click",()=>{ removeLink(n.id,b.dataset.unlink); renderPanelBody(n); renderActive(); })); }
-  function itemHTML(k){ const sc=cssv(STATUS[k.status].v); return `<div class="item" data-it="${k.id}" style="border-left-color:${sc}">
-    <div class="r1"><input type="checkbox" class="chk" ${k.done?"checked":""}><input class="it ${k.done?'done':''}" value="${esc(k.title)}" placeholder="¿Qué hay que hacer / decidir?"><button class="notesbtn" title="Notas">🗒${k.notas?'<span class="dotn"></span>':''}</button><button class="del" aria-label="Eliminar">✕</button></div>
-    <div class="r2"><input class="own" value="${esc(k.owner||"")}" placeholder="Encargado" list="peopleList"><select class="m st">${Object.entries(STATUS).map(([v,o])=>`<option value="${v}"${v===k.status?" selected":""}>${o.l}</option>`).join("")}</select><select class="m pr">${Object.entries(PRIO).map(([v,o])=>`<option value="${v}"${v===k.prio?" selected":""}>${o.l}</option>`).join("")}</select><input type="date" class="due" value="${k.due||''}"></div>
-    <div class="notes" style="display:${k.notas?'block':'none'}"><textarea placeholder="Notas · en qué está la persona…">${esc(k.notas||"")}</textarea></div></div>`; }
-  function wireItem(n,k){ const row=itemList.querySelector(`[data-it="${k.id}"]`); if(!row)return;
-    row.querySelector(".chk").addEventListener("change",e=>{ setDone(k,e.target.checked); renderPanelBody(n); commit(); });
-    row.querySelector(".it").addEventListener("input",e=>{k.title=e.target.value;save();});
-    row.querySelector(".own").addEventListener("input",e=>{k.owner=e.target.value;save();});
-    row.querySelector(".own").addEventListener("change",()=>{refreshChrome();renderActive();});
-    row.querySelector(".st").addEventListener("change",e=>{setStatus(k,e.target.value);row.style.borderLeftColor=cssv(STATUS[k.status].v);renderPanelBody(n);commit();});
-    row.querySelector(".pr").addEventListener("change",e=>{k.prio=e.target.value;save();});
-    row.querySelector(".due").addEventListener("change",e=>{k.due=e.target.value;commit();});
-    const nb=row.querySelector(".notesbtn"),notes=row.querySelector(".notes"); nb.addEventListener("click",()=>{ notes.style.display=notes.style.display==="none"?"block":"none"; if(notes.style.display==="block")notes.querySelector("textarea").focus(); });
-    notes.querySelector("textarea").addEventListener("input",e=>{ k.notas=e.target.value; save(); nb.innerHTML="🗒"+(k.notas?'<span class="dotn"></span>':''); });
-    row.querySelector(".del").addEventListener("click",()=>{ n.items=n.items.filter(x=>x!==k); renderPanelBody(n); commit(); }); }
   pTitle.addEventListener("input",()=>{ const n=N(selId); if(n){n.name=pTitle.value;save(); const e=document.querySelector(`.neu[data-id="${selId}"] .nm`); if(e)e.textContent=n.name;} });
   pTitle.addEventListener("change",()=>renderActive());
-  pPrio.addEventListener("change",()=>{ const n=N(selId); if(n){n.prio=pPrio.value;commit();} });
-  pEnc.addEventListener("input",()=>{ const n=N(selId); if(n){n.encargado=pEnc.value;save();} });
-  pEnc.addEventListener("change",()=>{ refreshChrome(); renderActive(); });
   pObj.addEventListener("input",()=>{ const n=N(selId); if(n){n.objetivo=pObj.value;save();} });
   pObj.addEventListener("change",()=>renderActive());
   pCtx.addEventListener("input",()=>{ const n=N(selId); if(n){n.contexto=pCtx.value;save();} });
   pCtx.addEventListener("change",()=>renderActive());
   document.getElementById("enterBtn").addEventListener("click",()=>{ if(selId){ showTab("mapa"); focusNode(selId); } });
   document.getElementById("addSub").addEventListener("click",()=>{ if(selId)addSubTo(selId); });
-  document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; n.items=n.items||[]; n.items.push(newTask()); renderPanelBody(n); commit(); const its=itemList.querySelectorAll(".it"); its[its.length-1]?.focus(); });
-  document.getElementById("delNode").addEventListener("click",()=>{ const n=N(selId); if(!n)return; if(n.kind==="project"&&state.roots.length<=1){ alert("Tiene que quedar al menos un proyecto."); return; } if(!confirm(`¿Eliminar "${n.name}" y todo su contenido?`))return;
-    const rm=id=>{ const x=N(id); if(!x)return; (x.children||[]).slice().forEach(rm); (x.links||[]).slice().forEach(l=>removeLink(id,l)); const par=N(x.parent); if(par)par.children=par.children.filter(c=>c!==id); state.roots=state.roots.filter(r=>r!==id); delete state.nodes[id]; off.delete(id); };
-    rm(n.id); selId=null; save(); closePanel(); renderActive(); });
+  document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; n.items=n.items||[]; const k=newTask(); n.items.push(k); save(); openTask(n.id,k.id); });
+  document.getElementById("delNode").addEventListener("click",()=>{ const n=N(selId); if(!n)return; if(n.kind==="project"&&state.roots.length<=1){ note("Tiene que quedar al menos un proyecto."); return; }
+    confirmar(`Se elimina "${n.name}" con todos sus sub-temas y tareas. No se puede deshacer.`,()=>{
+      const rm=id=>{ const x=N(id); if(!x)return; (x.children||[]).slice().forEach(rm); (x.links||[]).slice().forEach(l=>removeLink(id,l)); const par=N(x.parent); if(par)par.children=par.children.filter(c=>c!==id); state.roots=state.roots.filter(r=>r!==id); delete state.nodes[id]; off.delete(id); };
+      rm(n.id); selId=null; save(); closePanel(); renderActive(); },{title:"Eliminar tema",yes:"Eliminar",danger:true}); });
   document.getElementById("closePanel").addEventListener("click",closePanel);
-  scrim.addEventListener("click",closePanel);
+  scrim.addEventListener("click",()=>{ closePanel(); closeTask(); });
+  document.getElementById("closeTask").addEventListener("click",closeTask);
+  tTitle.addEventListener("input",()=>{ const k=curTask(); if(k){k.title=tTitle.value;save();} });
+  tTitle.addEventListener("change",renderActive);
+  tStatus.addEventListener("change",()=>{ const k=curTask(); if(k){ setStatus(k,tStatus.value); syncTaskDone(k); save(); renderActive(); } });
+  document.getElementById("tDoneChk").addEventListener("change",e=>{ const k=curTask(); if(!k)return; setDone(k,e.target.checked); tStatus.value=k.status; syncTaskDone(k); save(); renderActive(); });
+  document.getElementById("tArch").addEventListener("click",()=>{ const k=curTask(); if(!k)return; archiveTask(k); save(); closeTask(); renderActive(); refreshChrome(); });
+  tPrio.addEventListener("change",()=>{ const k=curTask(); if(k){k.prio=tPrio.value;syncTaskDots(k);save();renderActive();} });
+  tDue.addEventListener("change",()=>{ const k=curTask(); if(k){k.due=tDue.value;save();renderActive();} });
+  tObj.addEventListener("input",()=>{ const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
+  tNotas.addEventListener("input",()=>{ const k=curTask(); if(k){k.notas=tNotas.value;save();} });
+  document.getElementById("tDel").addEventListener("click",()=>{ if(isPriv()){ const arr=privList(); if(!arr){ note("Elegí quién sos para poder borrarla."); return; } const i=arr.findIndex(x=>x.id===selTaskId); if(i<0){ note("Esa tarea ya no existe."); closeTask(); renderActive(); return; } arr.splice(i,1); } else { const nd=N(selTaskNode); if(!nd)return; nd.items=(nd.items||[]).filter(x=>x.id!==selTaskId); } save(); closeTask(); renderActive(); });
   const picker=document.getElementById("picker"),pickSearch=document.getElementById("pickSearch"),pickList=document.getElementById("pickList");
   document.getElementById("addLink").addEventListener("click",()=>{ picker.classList.toggle("on"); if(picker.classList.contains("on")){pickSearch.value="";renderPick("");pickSearch.focus();} });
   pickSearch.addEventListener("input",()=>renderPick(pickSearch.value));
   function renderPick(q){ const n=N(selId); if(!n)return; q=q.toLowerCase(); const opts=Object.values(state.nodes).filter(x=>x.id!==selId&&!n.links.includes(x.id)&&x.name.toLowerCase().includes(q)).slice(0,40).map(x=>{ const p=pathOf(x.id).map(z=>z.name); const label=p.pop(); return `<div class="opt" data-pick="${x.id}"><b>${esc(label)}</b> <span>${esc(p.join(" › ")||"proyecto")}</span></div>`; }).join(""); pickList.innerHTML=opts||`<div class="empty">Sin resultados</div>`;
     pickList.querySelectorAll("[data-pick]").forEach(o=>o.addEventListener("click",()=>{ addLinkBetween(selId,o.dataset.pick); picker.classList.remove("on"); renderPanelBody(n); renderActive(); toast("Vínculo creado ✦"); })); }
 
+  // ---------- nueva tarea (desde la pestaña Tareas) ----------
+  const ntModal=document.getElementById("ntModal");
+  let ntOwnersArr=[];
+  function renderNtOwners(){ peoplePick(document.getElementById("ntOwners"),()=>ntOwnersArr,renderNtOwners); }
+  // los proyectos raíz no llevan tareas propias: van como encabezado inerte, no como opción elegible
+  function nodeOptionsHTML(sel,noPriv){ const out=[];
+    if(!noPriv&&state.me)out.push(`<option value="__priv"${sel==="__priv"?" selected":""}>🔒 Privada — solo la ves vos</option>`);
+    const walk=(id,depth)=>{ const n=N(id); if(!n)return;
+      if(depth===1) out.push(`<option disabled>── ${esc(n.name)} ──</option>`);
+      else { const pad="　".repeat(depth-2)+(depth>2?"› ":""); out.push(`<option value="${n.id}"${n.id===sel?" selected":""}>${esc(pad+n.name)}</option>`); }
+      (n.children||[]).forEach(c=>walk(c,depth+1)); };
+    state.roots.forEach(r=>walk(r,1)); return out.join(""); }
+  function openNewTask(priv){ const f=tfil();
+    if(priv===true&&!state.me){ note('Primero elegí quién sos en el campo "Sos" (arriba) para tener tareas privadas.'); return; }
+    document.getElementById("ntTitle").value="";
+    const preT=priv===true?"__priv":(f.temas.length===1?f.temas[0]:(N(state.estFocus)?state.estFocus:""));
+    document.getElementById("ntNode").innerHTML=nodeOptionsHTML(preT);
+    const preP=(f.people.length===1&&f.people[0]!=="__none")?f.people[0]:(state.me||"");
+    ntOwnersArr=preP?[preP]:[]; renderNtOwners();
+    document.getElementById("ntDue").value="";
+    document.getElementById("ntStatus").innerHTML=STORD.filter(s=>s!=="listo").map(s=>`<option value="${s}"${s==="sin"?" selected":""}>${STATUS[s].l}</option>`).join("");
+    document.getElementById("ntPrio").innerHTML=`<option value="" selected>— sin prioridad —</option>`+PRORD.map(v=>`<option value="${v}">${PRIO[v].l}</option>`).join("");
+    ntModal.classList.add("on"); setTimeout(()=>document.getElementById("ntTitle").focus(),40); }
+  function closeNT(){ ntModal.classList.remove("on"); }
+  function createNT(){ const dest=document.getElementById("ntNode").value; const priv=dest==="__priv"; const n=priv?null:N(dest);
+    if(!priv&&!n){ note("Elegí a qué tema pertenece."); return; }
+    const title=document.getElementById("ntTitle").value.trim(); if(!title){ note("Poné un título para la tarea."); return; }
+    const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
+    if(priv){ const arr=privList(); if(!arr){ note('Elegí quién sos en el campo "Sos" (arriba) para tener tareas privadas.'); return; }
+      k.priv=true; if(!k.owners.length&&state.me)k.owners=[state.me]; arr.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask("__priv",k.id); return; }
+    n.items=n.items||[]; n.items.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask(n.id,k.id); }
+  document.getElementById("gmCancel").addEventListener("click",closeGM);
+  document.getElementById("gmSave").addEventListener("click",saveGM);
+  document.getElementById("gmDel").addEventListener("click",delGM);
+  document.getElementById("groupModal").addEventListener("click",e=>{ if(e.target.id==="groupModal")closeGM(); });
+  document.getElementById("gmName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveGM(); } });
+  document.getElementById("driveSearch").addEventListener("input",e=>{ driveQuery=e.target.value; renderDrive(); });
+  document.getElementById("driveAdd").addEventListener("click",()=>openFileModal({kind:"pick"}));
+  document.getElementById("pAddFile").addEventListener("click",()=>{ const n=N(selId); if(!n)return; openFileModal({kind:"node",node:n}); });
+  document.getElementById("tAddFile").addEventListener("click",()=>{ const k=curTask(); if(!k)return; openFileModal({kind:"task",task:k}); });
+  document.getElementById("fmCancel").addEventListener("click",closeFM);
+  document.getElementById("fmSave").addEventListener("click",saveFM);
+  document.getElementById("fileModal").addEventListener("click",e=>{ if(e.target.id==="fileModal")closeFM(); });
+  document.getElementById("fmUrl").addEventListener("input",e=>{ const nm=document.getElementById("fmName"); if(!nm.dataset.touched){ const k=kindOfUrl(e.target.value); nm.placeholder="Ej: "+(FKIND[k]||FKIND.link).l; } });
+  document.getElementById("fmName").addEventListener("input",e=>{ e.target.dataset.touched=e.target.value?"1":""; });
+  document.getElementById("fmName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveFM(); } });
+  document.getElementById("askYes").addEventListener("click",()=>{ const cb=askCb, v=document.getElementById("askInput").value; closeAsk(); if(cb)cb(v); });
+  document.getElementById("askNo").addEventListener("click",closeAsk);
+  document.getElementById("askModal").addEventListener("click",e=>{ if(e.target.id==="askModal")closeAsk(); });
+  document.getElementById("askInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("askYes").click(); } });
+  document.getElementById("taskSearch").addEventListener("input",e=>{ taskQuery=e.target.value; renderTareas(); });
+  document.getElementById("estSearch").addEventListener("input",e=>{ estQuery=e.target.value; renderEstructura(); });
+  document.getElementById("estSearchClear").addEventListener("click",()=>{ estQuery=""; document.getElementById("estSearch").value=""; renderEstructura(); });
+  document.getElementById("newTaskBtn").addEventListener("click",openNewTask);
+  document.getElementById("ntCancel").addEventListener("click",closeNT);
+  document.getElementById("ntCreate").addEventListener("click",createNT);
+  document.getElementById("ntTitle").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); createNT(); } });
+  ntModal.addEventListener("click",e=>{ if(e.target===ntModal)closeNT(); });
+
   fPerson.addEventListener("change",renderActive); fStatus.addEventListener("change",renderActive);
   document.getElementById("weekGoals").addEventListener("input",e=>{ state.weekGoals=e.target.value; save(); });
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
+  document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note('Elegí quién sos en el campo "Sos" (arriba) para poder mandar archivos.'); return; } document.getElementById("chatFile").click(); });
+  document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
   document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg(); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });
-  meSel.addEventListener("change",()=>{ state.me=meSel.value; save(); if(active==="panel")renderPanel(); });
+  // cambiar de identidad afecta panel, chat, privadas y archivo: hay que refrescar todo y soltar lo que estaba abierto
+  meSel.addEventListener("change",()=>{ state.me=meSel.value;
+    if(taskOpen)closeTask(); if(panelOpen)closePanel();
+    closeAsk(); closeNT(); closeFM(); closeGM(); closeEv();
+    save(); refreshChrome(); renderActive(); updateChatBadge(); });
   function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
-  document.getElementById("themeBtn").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const next=cur==="dark"?"light":"dark"; state.theme=next; applyTheme(next); save(); renderActive(); });
+  // Paleta de fondo, aparte del claro/oscuro: cada una define sus tonos en ambos modos.
+  const PALETAS={bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
+  function applyPalette(p){ if(p&&PALETAS[p])document.documentElement.setAttribute("data-palette",p); else document.documentElement.removeAttribute("data-palette"); }
+  document.getElementById("themeBtn").addEventListener("click",()=>{ let cur=document.documentElement.getAttribute("data-theme");
+    if(!cur)cur=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; // sin esto, el 1er clic no hacía nada
+    const next=cur==="dark"?"light":"dark"; state.theme=next; applyTheme(next); save(); renderActive(); });
   const modal=document.getElementById("modal"),jsonArea=document.getElementById("jsonArea");
   document.getElementById("openData").addEventListener("click",()=>{ jsonArea.value=JSON.stringify(state,null,2); modal.classList.add("on"); });
   function closeModal(){ modal.classList.remove("on"); }
   document.getElementById("closeModal").addEventListener("click",closeModal);
   modal.addEventListener("click",e=>{ if(e.target===modal)closeModal(); });
   document.getElementById("copyJson").addEventListener("click",async()=>{ try{await navigator.clipboard.writeText(jsonArea.value);}catch(e){jsonArea.select();document.execCommand("copy");} flashBtn("copyJson","¡Copiado!"); });
-  document.getElementById("loadJson").addEventListener("click",()=>{ try{ const d=JSON.parse(jsonArea.value); if(!d||!d.nodes)throw 0; state=normalize(d); if(typeof state.seq!=="number")state.seq=9999; applyTheme(state.theme||null); selId=null; off.clear(); treeOpen.clear(); closePops(); cam._init=0; save(); renderActive(); if(active==="mapa"){fit();cam._init=1;} closeModal(); }catch(e){ alert("Ese texto no es válido."); } });
-  document.getElementById("dlJson").addEventListener("click",async()=>{ const data=JSON.stringify(state,null,2),fname="mesa-bosques.json"; if(window.claude&&window.claude.downloads){ try{ await window.claude.downloads.save({filename:fname,data}); flashBtn("dlJson","Descargado"); return; }catch(err){ if(err&&err.code==="declined")return; } } try{ const b=new Blob([data],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }catch(e){ alert("Usá Copiar."); } });
-  document.getElementById("resetDemo").addEventListener("click",()=>{ if(confirm("Esto borra los datos de TODO el equipo (compartidos) y los reemplaza por el ejemplo. Esta acción no se puede deshacer. ¿Seguro que querés seguir?")){ state=demo(); applyTheme(null); selId=null; off.clear(); treeOpen.clear(); cam._init=0; save(); renderActive(); fit(); cam._init=1; closeModal(); } });
+  document.getElementById("loadJson").addEventListener("click",()=>{ try{ const d=JSON.parse(jsonArea.value);
+    if(!d||typeof d!=="object"||!d.nodes||typeof d.nodes!=="object")throw 0;
+    if(!Array.isArray(d.roots))d.roots=Object.values(d.nodes).filter(n=>n&&!n.parent).map(n=>n.id);
+    d.roots=d.roots.filter(r=>d.nodes[r]); if(!d.roots.length)throw 0;   // sin raíces la app queda inutilizable
+    state=normalize(d); if(typeof state.seq!=="number")state.seq=9999; applyTheme(state.theme||null); selId=null; off.clear(); treeOpen.clear(); closePops(); cam._init=0; save(); renderActive(); if(active==="mapa"){fit();cam._init=1;} closeModal(); }catch(e){ note("Ese texto no es un respaldo válido."); } });
+  document.getElementById("dlJson").addEventListener("click",async()=>{ const data=JSON.stringify(state,null,2),fname="mesa-bosques.json"; if(window.claude&&window.claude.downloads){ try{ await window.claude.downloads.save({filename:fname,data}); flashBtn("dlJson","Descargado"); return; }catch(err){ if(err&&err.code==="declined")return; } } try{ const b=new Blob([data],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }catch(e){ note("No se pudo descargar. Usá el botón Copiar."); } });
+  document.getElementById("resetDemo").addEventListener("click",()=>{ closeModal(); confirmar("Se reemplaza TODO el contenido actual por los datos de ejemplo. Se pierde lo que hayan cargado.",()=>{ state=normalize(demo()); applyTheme(null); selId=null; off.clear(); treeOpen.clear(); cam._init=0; save(); renderActive(); fit(); cam._init=1; },{title:"Volver al ejemplo",yes:"Reemplazar todo",danger:true}); });
   function flashBtn(id,t){ const b=document.getElementById(id); const o=b.textContent; b.textContent=t; setTimeout(()=>b.textContent=o,1200); }
   let toastT; const toastEl=document.getElementById("toast");
   function toast(m){ toastEl.textContent=m; toastEl.classList.remove("hide"); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.add("hide"),2600); }
-  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(panelOpen){closePanel();return;} if(modal.classList.contains("on")){closeModal();return;} });
+  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("askModal").classList.contains("on")){closeAsk();return;} if(document.getElementById("fileModal").classList.contains("on")){closeFM();return;} if(document.getElementById("groupModal").classList.contains("on")){closeGM();return;} if(ntModal.classList.contains("on")){closeNT();return;} if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(taskOpen){closeTask();return;} if(panelOpen){closePanel();return;} if(modal.classList.contains("on")){closeModal();return;} });
 
   const dl=document.createElement("datalist"); dl.id="peopleList"; document.body.appendChild(dl);
   function syncPeopleList(){ dl.innerHTML=allPeople().map(p=>`<option value="${esc(p)}">`).join(""); }
 
-  { const prefs=loadLocalPrefs(); state=Object.assign(seed?normalize(seed):demo(),prefs); }
-  if(typeof state.seq!=="number")state.seq=9999; if(!state.edgeMeta)state.edgeMeta={}; applyTheme(state.theme||null); sweepArchive(); syncPeopleList();
-  if(!seed) pushRemoteState(stripLocal(state));
-  active=state.tab||"mapa"; if(active==="personal")active="panel"; showTab(active);
-  window.addEventListener("resize",()=>{ if(active==="mapa")applyCam(); });
 
-  return { applyRemoteState };
+  // Arranque. normalize() corre DESPUÉS de mezclar las preferencias locales,
+  // así un tema borrado por otro no deja filtros apuntando a la nada.
+  { const prefs=loadLocalPrefs();
+    state=normalize(Object.assign(seed?seed:demo(),prefs)); }
+  if(typeof state.seq!=="number")state.seq=9999; if(!state.edgeMeta)state.edgeMeta={};
+  mountPrivate(priv);
+  migrarMisPrivados(priv);
+  applyTheme(state.theme||null); applyPalette(state.palette||null);
+  sweepArchive(); loadTreeOpen(); syncPeopleList();
+  lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
+  if(!seed) save();                                // base vacía: sembrar
+  active=state.tab||"panel"; if(active==="personal")active="panel"; if(active==="mapa")active="estructura"; showTab(active);
+  window.addEventListener("resize",()=>{ if(active==="mapa"||active==="estructura")applyCam(); });
+
+  return { applyRemoteState, applyPrivateState };
 }

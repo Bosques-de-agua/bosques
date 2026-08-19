@@ -1,6 +1,7 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
 import { fetchRemoteState, pushRemoteState, subscribeRemoteState } from "./sync.js";
+import { fetchPrivateState, pushPrivateState } from "./private.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
 
@@ -60,11 +61,26 @@ async function launchApp(session) {
     return;
   }
 
+  // Los datos privados son de esta persona: si no se pueden leer, la app
+  // arranca igual (con la porción vacía) en vez de bloquear todo.
+  const email = session.user.email;
+  let priv = null;
+  try {
+    priv = await fetchPrivateState(email);
+  } catch (err) {
+    console.error("No se pudieron leer tus datos privados:", err);
+  }
+
   showApp();
-  addSignOutPill(session.user.email);
+  addSignOutPill(email);
   initPush();
 
-  const app = startApp({ seed, pushRemoteState });
+  const app = startApp({
+    seed,
+    priv,
+    pushRemoteState,
+    pushPrivateState: (data) => pushPrivateState(email, data),
+  });
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 }
 

@@ -79,3 +79,32 @@ create policy "team manages own push sub" on push_subscriptions
   for all
   using (is_allowed() and email = auth.jwt() ->> 'email')
   with check (is_allowed() and email = auth.jwt() ->> 'email');
+
+-- 6) Datos privados de cada persona: tareas privadas y notas personales.
+--    Van acá y NO en app_state, que es una sola fila compartida por el equipo:
+--    cualquier cosa que esté ahí la puede leer cualquiera.
+--    La clave es el EMAIL (no el nombre visible) para que renombrarse no rompa nada.
+create table if not exists user_private (
+  email text primary key,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table user_private enable row level security;
+
+-- Cada quien ve y escribe únicamente su propia fila.
+drop policy if exists "own private select" on user_private;
+create policy "own private select" on user_private
+  for select using (is_allowed() and email = auth.jwt() ->> 'email');
+
+drop policy if exists "own private insert" on user_private;
+create policy "own private insert" on user_private
+  for insert with check (is_allowed() and email = auth.jwt() ->> 'email');
+
+drop policy if exists "own private update" on user_private;
+create policy "own private update" on user_private
+  for update using (is_allowed() and email = auth.jwt() ->> 'email')
+        with check (is_allowed() and email = auth.jwt() ->> 'email');
+
+-- A propósito NO se agrega a supabase_realtime: sincronizar al abrir alcanza
+-- para datos personales, y es una superficie menos donde equivocarse con permisos.
