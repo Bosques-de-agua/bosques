@@ -905,7 +905,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.values(state.nodes).forEach(n=>{ n.encargados=cambia(encsOf(n));
       (n.items||[]).forEach(k=>{ k.owners=cambia(ownersOf(k)); });
       filesOf(n).forEach(f=>{ if(f.addedBy===viejo)f.addedBy=nuevo; }); });
-    [state.privTasks,state.myNotes,state.avatars,state.userColors,state.tasksSeen].forEach(mueveClave);
+    [state.privTasks,state.myNotes,state.avatars,state.userColors,state.tasksSeen,state.chatSeen].forEach(mueveClave);
     (state.events||[]).forEach(ev=>mueveClave(ev.rsvp));
     // conversaciones privadas: la clave son los dos nombres ordenados
     const dm=state.chat.dm||{}; const nuevoDm={};
@@ -1284,12 +1284,24 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(yo&&yo.name)state.me=yo.name;
   mountPrivate(priv);
   migrarMisPrivados(priv);
+  // Primer arranque en este dispositivo (o después de un renombre hecho en
+  // otro): se da por visto lo que ya existe, para no mostrar treinta avisos.
+  if(state.me){ state.tasksSeen=state.tasksSeen||{};
+    if(!Array.isArray(state.tasksSeen[state.me]))
+      state.tasksSeen[state.me]=activeItems().filter(x=>ownersOf(x.k).includes(state.me)).map(x=>x.k.id); }
   applyTheme(state.theme||null); applyPalette(state.palette||null);
   sweepArchive(); loadTreeOpen(); syncPeopleList();
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
   if(!seed) save();                                // base vacía: sembrar
-  active=state.tab||"panel"; if(active==="personal")active="panel"; if(active==="mapa")active="estructura"; showTab(active);
-  window.addEventListener("resize",()=>{ if(active==="mapa"||active==="estructura")applyCam(); });
+  // Si la pestaña guardada ya no existe (el mapa pasó a vivir dentro de
+  // Estructura), se cae a una válida en vez de quedar en pantalla vacía.
+  const TABS=["panel","tareas","chat","drive","archivo","estructura"];
+  active=state.tab||"panel";
+  if(active==="personal")active="panel";
+  if(active==="mapa"){ active="estructura"; state.estView="mapa"; }
+  if(!TABS.includes(active))active="panel";
+  showTab(active);
+  window.addEventListener("resize",()=>{ if(active==="estructura"&&estView()==="mapa")applyCam(); });
 
   // Si llegaste desde una notificación, abrimos esa tarea directamente.
   try{ const q=new URLSearchParams(window.location.search); const tid=q.get("tarea");
