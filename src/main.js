@@ -1,6 +1,6 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
-import { fetchRemoteState, pushRemoteState, subscribeRemoteState } from "./sync.js";
+import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail } from "./sync.js";
 import { fetchPrivateState, pushPrivateState } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail } from "./team.js";
 import { startApp } from "./app.js";
@@ -62,26 +62,35 @@ async function launchApp(session) {
     return;
   }
 
-  // Los datos privados son de esta persona: si no se pueden leer, la app
-  // arranca igual (con la porción vacía) en vez de bloquear todo.
+  // Datos privados. Si NO se pudieron leer, la app arranca igual pero en modo
+  // solo-lectura para esa parte: sin esto, el primer guardado subiría una
+  // porción vacía y borraría las notas y tareas privadas de verdad.
   const email = session.user.email;
+  setClientEmail(email);
   let priv = null;
+  let privOk = true;
   try {
     priv = await fetchPrivateState(email);
   } catch (err) {
     console.error("No se pudieron leer tus datos privados:", err);
+    privOk = false;
   }
 
   // Quién sos sale del correo con el que entraste, no de un selector.
   // Si es tu primera vez, se crea tu ficha con la parte antes del @.
   let team = [];
+  let teamOk = true;
   try {
     team = await fetchTeam();
   } catch (err) {
     console.error("No se pudo leer el equipo:", err);
+    teamOk = false;
   }
   let yo = team.find((m) => m.email === email) || null;
-  if (!yo) {
+  // Solo se crea la ficha si de verdad pudimos leer el equipo. Si la lectura
+  // falló, "no está" no significa "es nuevo": crearla le cambiaría el nombre
+  // a alguien que ya existe y lo desconectaría de sus tareas.
+  if (!yo && teamOk) {
     const nombre = email.split("@")[0].replace(/[._-]+/g, " ").trim() || email;
     yo = { email, name: nombre.charAt(0).toUpperCase() + nombre.slice(1) };
     try {
@@ -91,6 +100,11 @@ async function launchApp(session) {
     } catch (err) {
       console.error("No se pudo crear tu ficha de equipo:", err);
     }
+  }
+  if (!yo) {
+    showLoadError(new Error("No pudimos identificarte. Revisá tu conexión y volvé a intentar."));
+    launched = false;
+    return;
   }
 
   showApp();
@@ -105,8 +119,9 @@ async function launchApp(session) {
     saveMember: upsertMe,
     inviteEmail,
     refreshTeam: fetchTeam,
+    // Sin lectura previa no se escribe: subir una porción vacía borraría lo real.
+    pushPrivateState: privOk ? (data) => pushPrivateState(email, data) : null,
     pushRemoteState,
-    pushPrivateState: (data) => pushPrivateState(email, data),
   });
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 }

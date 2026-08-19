@@ -16,7 +16,15 @@ function saveLocalPrefs(state){
     localStorage.setItem(PREFS_KEY,JSON.stringify(o)); }catch(e){}
 }
 function stripLocal(state){ const o=Object.assign({},state); LOCAL_KEYS.forEach(k=>delete o[k]); return o; }
-function stripShared(state){ const o=stripLocal(state); PRIV_KEYS.forEach(k=>delete o[k]); return o; }
+// Del payload compartido se saca SOLO la porción privada propia. Las de quienes
+// todavía no entraron después de la migración quedan intactas hasta que cada
+// uno las mueva: borrarlas de una les haría perder sus notas y tareas privadas.
+function stripShared(state){ const o=stripLocal(state); const me=state.me;
+  PRIV_KEYS.forEach(k=>{ const v=o[k];
+    if(!v||typeof v!=="object"){ delete o[k]; return; }
+    const resto=Object.assign({},v); if(me)delete resto[me];
+    if(Object.keys(resto).length)o[k]=resto; else delete o[k]; });
+  return o; }
 
 export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam }){
   // El equipo viene de la base (tabla team_members), no del estado compartido.
@@ -279,8 +287,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     SKIP.forEach(k=>{ if(state[k]!==undefined)merged[k]=state[k]; else delete merged[k]; });
     state=normalize(merged);
     lastPushed=JSON.stringify(stripShared(state));
+    // Si el panel quedó abierto, hay que volver a dibujarlo: sus manejadores
+    // apuntaban a objetos del estado anterior y tocarlos no haría nada.
     if(selId&&!N(selId))closePanel();
     if(taskOpen&&!curTask())closeTask();
+    if(panelOpen&&N(selId))renderPanelBody(N(selId));
+    if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); syncTaskDone(curTask()); }
     loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
   }
   // Mi porción privada: es lo único que sube a la tabla con permisos.
@@ -666,7 +678,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=html;
     box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go))); }
 
-  // ---------- CHAT + EVENTOS (preview local) ----------
+  // ---------- CHAT + EVENTOS ----------
   function groupsAll(){ if(!state.chat.groups)state.chat.groups={}; return state.chat.groups; }
   function groupOf(chan){ return chan.startsWith("grp:")?groupsAll()[chan.slice(4)]:null; }
   function myGroups(){ const me=state.me; return Object.values(groupsAll()).filter(g=>!me||(g.members||[]).includes(me)).sort((a,b)=>a.name.localeCompare(b.name)); }
@@ -689,15 +701,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
-    head.innerHTML=`<span>${esc(chanTitle(chatChan))}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="previewbadge">preview local</span><span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
+    head.innerHTML=`<span>${esc(chanTitle(chatChan))}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
       <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
-      <li><b>"preview local"</b>: por ahora los mensajes se guardan en tu navegador, todavía no viajan entre computadoras.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
+      <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
-    if(!me){ box.innerHTML=`<div class="ph"><div class="big">💬</div><b>Elegí quién sos</b><div style="margin-top:6px;font-size:13px">Usá el selector "Sos" (arriba) para chatear como vos.</div></div>`; inp.disabled=true; return; }
+    if(!me){ box.innerHTML=`<div class="ph"><div class="big">💬</div><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
     inp.disabled=false; const msgs=msgsOf(chatChan);
     box.innerHTML=msgs.length?msgs.map(m=>msgHTML(m,me)).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
@@ -754,14 +766,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(ev.desc)p.set("details",ev.desc);
     return "https://calendar.google.com/calendar/render?"+p.toString(); }
   function openEvView(id){ const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; const box=document.getElementById("evBox"); const me=state.me;
-    const rows=(state.members||[]).map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"✅ Voy":v==="no"?"❌ No voy":"— sin responder"}</span></div>`; }).join("");
+    const rows=allPeople().map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"✅ Voy":v==="no"?"❌ No voy":"— sin responder"}</span></div>`; }).join("");
     box.innerHTML=`<h2>${esc(ev.title)}</h2><p>📅 ${esc(ev.date)}${ev.time?" · ⏰ "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">📅 Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelectorAll("[data-rv]").forEach(b=>b.addEventListener("click",()=>{ setRsvp(id,b.dataset.rv); openEvView(id); }));
     box.querySelector("#evEdit").addEventListener("click",()=>openEvEdit(id));
     box.querySelector("#evOk").addEventListener("click",closeEv);
     box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar("El evento se borra para todo el equipo.",()=>{ state.events=state.events.filter(e=>e.id!==id); if(state.chat)state.chat.team=(state.chat.team||[]).filter(m=>m.ev!==id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
-  function setRsvp(id,val){ if(!state.me){ note('Elegí quién sos en el campo "Sos" (arriba) para poder responder.'); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
+  function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
   function chatUnread(){ const c=state.chat||{team:[],dm:{}}; const seen=seenMap(); const me=state.me;
     let u=Math.max(0,(c.team||[]).length-(seen.team||0));
     if(me)allPeople().filter(p=>p&&p!==me).forEach(p=>{ const arr=(c.dm||{})[dmKey(me,p)]||[]; u+=Math.max(0,arr.length-(seen["dm:"+p]||0)); });
@@ -770,7 +782,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- grupos de chat ----------
   let grpEditId=null, grpMembers=[];
   function openGroupModal(gid){ const me=state.me;
-    if(!me){ note('Primero elegí quién sos en el campo "Sos" (arriba) para armar un grupo.'); return; }
+    if(!me){ note("No pudimos identificarte para armar un grupo."); return; }
     grpEditId=gid; const g=gid?groupsAll()[gid]:null;
     grpMembers=g?(g.members||[]).slice():[me];
     document.getElementById("gmTitle").textContent=g?"Editar grupo":"Nuevo grupo";
@@ -905,12 +917,18 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.values(state.nodes).forEach(n=>{ n.encargados=cambia(encsOf(n));
       (n.items||[]).forEach(k=>{ k.owners=cambia(ownersOf(k)); });
       filesOf(n).forEach(f=>{ if(f.addedBy===viejo)f.addedBy=nuevo; }); });
+    // Los responsables DENTRO de las tareas privadas: si no, el nombre viejo
+    // revive en los filtros y en las columnas por persona.
+    Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>{ k.owners=cambia(ownersOf(k)); }));
     [state.privTasks,state.myNotes,state.avatars,state.userColors,state.tasksSeen,state.chatSeen].forEach(mueveClave);
     (state.events||[]).forEach(ev=>mueveClave(ev.rsvp));
     // conversaciones privadas: la clave son los dos nombres ordenados
     const dm=state.chat.dm||{}; const nuevoDm={};
     Object.keys(dm).forEach(k=>{ const partes=k.split(" ~ ").map(p=>p===viejo?nuevo:p);
       const nk=partes.sort((a,b)=>a.localeCompare(b)).join(" ~ ");
+      // y el autor de cada mensaje: si no, tus propios mensajes privados
+      // quedan con el nombre viejo y se dibujan como si fueran del otro.
+      (dm[k]||[]).forEach(m=>{ if(m.from===viejo)m.from=nuevo; });
       (nuevoDm[nk]=nuevoDm[nk]||[]).push(...(dm[k]||[])); });
     Object.keys(nuevoDm).forEach(k=>nuevoDm[k].sort((a,b)=>(a.ts||0)-(b.ts||0)));
     state.chat.dm=nuevoDm;
@@ -954,7 +972,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else openEvView(c.id); })); }
   function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
-    if(!me){ box.innerHTML=`<div class="ph"><div class="big">👋</div><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Elegí tu nombre arriba, en el campo "Sos".</div></div>`; return; }
+    if(!me){ box.innerHTML=`<div class="ph"><div class="big">👋</div><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; return; }
     const allMine=activeItems().filter(x=>ownersOf(x.k).includes(me));
     state.tasksSeen=state.tasksSeen||{}; const seenSet=new Set(state.tasksSeen[me]||[]); const news=allMine.filter(x=>!seenSet.has(x.k.id));
     // el panel muestra SIEMPRE todo lo tuyo salvo que vos filtres acá mismo
@@ -985,7 +1003,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     pfm.querySelectorAll("[data-pf]").forEach(cb=>cb.addEventListener("change",()=>{ const v=cb.dataset.pf, i=pf.indexOf(v);
       if(cb.checked){ if(i<0)pf.push(v); } else if(i>=0)pf.splice(i,1); save(); renderMyTasks(); document.getElementById("panelFilt").querySelector(".fmenu").classList.add("on"); }));
     const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
-    const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); }); }
+    const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); }); }
 
   // ---------- panel lateral ----------
   const drawer=document.getElementById("drawer"),scrim=document.getElementById("scrim");
@@ -1016,7 +1034,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         +`<div style="margin-top:8px"><label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:4px">Pasarla al equipo</label><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="pick" id="tMoveNode" style="flex:1 1 190px"></select><button class="btn" id="tMoveGo">Compartir</button></div></div>`;
       document.getElementById("tMoveNode").innerHTML=nodeOptionsHTML("",true);
       document.getElementById("tMoveGo").addEventListener("click",()=>{ const n=N(document.getElementById("tMoveNode").value); if(!n){ note("Elegí a qué tema la querés pasar."); return; }
-        const arr=privList(); if(!arr){ note('Elegí quién sos para poder mover esta tarea.'); return; }
+        const arr=privList(); if(!arr){ note("No pudimos identificarte para mover esta tarea."); return; }
         const i=arr.findIndex(x=>x.id===selTaskId); if(i<0){ note("Esa tarea ya no está en tu lista privada."); closeTask(); renderActive(); return; }
         const [it]=arr.splice(i,1); delete it.priv; n.items=n.items||[]; n.items.push(it);
         selTaskNode=n.id; save(); refreshChrome(); renderActive(); renderTBelong(); });
@@ -1026,7 +1044,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><span class="go">↗</span></div>`
       +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">🔒 Convertir en tarea privada</button>`;
     document.getElementById("tGoNode").addEventListener("click",()=>{ closeTask(); openPanel(selTaskNode); });
-    document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note('Primero elegí quién sos en el campo "Sos" (arriba).'); return; }
+    document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note("No pudimos identificarte."); return; }
       confirmar("La tarea sale del tema y pasa a tu panel privado: nadie más la va a ver y queda solo a tu nombre.",()=>{
         const n=N(selTaskNode); const i=(n.items||[]).findIndex(x=>x.id===selTaskId); if(i<0)return; const [it]=n.items.splice(i,1); it.priv=true; it.owners=[me];
         privList(me).push(it); selTaskNode="__priv"; save(); refreshChrome(); renderActive(); renderTBelong(); renderTOwners(); },{title:"Convertir en privada",yes:"Hacerla privada"}); }); }
@@ -1083,7 +1101,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   pObj.addEventListener("change",()=>renderActive());
   pCtx.addEventListener("input",()=>{ const n=N(selId); if(n){n.contexto=pCtx.value;save();} });
   pCtx.addEventListener("change",()=>renderActive());
-  document.getElementById("enterBtn").addEventListener("click",()=>{ if(selId){ showTab("mapa"); focusNode(selId); } });
+  document.getElementById("enterBtn").addEventListener("click",()=>{ if(!selId)return;
+    state.estView="mapa"; closePanel(); showTab("estructura");
+    requestAnimationFrame(()=>focusNode(selId)); });
   document.getElementById("addSub").addEventListener("click",()=>{ if(selId)addSubTo(selId); });
   document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; closePanel(); openNewTask({nodeId:n.id}); });
   document.getElementById("delNode").addEventListener("click",()=>{ const n=N(selId); if(!n)return; if(n.kind==="project"&&state.roots.length<=1){ note("Tiene que quedar al menos un proyecto."); return; }
@@ -1165,7 +1185,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!priv&&!n){ note("Elegí a qué tema pertenece."); return; }
     const title=document.getElementById("ntTitle").value.trim(); if(!title){ note("Poné un título para la tarea."); return; }
     const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
-    if(priv){ const arr=privList(); if(!arr){ note('Elegí quién sos en el campo "Sos" (arriba) para tener tareas privadas.'); return; }
+    if(priv){ const arr=privList(); if(!arr){ note("No pudimos identificarte para crear una tarea privada."); return; }
       k.priv=true; if(!k.owners.length&&state.me)k.owners=[state.me]; arr.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask("__priv",k.id); return; }
     n.items=n.items||[]; n.items.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask(n.id,k.id); }
   document.getElementById("gmCancel").addEventListener("click",closeGM);
@@ -1201,7 +1221,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   fPerson.addEventListener("change",renderActive); fStatus.addEventListener("change",renderActive);
   document.getElementById("weekGoals").addEventListener("input",e=>{ state.weekGoals=e.target.value; save(); });
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
-  document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note('Elegí quién sos en el campo "Sos" (arriba) para poder mandar archivos.'); return; } document.getElementById("chatFile").click(); });
+  document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
   document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
   document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg(); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });

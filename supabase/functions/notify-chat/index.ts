@@ -46,17 +46,33 @@ function flattenTasks(data: any): Map<string, Tarea> {
 }
 
 // Devuelve, por tarea, solo los responsables que ANTES no estaban.
+// Una tarea que no existía antes no cuenta: la acaba de crear alguien y ya
+// se le avisa por otros medios; si contara, cada tarea nueva avisaría a todos
+// sus responsables, incluido quien la creó.
 function findNewAssignments(oldData: any, newData: any) {
   const antes = flattenTasks(oldData);
   const ahora = flattenTasks(newData);
   const out: { owner: string; title: string; nodeName: string; taskId: string }[] = [];
   for (const [id, t] of ahora) {
-    const previos = new Set(antes.get(id)?.owners || []);
+    const previa = antes.get(id);
+    if (!previa) continue;
+    const previos = new Set(previa.owners);
     for (const w of t.owners) {
       if (!previos.has(w)) out.push({ owner: w, title: t.title, nodeName: t.nodeName, taskId: id });
     }
   }
   return out;
+}
+
+// Un renombre reescribe el nombre en todas las tareas de una sola vez. Sin
+// esto, esa persona recibiría una notificación por cada tarea suya.
+function esRenombre(oldData: any, newData: any): boolean {
+  const a = new Set<string>(oldData?.members || []);
+  const b = new Set<string>(newData?.members || []);
+  if (a.size !== b.size) return false;
+  let distintos = 0;
+  for (const n of b) if (!a.has(n)) distintos++;
+  return distintos === 1;
 }
 
 function cuerpoDe(m: any): string {
@@ -100,55 +116,65 @@ Deno.serve(async (req) => {
   const newData = payload.record?.data;
   if (!oldData || !newData) return new Response("ok");
 
+  // Un renombre reescribe medio estado de una sola vez: cambian las claves de
+  // las conversaciones privadas y el nombre en todas las tareas. Notificar eso
+  // sería una avalancha de avisos falsos.
+  if (esRenombre(oldData, newData)) return new Response("ok (renombre)");
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const emailDe = await nameToEmail(supabase);
+  // Quién hizo el cambio: nunca se le notifica lo que acaba de hacer.
+  const autorEmail: string = payload.record?.updated_by_email || "";
+  const paraOtros = (correos: (string | undefined)[]) =>
+    correos.filter((e): e is string => !!e && e !== autorEmail);
   const todosMenos = (nombre: string) =>
-    Object.entries(emailDe)
-      .filter(([n]) => n !== nombre)
-      .map(([, e]) => e);
+    paraOtros(
+      Object.entries(emailDe)
+        .filter(([n]) => n !== nombre)
+        .map(([, e]) => e)
+    );
+
+  // Los mensajes se comparan por id, no por cantidad: con el retardo de
+  // guardado pueden entrar dos juntos y si no, el anteúltimo no avisa nunca.
+  const nuevosDe = (antes: any[], ahora: any[]) => {
+    const vistos = new Set((antes || []).map((m: any) => m.id));
+    return (ahora || []).filter((m: any) => !vistos.has(m.id));
+  };
 
   // 1) Canal del equipo: le llega a todos menos a quien escribió.
-  const teamAntes = oldData.chat?.team || [];
-  const teamAhora = newData.chat?.team || [];
-  if (teamAhora.length > teamAntes.length) {
-    const last = teamAhora[teamAhora.length - 1];
-    await sendTo(supabase, todosMenos(last.from), "👥 Equipo", `${last.from}: ${cuerpoDe(last)}`);
+  for (const m of nuevosDe(oldData.chat?.team, newData.chat?.team)) {
+    await sendTo(supabase, todosMenos(m.from), "👥 Equipo", `${m.from}: ${cuerpoDe(m)}`);
   }
 
   // 2) Grupos: solo a sus integrantes, menos quien escribió.
   for (const [gid, g] of Object.entries<any>(newData.chat?.groups || {})) {
-    const antes = oldData.chat?.groups?.[gid]?.msgs || [];
-    const ahora = g.msgs || [];
-    if (ahora.length <= antes.length) continue;
-    const last = ahora[ahora.length - 1];
-    const destinos = (g.members || [])
-      .filter((p: string) => p !== last.from)
-      .map((p: string) => emailDe[p]);
-    await sendTo(supabase, destinos, `👪 ${g.name || "Grupo"}`, `${last.from}: ${cuerpoDe(last)}`);
+    for (const m of nuevosDe(oldData.chat?.groups?.[gid]?.msgs, g.msgs)) {
+      const destinos = paraOtros(
+        (g.members || []).filter((p: string) => p !== m.from).map((p: string) => emailDe[p])
+      );
+      await sendTo(supabase, destinos, `👪 ${g.name || "Grupo"}`, `${m.from}: ${cuerpoDe(m)}`);
+    }
   }
 
   // 3) Privados: la clave es "A ~ B"; el destinatario es el que no escribió.
   for (const [clave, arr] of Object.entries<any>(newData.chat?.dm || {})) {
-    const antes = oldData.chat?.dm?.[clave] || [];
-    const ahora = arr || [];
-    if (ahora.length <= antes.length) continue;
-    const last = ahora[ahora.length - 1];
-    const destino = String(clave)
-      .split(" ~ ")
-      .find((n) => n !== last.from);
-    if (destino && emailDe[destino]) {
-      await sendTo(supabase, [emailDe[destino]], `💬 ${last.from}`, cuerpoDe(last));
+    for (const m of nuevosDe(oldData.chat?.dm?.[clave], arr)) {
+      const destino = String(clave)
+        .split(" ~ ")
+        .find((n) => n !== m.from);
+      const dest = paraOtros([destino ? emailDe[destino] : undefined]);
+      if (dest.length) await sendTo(supabase, dest, `💬 ${m.from}`, cuerpoDe(m));
     }
   }
 
   // 4) Tareas recién asignadas: una notificación por responsable nuevo.
   //    El enlace deja la app abierta en esa tarea.
   for (const a of findNewAssignments(oldData, newData)) {
-    const email = emailDe[String(a.owner).trim()];
-    if (!email) continue;
+    const dest = paraOtros([emailDe[String(a.owner).trim()]]);
+    if (!dest.length) continue; // sin ficha, o sos vos mismo asignándote
     await sendTo(
       supabase,
-      [email],
+      dest,
       "Te asignaron una tarea",
       `${a.title}${a.nodeName ? ` (${a.nodeName})` : ""}`,
       `/?tarea=${encodeURIComponent(a.taskId)}`

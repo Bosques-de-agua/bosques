@@ -31,6 +31,11 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
+        // Navegar antes de enfocar: si solo enfocamos, el enlace de la
+        // notificación (/?tarea=id) se pierde y no se abre nada en concreto.
+        if ("navigate" in client) {
+          return client.navigate(url).then((c) => (c && c.focus ? c.focus() : null));
+        }
         if ("focus" in client) return client.focus();
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);

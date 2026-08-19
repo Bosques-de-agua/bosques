@@ -35,9 +35,14 @@ create table if not exists app_state (
   id smallint primary key default 1,
   data jsonb not null,
   updated_by_client text,
+  updated_by_email text,
   updated_at timestamptz not null default now(),
   constraint single_row check (id = 1)
 );
+
+-- Por si la tabla ya existía sin esta columna. Sirve para saber quién guardó
+-- y así no mandarle a esa persona una notificación de su propio cambio.
+alter table app_state add column if not exists updated_by_email text;
 
 alter table app_state enable row level security;
 
