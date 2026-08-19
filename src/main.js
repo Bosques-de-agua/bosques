@@ -46,19 +46,42 @@ function addSignOutPill(email) {
 async function launchApp(session) {
   if (launched) return;
   launched = true;
-  showApp();
-  addSignOutPill(session.user.email);
-  initPush();
 
+  // Distinguir "la base está vacía" de "no pude leer la base" es crítico:
+  // si arrancamos la app con seed=null tras un error, el primer guardado
+  // reemplaza el contenido de todo el equipo por los datos de ejemplo.
   let seed = null;
   try {
     seed = await fetchRemoteState();
   } catch (err) {
     console.error("No se pudo leer el estado remoto:", err);
+    launched = false;
+    showLoadError(err);
+    return;
   }
+
+  showApp();
+  addSignOutPill(session.user.email);
+  initPush();
 
   const app = startApp({ seed, pushRemoteState });
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
+}
+
+function showLoadError(err) {
+  loginScreen.style.display = "grid";
+  appRoot.classList.remove("on");
+  const box = loginScreen.querySelector(".login-box");
+  if (!box) return;
+  box.innerHTML =
+    '<h1>No pudimos cargar la información</h1>' +
+    '<p>Puede ser un problema de conexión. No se modificó nada: tus datos y los del equipo están intactos.</p>' +
+    '<button type="button" class="btn btn-primary enter-btn" id="retry-load">Reintentar</button>' +
+    '<div class="status err">' +
+    String((err && err.message) || err || "Error desconocido") +
+    "</div>";
+  const retry = box.querySelector("#retry-load");
+  if (retry) retry.addEventListener("click", () => window.location.reload());
 }
 
 loginForm.addEventListener("submit", async (e) => {
