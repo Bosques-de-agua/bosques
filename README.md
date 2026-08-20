@@ -45,7 +45,7 @@ Se pasa del taller a la vidriera **por tandas**, con un merge, cuando una tanda 
 
 ## Deploy
 
-Conectado a Vercel (free) sobre este repo — cada push a `main` deploya solo. Variables de entorno en Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY`.
+Conectado a Vercel (free) sobre este repo — cada push a `main` deploya solo. Variables de entorno en Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY` y, para el selector de Drive, `VITE_GOOGLE_CLIENT_ID` + `VITE_GOOGLE_API_KEY` (ver *Drive*).
 
 ## App en el celular + notificaciones
 
@@ -77,6 +77,24 @@ Ojo con esto: quien recibe el mensaje por debajo es **Chrome**, no "Mesa de trab
 Conviene hacerlo parte del alta de cada persona, junto con instalar la app y activar los avisos.
 
 **Cómo se ve un aviso que no llega**, para no perder tiempo la próxima: la campanita de la app se enciende igual, porque se calcula en el cliente y no depende del push. Y en Ajustes → Aplicaciones, Android dice *"Esta app no publicó ninguna notificación"*, que es la señal de que el mensaje nunca llegó a despertar al service worker. Los registros de la función (Edge Functions → notify-chat → Logs) muestran cuántas suscripciones encontró y si cada entrega salió o falló.
+
+## Drive
+
+Los archivos **viven en Drive**; la app solo guarda el vínculo (`n.files[]` / `k.files[]`). Nunca hay una copia acá.
+
+**Ver un archivo sin salir de la app.** Cada vínculo tiene un ojo que lo abre en una ventana de lectura. Funciona porque Drive publica de cada archivo una vista de solo lectura en `.../preview`, y **esa** sí se deja incrustar: las de `/edit` y `/view` las bloquea el propio Google. No hace falta ningún permiso: quien mira usa la sesión de Google que ya tiene abierta en el navegador, así que ve exactamente lo que Drive le deja ver. `previewUrl()` en `src/app.js` traduce cada link. **Las carpetas no tienen vista propia**: ahí no aparece el ojo.
+
+**Elegir de Drive en vez de pegar el link.** Botón "Elegir de mi Drive" en el modal de vincular. Trae nombre y tipo exactos (el tipo por la URL sola no distingue un PDF de un Word). Está en `src/picker.js` y **solo aparece si están cargadas las dos variables de Google**; sin ellas la app funciona igual que antes, con el link pegado a mano.
+
+Para encenderlo, en [Google Cloud Console](https://console.cloud.google.com/) sobre un proyecto propio:
+
+1. **APIs y servicios → Biblioteca**: habilitar **Google Picker API**.
+2. **Pantalla de consentimiento de OAuth**: tipo *Externo*; agregar el scope `https://www.googleapis.com/auth/drive.file`. Ese scope **no es sensible**, así que Google **no** pide verificar la app. Mientras esté en *Testing*, sumar los 4 correos del equipo como usuarios de prueba (o publicarla, que con este scope no requiere revisión).
+3. **Credenciales → Crear → ID de cliente de OAuth**, tipo *Aplicación web*. En **Orígenes de JavaScript autorizados**: `https://bosques.vercel.app` y `http://localhost:5180`. No hace falta URI de redirección: el token se pide desde el navegador.
+4. **Credenciales → Crear → Clave de API**. Restringirla por **referente HTTP** a los mismos dos orígenes, y por API a *Google Picker API*.
+5. Cargar `VITE_GOOGLE_CLIENT_ID` y `VITE_GOOGLE_API_KEY` en `.env.local` y en Vercel (Settings → Environment Variables), y **volver a deployar**: las `VITE_*` se hornean en el bundle, no se leen en vivo.
+
+Por qué `drive.file` y no `drive.readonly`: `drive.file` le da a la app **solo los archivos que la persona elige a mano** en esa ventana, nunca el resto del Drive. Por ser tan acotado no exige verificación de Google ni tiene el vencimiento del token a 7 días del modo *Testing*. El buscador de todo el Drive viene adentro de la ventana de Google: buscar ahí no le entrega nada a la app, solo elegir. El equipo usa cuentas @gmail, no Workspace, así que la opción de "app interna" no está disponible.
 
 ## Arquitectura (por qué está armado así)
 

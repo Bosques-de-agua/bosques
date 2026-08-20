@@ -5,6 +5,7 @@ import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPri
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
+import { initPicker } from "./picker.js";
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch((err) => {
@@ -128,6 +129,9 @@ async function launchApp(session) {
   showApp();
   addSignOutPill(email);
   initPush();
+  // Si no están cargadas las variables de Google, no instala nada y la app
+  // sigue pidiendo el link pegado a mano.
+  initPicker();
 
   const app = startApp({
     seed,

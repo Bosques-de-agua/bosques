@@ -241,10 +241,17 @@
 
 <div class="modal" id="fileModal"><div class="box" style="width:min(500px,92vw)">
   <h2>Vincular un archivo de Drive</h2>
+  <!-- Primero dónde va, porque el selector de Google vincula ahí mismo. -->
+  <div class="pctl" id="fmWhereWrap"><div class="c" style="flex:1 1 100%"><label>Vincularlo a</label><select class="pick" id="fmWhere"></select></div></div>
+  <!-- El selector de Google solo aparece si están cargadas sus variables. -->
+  <div class="fmpick" id="fmPickWrap" hidden>
+    <button type="button" class="btn btn-primary" id="fmPick">Elegir de mi Drive</button>
+    <span class="fmpickhint">Trae el nombre y el tipo solos. Podés elegir varios de una.</span>
+  </div>
+  <div class="fmsep" id="fmSep" hidden><span>o pegá el link</span></div>
   <p>Abrí el archivo o la carpeta en Drive, copiá el link de la barra del navegador y pegalo acá. El archivo queda en Drive: la app solo guarda el link.</p>
   <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Link de Drive</label><input class="txt" id="fmUrl" placeholder="https://docs.google.com/…"></div></div>
   <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nombre (cómo lo van a ver)</label><input class="txt" id="fmName" placeholder="Ej: Borrador carta de intención"></div></div>
-  <div class="pctl" id="fmWhereWrap"><div class="c" style="flex:1 1 100%"><label>Vincularlo a</label><select class="pick" id="fmWhere"></select></div></div>
   <div class="row"><div style="flex:1"></div><button class="btn" id="fmCancel">Cancelar</button><button class="btn btn-primary" id="fmSave">Vincular</button></div>
 </div></div>
 

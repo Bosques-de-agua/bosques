@@ -185,6 +185,38 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(/\/forms\//i.test(s))return `https://docs.google.com/forms/d/${id}/viewform?embedded=true`;
     if(/^https:\/\/drive\.google\.com\//i.test(s))return `https://drive.google.com/file/d/${id}/preview`;
     return null; }
+  // El identificador que Drive le da al archivo. Sirve para saber si dos links
+  // son el mismo archivo escrito distinto (/edit, /view, ?usp=sharing): con eso
+  // se evita vincular dos veces lo mismo. NO sirve para armar la direccion de
+  // la vista: eso lo hace previewUrl(), que ademas mira de que tipo es.
+  function driveIdDe(u){ const s=String(u||"");
+    const m=s.match(/\/d\/e\/([-\w]{20,})/)||s.match(/\/d\/([-\w]{20,})/)||s.match(/\/folders\/([-\w]{15,})/)||s.match(/[?&]id=([-\w]{20,})/);
+    return m?m[1]:null; }
+  // Cuando el archivo llega del selector de Google no hay que adivinar nada:
+  // viene con el tipo declarado. Es la unica via que da el tipo exacto de un
+  // PDF o un Word, que por la URL sola son indistinguibles.
+  function kindOfMime(m){ const s=String(m||"");
+    if(s==="application/vnd.google-apps.document")return "doc";
+    if(s==="application/vnd.google-apps.spreadsheet")return "sheet";
+    if(s==="application/vnd.google-apps.presentation")return "slides";
+    if(s==="application/vnd.google-apps.form")return "form";
+    if(s==="application/vnd.google-apps.folder")return "folder";
+    if(s==="application/pdf")return "pdf";
+    if(/wordprocessingml|msword|opendocument\.text/.test(s))return "word";
+    if(/spreadsheetml|ms-excel|opendocument\.spreadsheet/.test(s)||s==="text/csv")return "excel";
+    if(/presentationml|ms-powerpoint|opendocument\.presentation/.test(s))return "ppt";
+    if(/^image\//.test(s))return "image";
+    return s?"file":null; }
+  // El selector casi siempre manda la direccion; si faltara, se arma con el
+  // tipo, para no mandar un documento nativo a la direccion de archivo suelto.
+  function urlDeDoc(d){ if(d&&d.url)return d.url;
+    const id=d&&d.id; if(!id)return "";
+    const k=kindOfMime(d.mimeType);
+    if(k==="doc")return `https://docs.google.com/document/d/${id}/edit`;
+    if(k==="sheet")return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+    if(k==="slides")return `https://docs.google.com/presentation/d/${id}/edit`;
+    if(k==="folder")return `https://drive.google.com/drive/folders/${id}`;
+    return `https://drive.google.com/file/d/${id}/view`; }
   // El boton solo aparece si el archivo se puede mostrar adentro. Lo que no se
   // puede (carpetas, links de afuera) queda como estaba: se abre en Drive.
   function verBtn(f){ const p=previewUrl(f.url); if(!p)return "";
@@ -840,6 +872,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         (n.children||[]).forEach(c=>walk(c,depth+1)); };
       state.roots.forEach(r=>walk(r,1)); sel.innerHTML=opts.join("");
     } else wrap.style.display="none";
+    // El selector de Google aparece solo si initPicker() lo dejó instalado.
+    // Sin él, el modal es el de siempre: se pega el link a mano.
+    const hayPicker=!!window.__mesaDrivePicker;
+    document.getElementById("fmPickWrap").hidden=!hayPicker;
+    document.getElementById("fmSep").hidden=!hayPicker;
     document.getElementById("fileModal").classList.add("on"); setTimeout(()=>document.getElementById("fmUrl").focus(),40); }
   function closeFM(){ document.getElementById("fileModal").classList.remove("on"); fmTarget=null; }
   // La ventana de lectura. El marco se carga recién al abrirla y se vacía al
@@ -853,18 +890,49 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     m.classList.add("on"); }
   function cerrarPreview(){ const m=document.getElementById("pvModal"); if(!m||!m.classList.contains("on"))return;
     m.classList.remove("on"); document.getElementById("pvFrame").src="about:blank"; }
+  // A quién se le cuelga el archivo: lo elegido en "Vincularlo a" cuando el
+  // modal se abrió desde la pestaña Drive, o el tema/tarea desde cuya ficha se
+  // lo abrió. Lo usan los dos caminos, el link pegado y el selector de Google.
+  function ownerDeFM(){ const t=fmTarget; if(!t)return null;
+    if(t.kind==="pick"){ const p=String(document.getElementById("fmWhere").value||"").split(":");
+      if(p[0]==="n")return N(p[1]);
+      const n=N(p[1]); return n&&(n.items||[]).find(x=>x.id===p[2])||null; }
+    return (t.kind==="task"?t.task:t.node)||null; }
+  function trasVincular(){ save(); closeFM(); renderActive();
+    if(panelOpen&&N(selId))renderPanelBody(N(selId));
+    if(taskOpen)renderTFiles(); }
   function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta."); return; }
     if(!/^https?:\/\//i.test(url)){ note("El link tiene que empezar con http:// o https://"); return; }
     const nombre=document.getElementById("fmName").value.trim(); const kind=kindOf(url,nombre); const name=nombre||(FKIND[kind]||FKIND.link).l;
     const f={id:"f"+uid(),url,name,kind,addedBy:state.me||"",addedAt:nowMs()};
-    let owner=null, t=fmTarget;
-    if(t.kind==="pick"){ const v=document.getElementById("fmWhere").value; const p=v.split(":");
-      if(p[0]==="n")owner=N(p[1]); else { const n=N(p[1]); owner=n&&(n.items||[]).find(x=>x.id===p[2]); } }
-    else owner=t.kind==="task"?t.task:t.node;
+    const owner=ownerDeFM();
     if(!owner){ note("No encontré dónde vincularlo."); return; }
-    filesOf(owner).push(f); save(); closeFM(); renderActive();
-    if(panelOpen&&N(selId))renderPanelBody(N(selId));
-    if(taskOpen)renderTFiles(); }
+    filesOf(owner).push(f); trasVincular(); }
+  // ---------- elegir de Drive en vez de pegar el link ----------
+  // El selector lo instala initPicker() al entrar a la app real, y solo si
+  // están cargadas las variables de Google. Si no está, este botón ni aparece.
+  function elegirDeDrive(){ const abrir=window.__mesaDrivePicker; if(!abrir)return;
+    const owner=ownerDeFM();
+    if(!owner){ note("Elegí primero a qué tema o tarea vincularlo."); return; }
+    const btn=document.getElementById("fmPick"); const rotulo=btn.textContent;
+    btn.disabled=true; btn.textContent="Abriendo Drive…";
+    abrir().then(docs=>{
+      if(!docs||!docs.length)return;                       // cerró la ventana sin elegir
+      const yaEstan=new Set(filesOf(owner).map(f=>driveIdDe(f.url)||f.url));
+      let nuevos=0, repetidos=0;
+      docs.forEach(d=>{ const url=urlDeDoc(d); if(!url)return;
+        const clave=driveIdDe(url)||url;
+        if(yaEstan.has(clave)){ repetidos++; return; }
+        yaEstan.add(clave);
+        const kind=kindOfMime(d.mimeType)||kindOf(url,d.name);
+        filesOf(owner).push({id:"f"+uid(),url,name:d.name||(FKIND[kind]||FKIND.link).l,kind,addedBy:state.me||"",addedAt:nowMs()});
+        nuevos++; });
+      if(!nuevos){ note(repetidos===1?"Ese archivo ya estaba vinculado acá.":"Esos archivos ya estaban vinculados acá."); return; }
+      trasVincular();
+      const sobra=repetidos?` (${repetidos} ya ${repetidos===1?"estaba":"estaban"})`:"";
+      note(nuevos===1?`Listo: quedó vinculado 1 archivo${sobra}.`:`Listo: quedaron vinculados ${nuevos} archivos${sobra}.`,"Archivos de Drive");
+    }).catch(err=>note(String(err&&err.message||err),"No se pudo abrir Drive"))
+      .finally(()=>{ btn.disabled=false; btn.textContent=rotulo; }); }
   function llenarFiltroDrive(){
     const sel=document.getElementById("driveTema"); if(!sel)return;
     const abierto=document.activeElement===sel;
@@ -1546,6 +1614,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("tAddFile").addEventListener("click",()=>{ const k=curTask(); if(!k)return; openFileModal({kind:"task",task:k}); });
   document.getElementById("fmCancel").addEventListener("click",closeFM);
   document.getElementById("fmSave").addEventListener("click",saveFM);
+  document.getElementById("fmPick").addEventListener("click",elegirDeDrive);
   document.getElementById("fileModal").addEventListener("click",e=>{ if(e.target.id==="fileModal")closeFM(); });
   document.getElementById("fmUrl").addEventListener("input",e=>{ const nm=document.getElementById("fmName"); if(!nm.dataset.touched){ const k=kindOf(e.target.value,nm.value); nm.placeholder="Ej: "+(FKIND[k]||FKIND.link).l; } });
   document.getElementById("fmName").addEventListener("input",e=>{ e.target.dataset.touched=e.target.value?"1":""; });

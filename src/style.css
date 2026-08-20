@@ -471,6 +471,14 @@
   .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel);box-shadow:var(--shadow-lg);width:min(560px,92vw);padding:22px;color:var(--ink)}
   .modal .box h2,.modal .box p{color:var(--ink)}
   .modal .box .pop-l{color:var(--ink-faint)}
+  /* Elegir de Drive: el camino corto va arriba y en primer plano; pegar el
+     link queda abajo, como la salida para lo que no está en Drive. */
+  .fmpick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 10px}
+  .fmpick[hidden]{display:none}
+  .fmpickhint{font-size:11.5px;color:var(--ink-faint);flex:1;min-width:150px;line-height:1.4}
+  .fmsep{display:flex;align-items:center;gap:10px;margin:0 0 4px;color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  .fmsep[hidden]{display:none}
+  .fmsep::before,.fmsep::after{content:"";flex:1;height:1px;background:var(--line-soft)}
   /* Ventana de lectura: acá lo que manda es el archivo, así que el marco se
      queda con casi toda la pantalla y el borde de la app se hace fino. */
   #pvModal .box{width:min(1080px,96vw);padding:14px;display:flex;flex-direction:column;gap:10px}
