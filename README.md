@@ -47,9 +47,13 @@ La app es instalable: "Agregar a pantalla de inicio" desde el navegador del celu
 Pasos del lado de Supabase, una sola vez:
 
 1. Correr `supabase/schema.sql` completo.
-2. Deployar la función `supabase/functions/notify-chat` (Edge Functions → Deploy a new function → pegar el contenido de `index.ts`).
-3. Cargar los secrets de la función: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (está en `.env.local`, la privada **no** va en el repo), `SUPABASE_SERVICE_ROLE_KEY` y `SUPABASE_URL` (Project Settings → API).
-4. Crear un Database Webhook: tabla `app_state`, evento `UPDATE`, apuntando a `notify-chat`.
+2. Deployar la función `supabase/functions/notify-chat` (Edge Functions → Deploy a new function → Via Editor → pegar el contenido de `index.ts` y ponerle de nombre `notify-chat`).
+3. Cargar **solo dos** secrets de la función (Edge Functions → Secrets): `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY`. Están las dos en `.env.local`; la privada **no** va al repo (no lleva prefijo `VITE_`, así que Vite tampoco la manda al navegador).
+   `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` **no hace falta cargarlas**: Supabase las inyecta sola en toda Edge Function, figuran en esa misma pantalla bajo "Default secrets".
+4. Habilitar la integración **Database Webhooks** (Integrations → Database Webhooks → Install integration; instala la extensión `pg_net`). Sin ese paso, crear el webhook falla con `schema "supabase_functions" does not exist`.
+5. Crear el webhook: Create a new hook → tabla `app_state`, evento `UPDATE`, tipo **Supabase Edge Functions**, función `notify-chat`. El header `Authorization` lo completa Supabase solo con la clave legacy, que es la que espera "Verify JWT with legacy secret".
+
+**Las dos claves VAPID son un par**: si se regenera una hay que regenerar la otra, actualizar `VITE_VAPID_PUBLIC_KEY` en Vercel y en `.env.local`, y las suscripciones existentes en `push_subscriptions` dejan de servir (hay que volver a activar los avisos en cada celular).
 
 Cada persona activa las notificaciones desde **Panel → Configuración → Avisos**.
 
