@@ -248,6 +248,19 @@
   <div class="row"><div style="flex:1"></div><button class="btn" id="fmCancel">Cancelar</button><button class="btn btn-primary" id="fmSave">Vincular</button></div>
 </div></div>
 
+<!-- Leer un archivo sin salir de la app: la vista de solo lectura de Drive. -->
+<div class="modal" id="pvModal"><div class="box pvbox">
+  <div class="pvhead">
+    <span class="fic" id="pvIco"></span>
+    <b id="pvName"></b>
+    <div style="flex:1"></div>
+    <a class="btn" id="pvOpen" target="_blank" rel="noopener noreferrer">Abrir en Drive</a>
+    <button class="btn" id="pvClose">Cerrar</button>
+  </div>
+  <div class="pvframe"><iframe id="pvFrame" title="Vista del archivo" src="about:blank" referrerpolicy="no-referrer"></iframe></div>
+  <p class="pvfoot">Es el archivo en Drive, de solo lectura. Si dice que necesitás permiso, abrilo en Drive: se ve con la cuenta de Google que tengas abierta en este navegador.</p>
+</div></div>
+
 <div class="modal" id="askModal"><div class="box" style="width:min(430px,92vw)">
   <h2 id="askTitle">Confirmar</h2>
   <p id="askMsg"></p>

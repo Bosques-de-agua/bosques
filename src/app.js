@@ -135,7 +135,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     equipo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"7.6\" cy=\"8\" r=\"2.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M3.6 15.6c0-2.2 1.8-3.7 4-3.7s4 1.5 4 3.7\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/><path d=\"M13.4 6.2a2.4 2.4 0 0 1 0 4.6M14.4 12.4c1.3.5 2.1 1.7 2.1 3.2\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     grupo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 8h12M4 12.4h12M8.6 4L7.1 16M13.4 4L11.9 16\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
-    si:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M7 10.2l2.1 2.1L13 8.4\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+    si:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M7 10.2l2.1 2.1L13 8.4\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    ojo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M2.6 10S5.5 5.4 10 5.4 17.4 10 17.4 10 14.5 14.6 10 14.6 2.6 10 2.6 10Z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><circle cx=\"10\" cy=\"10\" r=\"2.2\" stroke=\"currentColor\" stroke-width=\"1.4\"/></svg>"
   };
   const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},word:{i:ICO.doc,l:"Word"},excel:{i:ICO.sheet,l:"Excel"},ppt:{i:ICO.slides,l:"PowerPoint"},image:{i:ICO.imagen,l:"Imagen"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
   // Un PDF o un Word subidos a Drive tienen URL "drive.google.com/file/d/…/view":
@@ -162,8 +163,34 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(s.includes("drive.google.com"))return "file";
     return "link"; }
   function filesOf(o){ if(!Array.isArray(o.files))o.files=[]; return o.files; }
+  // ---------- ver el archivo sin salir de la app ----------
+  // Drive publica de cada archivo una vista de SOLO LECTURA en la direccion
+  // .../preview, y esa si se deja incrustar (la de /edit y /view no: las
+  // bloquea el propio Google). No hace falta permiso de Google ni verificacion
+  // de la app: quien mira usa la sesion de Google que ya tiene abierta en su
+  // navegador, asi que ve exactamente lo que Drive le deja ver, ni mas ni
+  // menos. Las carpetas siguen sin poder mostrarse adentro.
+  function previewUrl(url){ const s=String(url||"");
+    if(!/^https:\/\/(docs|drive)\.google\.com\//i.test(s))return null;   // solo Drive se deja incrustar
+    if(/\/folders\//i.test(s))return null;                               // una carpeta no tiene vista propia
+    // Los identificadores de Drive son largos; pedir 20 caracteres o mas evita
+    // confundirse con el "/d/e/" de los formularios publicados.
+    const id=(s.match(/\/d\/([-\w]{20,})/)||s.match(/[?&]id=([-\w]{20,})/)||[])[1];
+    const idForm=(s.match(/\/forms\/d\/e\/([-\w]{20,})/)||[])[1];
+    if(idForm)return `https://docs.google.com/forms/d/e/${idForm}/viewform?embedded=true`;
+    if(!id)return null;
+    if(/\/document\//i.test(s))return `https://docs.google.com/document/d/${id}/preview`;
+    if(/\/spreadsheets\//i.test(s))return `https://docs.google.com/spreadsheets/d/${id}/preview`;
+    if(/\/presentation\//i.test(s))return `https://docs.google.com/presentation/d/${id}/preview`;
+    if(/\/forms\//i.test(s))return `https://docs.google.com/forms/d/${id}/viewform?embedded=true`;
+    if(/^https:\/\/drive\.google\.com\//i.test(s))return `https://drive.google.com/file/d/${id}/preview`;
+    return null; }
+  // El boton solo aparece si el archivo se puede mostrar adentro. Lo que no se
+  // puede (carpetas, links de afuera) queda como estaba: se abre en Drive.
+  function verBtn(f){ const p=previewUrl(f.url); if(!p)return "";
+    return `<button class="fver" data-ver="${esc(p)}" data-vernm="${esc(f.name||f.url)}" data-verk="${esc(f.kind||"link")}" data-verurl="${esc(f.url)}" title="Ver acá">${ICO.ojo}</button>`; }
   function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
-    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${onDel?`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
+    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
   // Archivos que cuelgan de los sub-temas de un tema (y de sus tareas).
   function filesHeredados(node){ const out=[];
     const bajar=id=>{ const n=N(id); if(!n)return;
@@ -180,7 +207,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(hered.length) html+=`<div class="dsublab">De los sub-temas</div>`+hered.map(x=>{
       const k=FKIND[x.f.kind]||FKIND.link;
       const ruta=pathOf(x.node.id).map(z=>z.name).slice(pathOf(owner.id).length).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
-      return `<div class="filerow hered"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(ruta)}">${esc(ruta)}</span></div>`; }).join("");
+      return `<div class="filerow hered"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(ruta)}">${esc(ruta)}</span>${verBtn(x.f)}</div>`; }).join("");
     el.innerHTML=html||`<div class="empty">Sin archivos. Pegá el link de Drive con "＋ archivo de Drive".</div>`;
     el.querySelectorAll("[data-delf]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.delf;
       confirmar("Se saca el link de acá. El archivo sigue intacto en Drive.",()=>{ owner.files=filesOf(owner).filter(f=>f.id!==id); save(); if(after)after(); },{title:"Desvincular archivo",yes:"Desvincular"}); })); }
@@ -815,6 +842,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     } else wrap.style.display="none";
     document.getElementById("fileModal").classList.add("on"); setTimeout(()=>document.getElementById("fmUrl").focus(),40); }
   function closeFM(){ document.getElementById("fileModal").classList.remove("on"); fmTarget=null; }
+  // La ventana de lectura. El marco se carga recién al abrirla y se vacía al
+  // cerrarla: si se dejara la dirección puesta, Drive seguiría trabajando
+  // detrás de una ventana que ya nadie mira.
+  function abrirPreview(src,nombre,kind,url){ const m=document.getElementById("pvModal"); if(!m)return;
+    document.getElementById("pvIco").innerHTML=(FKIND[kind]||FKIND.link).i;
+    const t=document.getElementById("pvName"); t.textContent=nombre||"Archivo"; t.title=nombre||"";
+    document.getElementById("pvOpen").href=url||src;
+    document.getElementById("pvFrame").src=src;
+    m.classList.add("on"); }
+  function cerrarPreview(){ const m=document.getElementById("pvModal"); if(!m||!m.classList.contains("on"))return;
+    m.classList.remove("on"); document.getElementById("pvFrame").src="about:blank"; }
   function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta."); return; }
     if(!/^https?:\/\//i.test(url)){ note("El link tiene que empezar con http:// o https://"); return; }
     const nombre=document.getElementById("fmName").value.trim(); const kind=kindOf(url,nombre); const name=nombre||(FKIND[kind]||FKIND.link).l;
@@ -855,9 +893,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const ruta=x=>{ const p=pathOf(x.node.id).map(z=>z.name); const bajo=p.slice(1).join(" › ")||p[0]||"Proyecto";
       return bajo+(x.task?" › "+(x.task.title||"Tarea"):""); };
     const filaConRuta=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const r=ruta(x);
-      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button></div>`; };
+      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button>${verBtn(x.f)}</div>`; };
     const fila=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const tarea=x.task?(x.task.title||"Tarea"):"";
-      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}</div>`; };
+      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}${verBtn(x.f)}</div>`; };
     const bloque=(titulo,color,ids)=>{ const conArchivos=ids.filter(id=>porNodo.has(id)); if(!conArchivos.length)return "";
       const total=conArchivos.reduce((a,id)=>a+porNodo.get(id).length,0);
       let h=`<div class="drivegroup"><h3><span class="orb" style="background:${color}"></span>${esc(titulo)}<span class="cnt">${total}</span></h3>`;
@@ -1497,6 +1535,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("driveTemaClear").addEventListener("click",()=>{ driveTema=""; renderDrive(); });
   document.querySelectorAll("#driveOrdenSeg [data-o]").forEach(b=>b.addEventListener("click",()=>{ driveOrden=b.dataset.o; renderDrive(); }));
   document.getElementById("driveAdd").addEventListener("click",()=>openFileModal({kind:"pick"}));
+  // El ojo de "ver acá" aparece en cuatro listas distintas que se vuelven a
+  // dibujar todo el tiempo. Un solo oyente arriba de todo evita tener que
+  // volver a colgarlo en cada redibujado (y las fugas que eso trae).
+  document.addEventListener("click",e=>{ const b=e.target.closest?e.target.closest("[data-ver]"):null; if(!b)return;
+    e.preventDefault(); abrirPreview(b.dataset.ver,b.dataset.vernm,b.dataset.verk,b.dataset.verurl); });
+  document.getElementById("pvClose").addEventListener("click",cerrarPreview);
+  document.getElementById("pvModal").addEventListener("click",e=>{ if(e.target.id==="pvModal")cerrarPreview(); });
   document.getElementById("pAddFile").addEventListener("click",()=>{ const n=N(selId); if(!n)return; openFileModal({kind:"node",node:n}); });
   document.getElementById("tAddFile").addEventListener("click",()=>{ const k=curTask(); if(!k)return; openFileModal({kind:"task",task:k}); });
   document.getElementById("fmCancel").addEventListener("click",closeFM);
@@ -1597,7 +1642,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function flashBtn(id,t){ const b=document.getElementById(id); const o=b.textContent; b.textContent=t; setTimeout(()=>b.textContent=o,1200); }
   let toastT; const toastEl=document.getElementById("toast");
   function toast(m){ toastEl.textContent=m; toastEl.classList.remove("hide"); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.add("hide"),2600); }
-  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("askModal").classList.contains("on")){closeAsk();return;} if(document.getElementById("fileModal").classList.contains("on")){closeFM();return;} if(document.getElementById("groupModal").classList.contains("on")){closeGM();return;} if(ntModal.classList.contains("on")){closeNT();return;} if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(taskOpen){closeTask();return;} if(panelOpen){closePanel();return;} });
+  document.addEventListener("keydown",e=>{ if(e.key!=="Escape")return; if(document.getElementById("pvModal").classList.contains("on")){cerrarPreview();return;} if(document.getElementById("askModal").classList.contains("on")){closeAsk();return;} if(document.getElementById("fileModal").classList.contains("on")){closeFM();return;} if(document.getElementById("groupModal").classList.contains("on")){closeGM();return;} if(ntModal.classList.contains("on")){closeNT();return;} if(document.getElementById("evModal").classList.contains("on")){closeEv();return;} if(picker.classList.contains("on")){picker.classList.remove("on");return;} if(viewport.querySelector(".pop")){closePops();return;} if(linking){linking=false;linkSrc=null;document.getElementById("linkMode").classList.remove("on");viewport.classList.remove("linking");renderMap();return;} if(editing){editing=false;document.getElementById("editMode").classList.remove("on");renderMap();return;} if(taskOpen){closeTask();return;} if(panelOpen){closePanel();return;} });
 
   const dl=document.createElement("datalist"); dl.id="peopleList"; document.body.appendChild(dl);
   function syncPeopleList(){ dl.innerHTML=allPeople().map(p=>`<option value="${esc(p)}">`).join(""); }
