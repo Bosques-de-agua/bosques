@@ -66,6 +66,12 @@ Pasos del lado de Supabase, una sola vez:
 
 Cada persona activa las notificaciones desde **Panel → Configuración → Avisos**.
 
+Al lado del interruptor hay un botón **Probar**, que pide una notificación directamente al sistema sin pasar por el servidor. Sirve para distinguir "no llega" de "el teléfono no lo muestra", que desde afuera se ven igual.
+
+**Android y el ahorro de batería.** Los avisos salen con prioridad alta y un día de vida (`urgency: "high"`, `TTL: 86400`) justamente para que lleguen con el ahorro de energía encendido: con la prioridad normal que viene por defecto, Android los pospone mientras la app está en segundo plano y no llegan nunca. Aun así, algunos teléfonos —Xiaomi, Samsung, Huawei, Oppo, Motorola— agregan un ahorro propio más agresivo. Si a alguien no le llegan, el primer lugar a mirar es **Ajustes → Aplicaciones → Mesa de trabajo → Batería → Sin restricciones** (y lo mismo con Chrome, que es quien recibe el mensaje por debajo).
+
+**Cómo se ve un aviso que no llega**, para no perder tiempo la próxima: la campanita de la app se enciende igual, porque se calcula en el cliente y no depende del push. Y en Ajustes → Aplicaciones, Android dice *"Esta app no publicó ninguna notificación"*, que es la señal de que el mensaje nunca llegó a despertar al service worker. Los registros de la función (Edge Functions → notify-chat → Logs) muestran cuántas suscripciones encontró y si cada entrega salió o falló.
+
 ## Arquitectura (por qué está armado así)
 
 Toda mutación pasa por una única función `save()`, que:
