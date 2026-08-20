@@ -26,7 +26,7 @@ function stripShared(state){ const o=stripLocal(state); const me=state.me;
     if(Object.keys(resto).length)o[k]=resto; else delete o[k]; });
   return o; }
 
-export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam }){
+export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente }){
   // El equipo viene de la base (tabla team_members), no del estado compartido.
   // Cada persona ES su email; el nombre es solo la etiqueta que se muestra.
   let equipo = Array.isArray(team) ? team.slice() : [];
@@ -343,6 +343,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const merged=Object.assign({},remote);
     SKIP.forEach(k=>{ if(state[k]!==undefined)merged[k]=state[k]; else delete merged[k]; });
     state=normalize(merged);
+    // Lo que estabas escribiendo en este instante no vivía todavía en el
+    // estado que llegó: sin esto, un guardado de otra persona te borra el
+    // renglón a medio escribir y encima deja la pantalla mostrando un texto
+    // que ya no existe en ningún lado.
+    reaplicarEdicionEnCurso();
     lastPushed=JSON.stringify(stripShared(state));
     // Si el panel quedó abierto, hay que volver a dibujarlo: sus manejadores
     // apuntaban a objetos del estado anterior y tocarlos no haría nada.
@@ -430,6 +435,50 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const itemPanel=document.querySelector('.sbitem[data-tab="panel"]');
   if(itemPanel)itemPanel.addEventListener("click",()=>{ state.panelView=""; save();
     if(active==="panel")renderPanel(); },true);
+
+  // Campos de texto que se editan en vivo. Si llega un cambio del equipo
+  // mientras alguien escribe en uno de ellos, su contenido se vuelve a poner
+  // sobre el estado recién llegado en vez de perderse.
+  const EDITORES=[
+    {id:"pTitle",  set:v=>{ const n=N(selId); if(n)n.name=v; }},
+    {id:"pObj",    set:v=>{ const n=N(selId); if(n)n.objetivo=v; }},
+    {id:"pCtx",    set:v=>{ const n=N(selId); if(n)n.contexto=v; }},
+    {id:"tTitle",  set:v=>{ const k=curTask(); if(k)k.title=v; }},
+    {id:"tObj",    set:v=>{ const k=curTask(); if(k)k.objetivo=v; }},
+    {id:"tNotas",  set:v=>{ const k=curTask(); if(k)k.notas=v; }},
+    {id:"weekGoals", set:v=>{ state.weekGoals=v; }},
+    {id:"myNotesArea", set:v=>{ state.myNotes=state.myNotes||{}; if(state.me)state.myNotes[state.me]=v; }},
+  ];
+  function reaplicarEdicionEnCurso(){
+    const el=document.activeElement; if(!el||!el.id)return;
+    const e=EDITORES.find(x=>x.id===el.id); if(!e)return;
+    try{ e.set(el.value); }catch(err){ console.error("No se pudo reaplicar la edición en curso:",err); }
+  }
+
+  // ---------- ESTADO DEL GUARDADO ----------
+  let estadoGuardado="guardado", ultimoGuardado=null;
+  function mostrarEstadoGuardado(estado,err){
+    estadoGuardado=estado;
+    if(estado==="guardado")ultimoGuardado=new Date();
+    // Un fallo suelta el guard anti-eco: si no, el mismo contenido nunca se
+    // vuelve a intentar y el cambio queda solo en la pantalla de quien lo hizo.
+    if(estado==="error")lastPushed="";
+    const barra=document.getElementById("saveState"); if(!barra)return;
+    if(estado==="error"){
+      barra.className="savestate mal";
+      barra.innerHTML='<span>No se pudo guardar. Tu trabajo está en pantalla pero todavía no en la base — no cierres esta pestaña.</span><button class="rowbtn" id="saveRetry">Reintentar</button>';
+      const b=barra.querySelector("#saveRetry");
+      if(b)b.addEventListener("click",()=>{ lastPushed=""; mostrarEstadoGuardado("guardando"); save(); });
+      return;
+    }
+    if(estado==="guardando"){ barra.className="savestate yendo"; barra.innerHTML='<span>Guardando…</span>'; return; }
+    barra.className="savestate bien";
+    barra.innerHTML='<span>Guardado '+ultimoGuardado.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</span>';
+  }
+  // Cerrar la pestaña con algo sin guardar es la forma más fácil de perder
+  // trabajo: el navegador pregunta antes.
+  window.addEventListener("beforeunload",e=>{
+    if(estadoGuardado==="error"||(hayPendiente&&hayPendiente())){ e.preventDefault(); e.returnValue=""; } });
 
   function renderActive(){ refreshChrome();
     if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); }
@@ -1531,5 +1580,5 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }
       history.replaceState(null,"",window.location.pathname); } }catch(e){}
 
-  return { applyRemoteState, applyPrivateState };
+  return { applyRemoteState, applyPrivateState, mostrarEstadoGuardado };
 }

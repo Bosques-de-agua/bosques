@@ -42,7 +42,13 @@ const nada = async () => {};
 // y a la tabla privada, sin mandarlo a ningún lado. Sirve para comprobar que
 // las preferencias personales no se cuelan en el payload compartido.
 window.__push = { compartido: null, privado: null, veces: 0 };
-const espiaCompartido = async (d) => { window.__push.compartido = d; window.__push.veces++; };
+window.__fallaGuardado = false;
+const espiaCompartido = async (d) => {
+  window.__push.compartido = d; window.__push.veces++;
+  if (window.__fallaGuardado) { app.mostrarEstadoGuardado("error", { message: "fallo simulado" }); return; }
+  app.mostrarEstadoGuardado("guardando");
+  setTimeout(() => { if (!window.__fallaGuardado) app.mostrarEstadoGuardado("guardado"); }, 60);
+};
 const espiaPrivado = async (d) => { window.__push.privado = d; };
 
 const app = startApp({
@@ -55,6 +61,7 @@ const app = startApp({
   saveMember: nada,
   inviteEmail: nada,
   refreshTeam: async () => team,
+  hayPendiente: () => false,
 });
 
 // Una cinta para no confundirlo nunca con la app de verdad.

@@ -15,12 +15,26 @@ export async function fetchRemoteState() {
 let saveTimer = null;
 let pendiente = null;
 let onError = null;
+let onEstado = null;
+let escribiendo = false;
 
 export function setSaveErrorHandler(fn) {
   onError = fn;
 }
+// La app necesita saber si lo que hiciste ya está a salvo. Sin esto, un fallo
+// de red era una línea en la consola que nadie mira: seguías trabajando una
+// hora creyendo que se guardaba, cerrabas la pestaña y no quedaba nada.
+export function setSaveStateHandler(fn) {
+  onEstado = fn;
+}
+export function hayCambiosSinGuardar() {
+  return !!pendiente || escribiendo;
+}
 
-async function escribir(state) {
+const REINTENTOS = 3;
+async function escribir(state, intento = 0) {
+  escribiendo = true;
+  if (onEstado) onEstado("guardando");
   const { error } = await supabase.from("app_state").upsert({
     id: ROW_ID,
     data: state,
@@ -29,15 +43,26 @@ async function escribir(state) {
     updated_at: new Date().toISOString(),
   });
   if (error) {
-    console.error("No se pudo guardar en Supabase:", error);
+    console.error("No se pudo guardar en Supabase (intento " + (intento + 1) + "):", error);
+    // Un corte de red de dos segundos no tiene por qué costarle el trabajo a
+    // nadie: se reintenta con esperas crecientes antes de dar la alarma.
+    if (intento + 1 < REINTENTOS) {
+      setTimeout(() => escribir(state, intento + 1), 900 * (intento + 1));
+      return false;
+    }
+    escribiendo = false;
+    if (onEstado) onEstado("error", error);
     if (onError) onError(error);
     return false;
   }
+  escribiendo = false;
+  if (onEstado) onEstado("guardado");
   return true;
 }
 
 export function pushRemoteState(state) {
   pendiente = state;
+  if (onEstado) onEstado("guardando");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     const payload = pendiente;

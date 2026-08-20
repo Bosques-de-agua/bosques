@@ -1,7 +1,7 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
-import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail } from "./sync.js";
-import { fetchPrivateState, pushPrivateState } from "./private.js";
+import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar } from "./sync.js";
+import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
@@ -135,7 +135,11 @@ async function launchApp(session) {
     // Sin lectura previa no se escribe: subir una porción vacía borraría lo real.
     pushPrivateState: privOk ? (data) => pushPrivateState(email, data) : null,
     pushRemoteState,
+    hayPendiente: () => hayCambiosSinGuardar() || hayPrivadoSinGuardar(),
   });
+  // El testigo de guardado: la app avisa en pantalla si algo no llegó a la base.
+  setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
+  setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 }
 
