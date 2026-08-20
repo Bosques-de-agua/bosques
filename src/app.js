@@ -1,7 +1,7 @@
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
-const LOCAL_KEYS=["me","theme","palette","tab","estProj","estFocus","estView","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
+const LOCAL_KEYS=["me","theme","palette","navRail","tab","estProj","estFocus","estView","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -326,18 +326,49 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function matches(node){ const p=fPerson.value,s=fStatus.value; if(!p&&!s)return true; const a=agg(node); return (!p||a.owners.has(p))&&(!s||a.st.has(s)); }
   function isOff(node){ let x=node; while(x){ if(off.has(x.id))return true; x=N(x.parent); } return false; }
   function isBright(node){ return !isOff(node)&&matches(node); }
+  // Vecindario de un tema: su padre, sus hijos y sus vínculos sueltos.
+  function vecinos(id){ const v=new Set(); const n=N(id); if(!n)return v;
+    if(n.parent)v.add(n.parent); (n.children||[]).forEach(c=>v.add(c)); (n.links||[]).forEach(l=>v.add(l));
+    Object.values(state.nodes).forEach(o=>{ if((o.links||[]).includes(id))v.add(o.id); });
+    return v; }
+  function enFoco(){ return selId?new Set([selId,...vecinos(selId)]):null; }
 
   // Ya no hay selector de identidad: sos quien entró con su correo.
   function applyTabControls(name){ const P=name==="mapa"||name==="estructura"; const E=P;
     document.getElementById("filtPersona").style.display=P?"":"none"; document.getElementById("filtEstado").style.display=E?"":"none";
     const s=document.getElementById("filtSos"); if(s)s.style.display="none"; }
-  function showTab(name){ active=name; applyTabControls(name);
+  function showTab(name){ active=name; applyTabControls(name); acomodarMenu();
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
     document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
     renderActive(); save(); }
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+
+  // ---------- MENÚ LATERAL ----------
+  // Se puede plegar a una banda de iconos. En Chat se pliega solo: ese costado
+  // es de la lista de contactos y los dos juntos no entran.
+  const sidebar=document.getElementById("sidebar"), sbToggle=document.getElementById("sbToggle"), panelSubs=document.getElementById("panelSubs");
+  const plegado=()=>!!(sidebar&&sidebar.classList.contains("rail"));
+  function pintarMenu(rail){ if(!sidebar)return;
+    sidebar.classList.toggle("rail",!!rail);
+    if(sbToggle){ sbToggle.setAttribute("aria-expanded",rail?"false":"true");
+      sbToggle.title=rail?"Mostrar el menú":"Esconder el menú"; } }
+  function acomodarMenu(){
+    // Las sub-secciones son el índice del Panel: fuera del Panel no significan nada.
+    if(panelSubs)panelSubs.hidden=(active!=="panel");
+    pintarMenu(active==="chat" ? true : !!state.navRail); }
+  if(sbToggle) sbToggle.addEventListener("click",()=>{
+    // En Chat el plegado es forzado: el botón lo abre por esta vez y no toca
+    // tu preferencia, así el menú vuelve a como lo tenías al salir de ahí.
+    if(active==="chat"){ pintarMenu(!plegado()); return; }
+    state.navRail=!plegado(); save(); pintarMenu(state.navRail); });
+  document.querySelectorAll(".sbsub").forEach(b=>b.addEventListener("click",()=>{
+    if(active!=="panel")showTab("panel");
+    document.querySelectorAll(".sbsub").forEach(x=>x.classList.toggle("on",x===b));
+    const el=document.getElementById(b.dataset.sec);
+    if(el)el.scrollIntoView({behavior:"smooth",block:"start"}); }));
+
   function renderActive(){ refreshChrome();
-    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); }
+    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); }
   // Estructura tiene dos vistas del mismo árbol: en columnas o como mapa.
   function estView(){ return state.estView==="mapa"?"mapa":"arbol"; }
   function renderEstructuraTab(){ const esMapa=estView()==="mapa";
@@ -369,9 +400,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function edgeD(a,b){ const c=ctrlOf(a,b); return `M ${OX+a.x} ${OY+a.y} Q ${OX+c.x} ${OY+c.y} ${OX+b.x} ${OY+b.y}`; }
   function edgeColor(e){ const m=EM()[e.key]||{}; return m.color||(e.type==="link"?cssv("--link"):accentOf(e.b)); }
   function edgeDash(e){ const m=EM()[e.key]||{}; const st=m.style||(e.type==="link"?"dash":"solid"); return st==="solid"?"":st==="dot"?"1.5 7":"7 7"; }
-  function buildEdges(){ const list=edgeList(); let paths="",hits="";
+  function buildEdges(){ const list=edgeList(); let paths="",hits=""; const foco=enFoco();
     list.forEach(e=>{ const on=isBright(e.a)&&isBright(e.b); const col=edgeColor(e),dash=edgeDash(e),d=edgeD(e.a,e.b);
-      paths+=`<path class="edge" data-key="${e.key}" d="${d}" stroke="${col}" stroke-width="${on?(e.type==="link"?1.6:2.2):1}" ${dash?`stroke-dasharray="${dash}"`:""} opacity="${on?0.7:0.12}" style="pointer-events:none"/>`;
+      const tocaSel=!!selId&&(e.a.id===selId||e.b.id===selId);
+      const grosor=on?(tocaSel?1.6:1):0.75;
+      const opac=on?(!foco||tocaSel?0.72:0.14):0.1;
+      paths+=`<path class="edge" data-key="${e.key}" d="${d}" stroke="${col}" stroke-width="${grosor}" ${dash?`stroke-dasharray="${dash}"`:""} opacity="${opac}" style="pointer-events:none"/>`;
       if(editing&&on) hits+=`<path class="hit" data-key="${e.key}" d="${d}"/>`; });
     svg.innerHTML=paths+hits; svg.style.pointerEvents=editing?"auto":"none"; handles.innerHTML="";
     if(editing){ svg.querySelectorAll("path.hit").forEach(p=>p.addEventListener("click",ev=>{ ev.stopPropagation(); const e=list.find(x=>x.key===p.dataset.key); if(e)openEdgePop(e); }));
@@ -380,15 +414,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     h.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); drag=true; h.setPointerCapture(ev.pointerId); sx=ev.clientX;sy=ev.clientY; const m=EM()[e.key]||{}; b0=Object.assign({dx:0,dy:0},m.bend); });
     h.addEventListener("pointermove",ev=>{ if(!drag)return; const dx=(ev.clientX-sx)/cam.s,dy=(ev.clientY-sy)/cam.s; setEdgeMeta(e.key,{bend:{dx:b0.dx+dx,dy:b0.dy+dy}}); const c=ctrlOf(e.a,e.b); h.style.left=(OX+c.x)+"px"; h.style.top=(OY+c.y)+"px"; const d=edgeD(e.a,e.b); const pa=svg.querySelector(`path.edge[data-key="${e.key}"]`); if(pa)pa.setAttribute("d",d); const hi=svg.querySelector(`path.hit[data-key="${e.key}"]`); if(hi)hi.setAttribute("d",d); });
     h.addEventListener("pointerup",()=>{ if(!drag)return; drag=false; save(); renderMap(); }); }
-  function renderMap(){ buildEdges();
+  function renderMap(){ buildEdges(); const foco=enFoco();
     [...worldInner.querySelectorAll(".neu")].forEach(n=>n.remove());
     Object.values(state.nodes).forEach(node=>{ const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
-      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"");
-      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
+      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(foco&&!foco.has(node.id)?" dim":"");
+      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
       const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>avatarMarkup(o,"av",true)).join("");
       const outLinks=(node.links||[]).length;
       const sub=`${hasKids?a.nc+" sub · ":""}${a.ic} tarea${a.ic===1?"":"s"}${a.ic?` · ${a.dc}✓`:""}`;
-      el.innerHTML=`<span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}`;
+      el.innerHTML=`<span class="nod"></span><span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}`;
       worldInner.appendChild(el); wireNeuron(el,node); });
     document.getElementById("addLabel").textContent=selId?"Nuevo sub-tema":"Nuevo proyecto"; }
   function applyCam(){ world.style.transform=`translate(${cam.tx}px,${cam.ty}px) scale(${cam.s})`; }
@@ -812,7 +846,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const DOWL=["lun","mar","mié","jue","vie","sáb","dom"];
   function ymdLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderProfile(); renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); renderConfig(); }
+  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); }
+  function renderConfigTab(){ renderProfile(); renderConfig(); }
   function renderProfile(){ const box=document.getElementById("profile"); if(!box)return; const me=state.me;
     if(!me){ box.innerHTML=""; return; }
     const mine=avColor(me); const hasPhoto=!!(state.avatars&&state.avatars[me]);
@@ -831,12 +866,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- CONFIGURACIÓN ----------
   // Todo lo tuyo en un solo lugar: quién sos, cómo se ve la app, avisos,
   // el equipo y el respaldo.
-  let cfgAbierta=false;
   function renderConfig(){ const box=document.getElementById("config"); if(!box)return;
-    if(!cfgAbierta){ box.innerHTML=`<button class="rowbtn" id="cfgOpen">⚙️ Configuración</button>`;
-      document.getElementById("cfgOpen").addEventListener("click",()=>{ cfgAbierta=true; renderConfig(); }); return; }
     const me=state.me||""; const yoM=miembroPorEmail(miEmail);
-    const paleta=state.palette||"bosque";
+    const paleta=state.palette||"atelier";
     const temaActual=state.theme||"";
     box.innerHTML=`<div class="cfg">
       <div class="cfgsec"><div class="lab">Vos</div>
@@ -871,9 +903,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         <div class="cfgrow"><span class="lbl">Importar una copia<small>Reemplaza el contenido de todo el equipo</small></span>
           <button class="btn danger" id="cfgRestore">Importar…</button></div>
       </div>
-      <button class="rowbtn" id="cfgClose">Cerrar configuración</button>
     </div>`;
-    document.getElementById("cfgClose").addEventListener("click",()=>{ cfgAbierta=false; renderConfig(); });
     const inp=document.getElementById("cfgNombre");
     const guardarNombre=()=>{ const nuevo=inp.value.trim();
       if(!nuevo){ note("El nombre no puede quedar vacío."); inp.value=me; return; }
@@ -1250,8 +1280,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       save(); box.classList.remove("on"); updateAvisos(); if(active==="panel")renderPanel(); }); }
   function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
   // Paleta de fondo, aparte del claro/oscuro: cada una define sus tonos en ambos modos.
-  const PALETAS={bosque:"Bosque",papel:"Papel",pizarra:"Pizarra",atelier:"Atelier"};
-  function applyPalette(p){ if(p&&PALETAS[p])document.documentElement.setAttribute("data-palette",p); else document.documentElement.removeAttribute("data-palette"); }
+  const PALETAS={atelier:"Atelier",bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
+  function applyPalette(p){ // Atelier es el tema de la casa: sin preferencia guardada, va Atelier.
+    document.documentElement.setAttribute("data-palette", (p&&PALETAS[p])?p:"atelier"); }
   document.getElementById("avisosBtn").addEventListener("click",e=>{ e.stopPropagation();
     const m=document.getElementById("avisosMenu");
     if(m.classList.contains("on")){ m.classList.remove("on"); return; }
@@ -1311,13 +1342,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(state.me){ state.tasksSeen=state.tasksSeen||{};
     if(!Array.isArray(state.tasksSeen[state.me]))
       state.tasksSeen[state.me]=activeItems().filter(x=>ownersOf(x.k).includes(state.me)).map(x=>x.k.id); }
-  applyTheme(state.theme||null); applyPalette(state.palette||null);
+  applyTheme(state.theme||null); applyPalette(state.palette||"atelier");
   sweepArchive(); loadTreeOpen(); syncPeopleList();
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
   if(!seed) save();                                // base vacía: sembrar
   // Si la pestaña guardada ya no existe (el mapa pasó a vivir dentro de
   // Estructura), se cae a una válida en vez de quedar en pantalla vacía.
-  const TABS=["panel","tareas","chat","drive","archivo","estructura"];
+  const TABS=["panel","tareas","chat","drive","archivo","estructura","config"];
   active=state.tab||"panel";
   if(active==="personal")active="panel";
   if(active==="mapa"){ active="estructura"; state.estView="mapa"; }

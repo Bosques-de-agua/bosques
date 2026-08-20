@@ -64,11 +64,11 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg)}
   /* Sin display aquí: lo controla .on, para que la app no se dibuje debajo del login */
-  #app{font-family:var(--font-ui);color:var(--ink);height:100vh;min-height:560px;overflow:hidden;grid-template-rows:auto 1fr;background:var(--bg);-webkit-font-smoothing:antialiased}
+  #app{font-family:var(--font-ui);color:var(--ink);height:100vh;min-height:560px;overflow:hidden;grid-template-rows:auto 1fr;grid-template-columns:auto 1fr;background:var(--bg);-webkit-font-smoothing:antialiased}
   #app.on{display:grid}
   #app:not(.on){display:none}
 
-  .topbar{display:flex;align-items:center;gap:14px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);z-index:30;flex-wrap:wrap}
+  .topbar{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);z-index:30;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:10px}
   .brand .mark{width:30px;height:30px;border-radius:var(--r-sm);background:var(--fill-mark);display:grid;place-items:center;box-shadow:var(--shadow)}
   .brand .mark img{height:19px;width:auto;display:block}
@@ -98,7 +98,7 @@
   .btn.on{border-color:var(--wood);background:var(--surface);box-shadow:inset 0 0 0 1px var(--wood)}
   :focus-visible{outline:2px solid var(--wood);outline-offset:2px}
 
-  main{position:relative;overflow:hidden}
+  main{grid-row:2;grid-column:2;position:relative;overflow:hidden}
   .tab{position:absolute;inset:0;display:none;overflow:auto}
   .tab.on{display:block}
   .tab.nopad{overflow:hidden}
@@ -798,3 +798,100 @@
   [data-palette="atelier"] .neu[data-lvl="2"]{border-top-width:1px;box-shadow:inset 0 2px 0 -1px var(--l2)}
   [data-palette="atelier"] .neu:hover{box-shadow:inset 0 2px 0 -1px var(--line);border-color:var(--ink-faint);transform:translate(-50%,-50%)}
   [data-palette="atelier"] .neu.sel{border-color:var(--wood);box-shadow:0 0 0 1px var(--wood),0 0 22px -6px var(--wood)}
+
+  /* ══════════════ MENÚ LATERAL ══════════════
+     Las secciones se fueron de la barra superior a una columna propia, que se
+     puede plegar a una banda de iconos. La barra de arriba queda para lo que
+     es transversal: marca, filtros, novedades y tema. */
+  .sidebar{grid-row:2;grid-column:1;width:210px;background:var(--panel);border-right:1px solid var(--line);
+    padding:14px 10px 12px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;
+    transition:width .18s ease}
+  .sidebar.rail{width:54px;padding:14px 7px 12px}
+  .sbtoggle{flex:none}
+  .sbgroup{display:flex;flex-direction:column;gap:1px}
+  .sblab{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);
+    font-weight:700;padding:0 9px;margin:16px 0 6px;white-space:nowrap}
+  .sbgroup:first-child .sblab{margin-top:2px}
+  .sidebar.rail .sblab{height:0;margin:12px 0 0;opacity:0;overflow:hidden}
+  .sbitem{position:relative;display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;
+    border-radius:var(--r-ctl);font:inherit;font-size:13px;font-weight:500;color:var(--ink-soft);
+    background:none;border:none;cursor:pointer;text-align:left;white-space:nowrap;
+    transition:background .12s,color .12s}
+  .sbitem svg{width:16px;height:16px;flex:none}
+  .sbitem:hover{color:var(--ink);background:var(--surface-2)}
+  .sbitem.on{color:var(--ink);background:var(--surface-2);font-weight:600}
+  .sidebar.rail .sblbl{display:none}
+  .sidebar.rail .sbitem{justify-content:center;padding:9px 0}
+  /* Plegado, el aviso de chat nuevo se apoya sobre el icono. */
+  .sidebar.rail .sbitem .navbadge{position:absolute;top:2px;right:7px;margin:0}
+  /* Las sub-secciones son el índice del Panel: solo aparecen estando ahí. */
+  .sbsubs{display:flex;flex-direction:column;margin:3px 0 4px 21px;padding-left:3px;
+    border-left:1px solid var(--line-soft)}
+  .sbsubs[hidden],.sidebar.rail .sbsubs{display:none}
+  .sbsub{font:inherit;font-size:12px;color:var(--ink-faint);background:none;border:none;text-align:left;
+    padding:5px 9px;border-radius:var(--r-sm);cursor:pointer;white-space:nowrap}
+  .sbsub:hover{color:var(--ink);background:var(--surface-2)}
+  .sbsub.on{color:var(--ink)}
+  .sbfoot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line-soft)}
+  /* En pantallas angostas no hay lugar para las etiquetas: siempre banda. */
+  @media (max-width:900px){
+    .sidebar,.sidebar.rail{width:54px;padding:14px 7px 12px}
+    .sidebar .sblbl,.sidebar .sbsubs{display:none}
+    .sidebar .sblab{height:0;margin:12px 0 0;opacity:0;overflow:hidden}
+    .sidebar .sbitem{justify-content:center;padding:9px 0}
+  }
+  /* En Atelier el rótulo de grupo es una etiqueta técnica, como los demás. */
+  [data-palette="atelier"] .sblab{font-family:var(--font-mono);font-weight:500}
+  [data-palette="atelier"] .sbitem.on{box-shadow:inset 2px 0 0 var(--wood)}
+
+  /* ══════════════ PORTADA ══════════════
+     El título se veía negro porque la pantalla de acceso vive FUERA de #app,
+     que es quien fija el color de texto: heredaba el negro del navegador.
+     Además la portada es siempre oscura, en cualquier tema — es la primera
+     impresión de la app y el nombre tiene que resaltar sobre el carbón. */
+  .login-screen{
+    --bg:#0D0F10; --panel:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
+    --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
+    --line:#292C2E; --wood:#C9A66B; --wood-deep:#C9A66B; --s-bloq:#C97263;
+    --on-primary:#14110B; --fill-primary:var(--wood); --shadow-lg:0 24px 64px rgba(0,0,0,.62);
+    font-family:var(--font-ui); color:var(--ink);
+  }
+  .login-box h1{color:var(--ink)}
+
+  /* ══════════════ ATELIER · el mapa en dos dimensiones ══════════════
+     Los globos dejan de ser tarjetas con relieve: cada tema es un punto y su
+     nombre. La profundidad la dan la escala, la opacidad y el foco — nunca el
+     volumen. Al seleccionar un tema, lo relacionado se queda iluminado y el
+     resto baja de presencia; eso lo resuelve la clase .dim desde app.js. */
+  .neu .nod{display:none}
+  [data-palette="atelier"] .neu{background:transparent;border:none;box-shadow:none;padding:7px 9px;border-radius:var(--r-card)}
+  [data-palette="atelier"] .neu:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);box-shadow:none}
+  [data-palette="atelier"] .neu.sel{background:color-mix(in srgb,var(--wood) 9%,transparent);box-shadow:none}
+  [data-palette="atelier"] .neu .nod{display:block;width:11px;height:11px;border-radius:50%;margin:0 auto 8px;
+    background:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 14%,transparent);
+    transition:box-shadow .28s ease,width .28s ease,height .28s ease}
+  [data-palette="atelier"] .neu[data-lvl="1"] .nod{width:15px;height:15px;box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 12%,transparent)}
+  [data-palette="atelier"] .neu[data-lvl="2"] .nod{width:13px;height:13px}
+  /* Bien adentro del árbol el punto se vacía: queda solo el anillo. */
+  [data-palette="atelier"] .neu.deep .nod{width:8px;height:8px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--acc)}
+  [data-palette="atelier"] .neu.sel .nod{box-shadow:0 0 0 1px var(--wood),0 0 20px 3px color-mix(in srgb,var(--wood) 38%,transparent)}
+  [data-palette="atelier"] .neu.dim{opacity:.3}
+  [data-palette="atelier"] .neu.dim:hover{opacity:.72}
+  [data-palette="atelier"] .neu .link-mark{left:auto;right:8px;bottom:5px}
+  [data-palette="atelier"] .neu .nm{font-weight:500}
+  [data-palette="atelier"] .neu[data-lvl="1"] .nm{font-weight:600}
+
+  /* El cobre de identidad es un color de RELLENO: como texto de 11 px sobre
+     papel se queda corto (4.0). Donde hace de texto va el cobre profundo,
+     que cierra en los dos modos. */
+  [data-palette="atelier"] .calcell.today .dnum,
+  [data-palette="atelier"] .profilerow .tinylink,
+  [data-palette="atelier"] .mini-add,
+  [data-palette="atelier"] .chadd,
+  [data-palette="atelier"] .fmenu .fclear,
+  [data-palette="atelier"] .kcol h4 .colact,
+  [data-palette="atelier"] .ppadd .addp,
+  [data-palette="atelier"] .pop .tiny,
+  [data-palette="atelier"] .undobar button,
+  [data-palette="atelier"] .filerow .fnm:hover,
+  [data-palette="atelier"] .myfoco .newchip{color:var(--wood-deep)}
