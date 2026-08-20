@@ -20,6 +20,13 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 
+// Con el permiso `drive.file`, el selector EXIGE que se le declare de qué
+// aplicación es; si no, Google rechaza la petición con un 401 y la ventana no
+// llega a abrirse nunca. Ese identificador es el número del proyecto, que ya
+// viene adelante del ID de cliente ("123456789-abc.apps.googleusercontent.com"),
+// así que se saca de ahí y no hay que cargar nada más.
+const APP_ID = String(CLIENT_ID || "").split("-")[0];
+
 function configurado() {
   return !!CLIENT_ID && !!API_KEY;
 }
@@ -105,7 +112,7 @@ function pedirToken() {
 }
 
 function mostrarSelector(accessToken) {
-  return new Promise((listo) => {
+  return new Promise((listo, falla) => {
     const g = window.google.picker;
     // Dos solapas: lo propio y lo que le compartieron. Las carpetas se pueden
     // elegir igual: la app las guarda como link, aunque adentro no se puedan
@@ -119,8 +126,20 @@ function mostrarSelector(accessToken) {
       .setSelectFolderEnabled(true)
       .setOwnedByMe(false)
       .setMode(g.DocsViewMode.LIST);
+    // Si Google rechaza la petición, no avisa: simplemente no pasa nada y el
+    // botón se queda "Abriendo Drive…" para siempre. El selector manda un
+    // aviso apenas se dibuja, así que si no llega ninguno en 15 segundos es
+    // que no va a llegar, y conviene decirlo en vez de esperar sentados.
+    let abrio = false;
+    const reloj = setTimeout(() => {
+      if (abrio) return;
+      falla(new Error(
+        "Google no llegó a abrir el selector. Suele ser una de dos: falta el permiso de Drive en la pantalla de consentimiento, o las restricciones de la clave de API todavía se están propagando (dan unos minutos)."
+      ));
+    }, 15000);
     let sel = null;
     sel = new g.PickerBuilder()
+      .setAppId(APP_ID)
       .setOAuthToken(accessToken)
       .setDeveloperKey(API_KEY)
       .setTitle("Elegí los archivos del proyecto")
@@ -129,6 +148,9 @@ function mostrarSelector(accessToken) {
       .addView(mias)
       .addView(compartidos)
       .setCallback((data) => {
+        // Cualquier aviso, incluido el de "ya me dibujé", prueba que abrió.
+        abrio = true;
+        clearTimeout(reloj);
         const a = data && data.action;
         if (a !== g.Action.PICKED && a !== g.Action.CANCEL) return;
         // Cerrada la ventana, se la saca del documento: si no, queda un velo
