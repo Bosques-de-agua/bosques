@@ -22,6 +22,18 @@ Correr el contenido de [`supabase/schema.sql`](supabase/schema.sql) en el SQL Ed
 
 Todo el acceso pasa por la función `is_allowed()`, que compara el email del token contra `allowed_emails`.
 
+### Respaldo automático
+
+Toda la información del equipo es **una fila**, y el plan gratuito **no garantiza copias**. [`supabase/respaldo.sql`](supabase/respaldo.sql) deja una tarea diaria que copia `app_state` y `user_private` a `app_state_backup`, y poda las copias automáticas de más de 60 días. Se corre **una sola vez**, después de habilitar `pg_cron` en Database → Extensions.
+
+`app_state_backup` tiene RLS activo y **ninguna política**: no se llega desde la app ni con sesión iniciada, solo desde el panel. Un respaldo que la app puede borrar no es un respaldo.
+
+De regalo resuelve el pausado: un proyecto gratuito se duerme tras ~1 semana sin actividad, y la tarea diaria lo mantiene despierto.
+
+### Pruebas
+
+`/pruebas.html` en el servidor local corre la capa de guardado (`sync.js` y `private.js`) contra una base de mentira. Es aparte del banco porque el banco reemplaza el guardado por espías, así que justo el código donde se puede perder trabajo no se ejecuta ahí. Cada comprobación corresponde a una falla que existió de verdad. Ni esto ni el banco se despliegan: Vite construye solo `index.html`.
+
 ### Sumar a alguien al equipo
 
 Desde la app: **Panel → Configuración → Equipo → Sumar a alguien**. Alcanza con el correo. Esa persona entra con su propio enlace de acceso y completa su nombre la primera vez.
