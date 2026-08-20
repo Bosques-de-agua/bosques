@@ -224,9 +224,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     kids(P2,[bo_fonag,bo_fauna,bo_nide]);
     link(sd,prod); link(bo_nide,sd_est); link(pnp,adm_leg);
     doLayout(nodes,roots);
-    const _d=new Date(); _d.setDate(_d.getDate()+3); const evd=_d.getFullYear()+"-"+String(_d.getMonth()+1).padStart(2,"0")+"-"+String(_d.getDate()).padStart(2,"0");
-    const events=[{id:"ev1",date:evd,title:"Reunión de equipo",time:"18:00",desc:"Repasamos avances de la semana y próximos pasos.",rsvp:{Nico:"yes"}}];
-    const chat={team:[{id:"m1",from:"Juanpi",text:"Equipo, ¿cómo venimos con los informes de dominio?",ts:null},{id:"m2",from:"Nico",text:"Los del ejido ya salieron; falta Provincia.",ts:null},{id:"m3",from:"Lucas",text:"Yo sigo con el bastón, avanza bien.",ts:null},{id:"m4",from:"Juanpi",ev:"ev1",ts:null}],dm:{}};
+    // El árbol de temas es real; la conversación y la agenda arrancan vacías.
+    // Antes el sembrado traía un evento y cuatro mensajes de ejemplo que después
+    // había que salir a borrar a mano de la base.
+    const events=[];
+    const chat={team:[],dm:{},groups:{}};
     return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juanpi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",privTasks:{},_seedfix:true,_layout3:true};
   }
 
@@ -1248,7 +1250,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       save(); box.classList.remove("on"); updateAvisos(); if(active==="panel")renderPanel(); }); }
   function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
   // Paleta de fondo, aparte del claro/oscuro: cada una define sus tonos en ambos modos.
-  const PALETAS={bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
+  const PALETAS={bosque:"Bosque",papel:"Papel",pizarra:"Pizarra",atelier:"Atelier"};
   function applyPalette(p){ if(p&&PALETAS[p])document.documentElement.setAttribute("data-palette",p); else document.documentElement.removeAttribute("data-palette"); }
   document.getElementById("avisosBtn").addEventListener("click",e=>{ e.stopPropagation();
     const m=document.getElementById("avisosMenu");
