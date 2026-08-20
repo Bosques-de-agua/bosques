@@ -26,7 +26,7 @@ function stripShared(state){ const o=stripLocal(state); const me=state.me;
     if(Object.keys(resto).length)o[k]=resto; else delete o[k]; });
   return o; }
 
-export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente }){
+export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto }){
   // El equipo viene de la base (tabla team_members), no del estado compartido.
   // Cada persona ES su email; el nombre es solo la etiqueta que se muestra.
   let equipo = Array.isArray(team) ? team.slice() : [];
@@ -553,6 +553,19 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       barra.innerHTML='<span>No se pudo guardar. Tu trabajo está en pantalla pero todavía no en la base — no cierres esta pestaña.</span><button class="rowbtn" id="saveRetry">Reintentar</button>';
       const b=barra.querySelector("#saveRetry");
       if(b)b.addEventListener("click",()=>{ lastPushed=""; mostrarEstadoGuardado("guardando"); save(); });
+      return;
+    }
+    // Si no pudimos LEER lo privado al entrar, la app no lo escribe a propósito
+    // (subir una porción vacía borraría lo que hay). Eso está bien; lo que
+    // faltaba era decirlo: antes escribías una nota, se veía en pantalla, y al
+    // recargar no estaba, sin que nada te hubiera avisado. El aviso ocupa la
+    // misma franja y dura toda la sesión, salvo que haya un fallo de guardado
+    // del equipo, que es más urgente y va primero.
+    if(privadoRoto){
+      barra.className="savestate mal";
+      barra.innerHTML='<span>No pudimos leer tus notas y tus tareas privadas. Para no borrar lo que ya tenías, en esta sesión <b>no se guarda nada privado</b>. Lo del equipo se guarda normal.</span><button class="rowbtn" id="privReload">Recargar</button>';
+      const r=barra.querySelector("#privReload");
+      if(r)r.addEventListener("click",()=>location.reload());
       return;
     }
     if(estado==="guardando"){ barra.className="savestate yendo"; barra.innerHTML='<span>Guardando…</span>'; return; }
@@ -1101,7 +1114,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=msgs.length?msgs.map(m=>msgHTML(m,me)).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
-      const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id)); });
+      const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
+      const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id)); });
     seenMap()[chatChan]=msgs.length; save(); updateChatBadge(); box.scrollTop=box.scrollHeight; }
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   function msgHTML(m,me){ if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
@@ -1112,14 +1126,50 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
-        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+`</div>`; }
-    return `<div class="msg ${mm?"mine":""}">${mm?"":`<div class="who">${esc(m.from)}</div>`}<div>${esc(m.text)}</div></div>`; }
+        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+borrarBtn(m,me)+`</div>`; }
+    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}<div>${esc(m.text)}</div>${borrarBtn(m,me)}</div>`; }
+  // Se puede borrar lo propio. Hacía falta igual, pero sobre todo porque un
+  // adjunto pesado se quedaba adentro de la fila compartida para siempre.
+  function borrarBtn(m,me){ return m.from===me?`<button class="msgx" data-borrarm="${m.id}" title="Borrar mensaje">✕</button>`:""; }
+  function borrarMsg(mid){ const arr=msgsOf(chatChan); const m=arr.find(x=>x.id===mid); if(!m)return;
+    if(m.from!==(state.me||""))return;
+    const q=m.file?"Se borra el mensaje y el archivo que trae, para todos.":"Se borra el mensaje para todos.";
+    confirmar(q,()=>{ const i=arr.findIndex(x=>x.id===mid); if(i>=0)arr.splice(i,1); save(); renderChat(); },{title:"Borrar mensaje",yes:"Borrar"}); }
   function sendMsg(){ const inp=document.getElementById("msgInput"); const me=state.me; if(!me)return; const t=inp.value.trim(); if(!t)return; msgsOf(chatChan).push({id:"m"+uid(),from:me,text:t,ts:nowMs()}); inp.value=""; save(); renderChat(); }
-  const MAXFILE=3*1024*1024;
+  // Lo que se adjunta al chat NO se guarda aparte: viaja dentro de la misma
+  // fila que comparte todo el equipo. O sea que el peso de un adjunto se lo
+  // banca cada guardado de cada persona, para siempre. Con el limite viejo de
+  // 3 MB, un solo archivo (que en base64 son 4 MB) dejaba la app pesada para
+  // los cuatro y encima reventaba el tope de los avisos en vivo.
+  //
+  // Ahora: las fotos se achican solas antes de guardarse, que es el 90% de lo
+  // que uno manda por chat, y para el resto hay un tope chico. Lo pesado va a
+  // Drive, que para eso esta la pestaña.
+  const MAXFILE=400*1024;
+  const MAXLADO=1400;
+  const pesoDataURL=u=>Math.round(String(u||"").length*0.75);   // base64 → bytes
+  // Una foto de celular son 4 MB; a 1400px de lado y calidad 0.8 queda en
+  // decenas de KB y en pantalla no se nota la diferencia.
+  function achicarImagen(file,cb,fallar){ const r=new FileReader();
+    r.onload=()=>{ const img=new Image();
+      img.onload=()=>{ const esc=Math.min(1,MAXLADO/Math.max(img.width,img.height));
+        if(esc>=1&&file.size<=MAXFILE){ cb(r.result,file.size); return; }   // ya es chica
+        const c=document.createElement("canvas");
+        c.width=Math.round(img.width*esc); c.height=Math.round(img.height*esc);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        const u=c.toDataURL("image/jpeg",0.8); cb(u,pesoDataURL(u)); };
+      img.onerror=fallar; img.src=r.result; };
+    r.onerror=fallar; r.readAsDataURL(file); }
   function attachFile(file){ const me=state.me; if(!me)return;
-    if(file.size>MAXFILE){ note(`"${file.name}" pesa ${(file.size/1048576).toFixed(1)} MB. Por ahora el límite es 3 MB por archivo, porque todo se guarda dentro de la app. Para algo más grande, subilo a Drive y compartí el link desde la pestaña Drive.`,"Archivo muy pesado"); return; }
+    const guardar=(data,peso,tipo)=>{
+      if(peso>MAXFILE){ note(`"${file.name}" pesa ${(peso/1024).toFixed(0)} KB y el tope acá es ${Math.round(MAXFILE/1024)} KB, porque los adjuntos del chat se guardan dentro de la app y los carga todo el equipo en cada cambio. Subilo a Drive y vinculalo desde la pestaña Drive: ahí no pesa, y además se puede ver sin salir de la app.`,"Muy pesado para el chat"); return; }
+      msgsOf(chatChan).push({id:"m"+uid(),from:me,text:"",ts:nowMs(),file:{name:file.name,size:peso,type:tipo,data}});
+      save(); renderChat(); };
+    const fallar=()=>note("No se pudo leer el archivo.");
+    if(/^image\//.test(file.type||"")){ achicarImagen(file,(data,peso)=>guardar(data,peso,"image/jpeg"),fallar); return; }
+    if(file.size>MAXFILE){ guardar(null,file.size,file.type||""); return; }   // avisa y corta
     const r=new FileReader();
-    r.onload=()=>{ msgsOf(chatChan).push({id:"m"+uid(),from:me,text:"",ts:nowMs(),file:{name:file.name,size:file.size,type:file.type||"",data:r.result}}); save(); renderChat(); };
+    r.onload=()=>guardar(r.result,file.size,file.type||"");
     r.onerror=()=>note("No se pudo leer el archivo.");
     r.readAsDataURL(file); }
   async function downloadMsgFile(mid){ const m=msgsOf(chatChan).find(x=>x.id===mid); if(!m||!m.file)return; const f=m.file;
@@ -1816,6 +1866,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(tid){ const hit=allItems().find(x=>x.k.id===tid);
       if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }
       history.replaceState(null,"",window.location.pathname); } }catch(e){}
+
+  // El aviso de "lo privado no se está guardando" tiene que estar desde el
+  // primer segundo, no recién cuando alguien intente escribir una nota.
+  if(privadoRoto)mostrarEstadoGuardado(estadoGuardado);
 
   return { applyRemoteState, applyPrivateState, mostrarEstadoGuardado };
 }

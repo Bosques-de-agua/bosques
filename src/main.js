@@ -143,6 +143,8 @@ async function launchApp(session) {
     refreshTeam: fetchTeam,
     // Sin lectura previa no se escribe: subir una porción vacía borraría lo real.
     pushPrivateState: privOk ? (data) => pushPrivateState(email, data) : null,
+    // ...pero eso hay que DECIRLO, o escribís una nota y desaparece al recargar.
+    privadoRoto: !privOk,
     pushRemoteState,
     hayPendiente: () => hayCambiosSinGuardar() || hayPrivadoSinGuardar(),
   });
@@ -150,6 +152,41 @@ async function launchApp(session) {
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
+
+  // Volver a la pestaña y releer.
+  //
+  // Los avisos en vivo viajan por un websocket, y ese websocket se cae cuando
+  // el celular se duerme o la pestaña queda mucho rato en segundo plano. Nadie
+  // lo reintentaba, así que al volver podías estar mirando datos viejos sin
+  // ninguna señal de que lo eran — y escribir sobre eso pisaba lo nuevo.
+  //
+  // Si hay algo tuyo sin guardar, lo tuyo va primero: releer ahora te
+  // reemplazaría el estado y te lo borraría. Se espera a que la cola se vacíe.
+  let releyendo = false;
+  async function releer(intento = 0) {
+    if (releyendo) return;
+    if (hayCambiosSinGuardar() || hayPrivadoSinGuardar()) {
+      if (intento < 6) setTimeout(() => releer(intento + 1), 700);
+      return;
+    }
+    releyendo = true;
+    try {
+      const fresco = await fetchRemoteState();
+      if (fresco) app.applyRemoteState(fresco);
+      if (privOk) {
+        const mio = await fetchPrivateState(email);
+        if (mio) app.applyPrivateState(mio);
+      }
+    } catch (err) {
+      console.error("No se pudo releer al volver a la pestaña:", err);
+    } finally {
+      releyendo = false;
+    }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") releer();
+  });
+  window.addEventListener("online", () => releer());
 }
 
 function showLoadError(err) {

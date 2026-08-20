@@ -55,13 +55,20 @@ const espiaCompartido = async (d) => {
 };
 const espiaPrivado = async (d) => { window.__push.privado = d; };
 
+// /banco.html?privroto=1 simula que no se pudieron leer las notas y tareas
+// privadas al entrar. En la app real eso hace que NO se guarde nada privado en
+// toda la sesión, así que lo único aceptable es que se vea un aviso: antes
+// escribías una nota, se veía en pantalla, y al recargar no estaba.
+const privadoRoto = new URLSearchParams(location.search).has("privroto");
+
 const app = startApp({
   seed: null, // sin semilla, la app se siembra sola con su ejemplo
   priv: null,
   yo: team[0],
   team,
   pushRemoteState: espiaCompartido,
-  pushPrivateState: espiaPrivado,
+  pushPrivateState: privadoRoto ? null : espiaPrivado,
+  privadoRoto,
   saveMember: nada,
   inviteEmail: nada,
   refreshTeam: async () => team,

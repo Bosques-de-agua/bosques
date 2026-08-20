@@ -526,6 +526,15 @@
   .msgs{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:9px;background:var(--bg)}
   .msg{max-width:70%;padding:8px 12px;border-radius:var(--r-md);font-size:13.5px;line-height:1.4;background:var(--surface);border:1px solid var(--line-soft);align-self:flex-start;box-shadow:var(--shadow)}
   .msg.mine{align-self:flex-end;background:color-mix(in srgb,var(--wood) 16%,var(--surface));border-color:color-mix(in srgb,var(--wood) 30%,var(--line))}
+  /* La cruz de borrar aparece al pasar por encima del propio mensaje; en
+     pantalla táctil no hay "pasar por encima", así que ahí se ve siempre. */
+  .msg{position:relative}
+  .msg .msgx{position:absolute;top:-7px;right:-7px;width:20px;height:20px;line-height:1;border-radius:999px;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink-faint);font-size:11px;cursor:pointer;
+    opacity:0;transition:opacity .12s;padding:0}
+  .msg:hover .msgx,.msg .msgx:focus-visible{opacity:1}
+  .msg .msgx:hover{color:#8E2F1D;border-color:#8E2F1D}
+  @media (hover:none){ .msg .msgx{opacity:.55} }
   .msg .who{font-size:10.5px;color:var(--ink-faint);margin-bottom:2px;font-weight:600}
   .msg.event{max-width:86%;align-self:stretch;border-left:3px solid var(--sky)}
   .msg .evtitle{font-weight:700;font-size:14px;margin-top:2px}

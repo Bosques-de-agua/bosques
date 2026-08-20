@@ -41,18 +41,28 @@ export function hayPrivadoSinGuardar() {
   return !!pending || escribiendo;
 }
 
+// Mismo cuidado que en sync.js, y por la misma razón: un reintento de una
+// versión vieja no puede escribirse encima de una nueva que ya salió bien.
+// Acá duele más todavía, porque son tus notas y nadie más las tiene.
+// Descartar lo viejo es seguro: cada guardado manda tu porción completa.
+let generacion = 0;
+
 const REINTENTOS = 3;
-async function escribir(email, payload, intento = 0) {
+async function escribir(email, payload, intento = 0, mia = generacion) {
+  if (mia !== generacion) return;
   escribiendo = true;
   const { error } = await supabase.from("user_private").upsert({
     email,
     data: payload,
     updated_at: new Date().toISOString(),
   });
+  // Entró algo más nuevo mientras se escribía: el resultado de ésta ya no
+  // manda. `escribiendo` queda como está, que es el lado seguro.
+  if (mia !== generacion) return;
   if (error) {
     console.error("No se pudieron guardar tus datos privados (intento " + (intento + 1) + "):", error);
     if (intento + 1 < REINTENTOS) {
-      setTimeout(() => escribir(email, payload, intento + 1), 900 * (intento + 1));
+      setTimeout(() => escribir(email, payload, intento + 1, mia), 900 * (intento + 1));
       return;
     }
     escribiendo = false;
@@ -64,6 +74,7 @@ async function escribir(email, payload, intento = 0) {
 }
 
 export function pushPrivateState(email, data) {
+  generacion++;
   pending = data;
   if (onEstado) onEstado("guardando");
   clearTimeout(saveTimer);
