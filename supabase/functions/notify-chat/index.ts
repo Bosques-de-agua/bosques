@@ -103,7 +103,14 @@ async function sendTo(
   await Promise.all(
     (subs || []).map((s: any) =>
       webpush
-        .sendNotification(s.subscription, JSON.stringify({ title, body, url }))
+        // Prioridad alta y un día de vida. Con la prioridad normal que viene por
+        // defecto, Android pospone el aviso mientras la app está en segundo plano
+        // y con el ahorro de batería encendido no llega nunca; con TTL corto
+        // encima se descarta. Esto es lo que hace que lleguen igual.
+        .sendNotification(s.subscription, JSON.stringify({ title, body, url }), {
+          TTL: 86400,
+          urgency: "high",
+        })
         .then(() => console.log(`entregado → ${s.email}`))
         .catch(async (err: any) => {
           console.error(

@@ -66,6 +66,18 @@ Pasos del lado de Supabase, una sola vez:
 
 Cada persona activa las notificaciones desde **Panel → Configuración → Avisos**.
 
+Al lado del interruptor hay un botón **Probar**, que pide una notificación directamente al sistema sin pasar por el servidor. Sirve para distinguir "no llega" de "el teléfono no lo muestra", que desde afuera se ven igual.
+
+**Android: hay que sacarle la restricción de batería a CHROME.** Es el paso que más cuesta descubrir y sin él las notificaciones no llegan nunca. Los avisos salen con prioridad alta y un día de vida (`urgency: "high"`, `TTL: 86400`), que es todo lo que se puede hacer desde el envío, pero aun así Android los descarta si Chrome está optimizado.
+
+> **Ajustes → Aplicaciones → Chrome → Batería → Sin restricciones**
+
+Ojo con esto: quien recibe el mensaje por debajo es **Chrome**, no "Mesa de trabajo". Ajustar solo la app —que es lo intuitivo, porque es la que tiene el nombre reconocible— **no alcanza**. Verificado el 2026-08-20: con el ahorro de batería encendido y la app cerrada, ajustando solo la app no llega; ajustando también Chrome, llega.
+
+Conviene hacerlo parte del alta de cada persona, junto con instalar la app y activar los avisos.
+
+**Cómo se ve un aviso que no llega**, para no perder tiempo la próxima: la campanita de la app se enciende igual, porque se calcula en el cliente y no depende del push. Y en Ajustes → Aplicaciones, Android dice *"Esta app no publicó ninguna notificación"*, que es la señal de que el mensaje nunca llegó a despertar al service worker. Los registros de la función (Edge Functions → notify-chat → Logs) muestran cuántas suscripciones encontró y si cada entrega salió o falló.
+
 ## Arquitectura (por qué está armado así)
 
 Toda mutación pasa por una única función `save()`, que:
