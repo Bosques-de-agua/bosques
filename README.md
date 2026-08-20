@@ -34,6 +34,15 @@ Login sin contraseña (enlace mágico / OTP) vía Supabase Auth.
 
 **Quién sos se deriva del correo con el que entraste**, no de un selector. Eso es lo que hace que las tareas privadas y las notas personales sean realmente privadas: viven en `user_private`, y los permisos de la base impiden leer la fila de otro. Cambiar tu nombre desde Configuración lo actualiza en toda la app para todos.
 
+## Ramas: taller y vidriera
+
+- **`tema-atelier` es el taller.** Acá se trabaja: estética, funcionalidad, lo que sea. Se mira en el servidor local (`npm run dev`), donde no lo ve nadie más.
+- **`main` es la vidriera.** Es lo que el equipo tiene abierto. Solo llega acá lo que está terminado y probado.
+
+Se pasa del taller a la vidriera **por tandas**, con un merge, cuando una tanda está lista. Nunca a mitad de camino: cada push a `main` se despliega solo y el equipo lo ve al recargar.
+
+**Antes de cada commit, verificar en qué rama estás** (`git status -sb`). Sobre este repo puede haber más de una sesión trabajando a la vez, y un commit en la rama equivocada termina publicando trabajo a medio hacer. Ya pasó una vez.
+
 ## Deploy
 
 Conectado a Vercel (free) sobre este repo — cada push a `main` deploya solo. Variables de entorno en Vercel: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY`.
