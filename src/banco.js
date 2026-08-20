@@ -25,13 +25,13 @@ const team = [
   { email: "lucas@ejemplo.org", name: "Lucas" },
   { email: "juanso@ejemplo.org", name: "Juanso" },
 ];
-// El banco arranca en Atelier — es el tema que se está trabajando. Se puede
+// El banco arranca en Carbón — es el tema que se está trabajando. Se puede
 // cambiar desde Configuración y la elección queda guardada.
 try {
   const K = "mesa-bosques-prefs";
   const p = JSON.parse(localStorage.getItem(K) || "{}");
   if (!p.palette) {
-    p.palette = "atelier";
+    p.palette = "carbon";
     localStorage.setItem(K, JSON.stringify(p));
   }
 } catch (e) {}

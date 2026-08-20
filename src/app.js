@@ -134,7 +134,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     nota:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 4.5h10v8l-3 3H5z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><path d=\"M15 12.5h-3v3M7.6 8h4.8M7.6 11h3\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg>",
     equipo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"7.6\" cy=\"8\" r=\"2.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M3.6 15.6c0-2.2 1.8-3.7 4-3.7s4 1.5 4 3.7\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/><path d=\"M13.4 6.2a2.4 2.4 0 0 1 0 4.6M14.4 12.4c1.3.5 2.1 1.7 2.1 3.2\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     grupo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 8h12M4 12.4h12M8.6 4L7.1 16M13.4 4L11.9 16\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
-    persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>"
+    persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    si:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M7 10.2l2.1 2.1L13 8.4\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
   };
   const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},word:{i:ICO.doc,l:"Word"},excel:{i:ICO.sheet,l:"Excel"},ppt:{i:ICO.slides,l:"PowerPoint"},image:{i:ICO.imagen,l:"Imagen"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
   // Un PDF o un Word subidos a Drive tienen URL "drive.google.com/file/d/…/view":
@@ -289,6 +290,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!d.taskFilters||typeof d.taskFilters!=="object")d.taskFilters={people:[],status:[],temas:[],prio:[]};
     ["people","status","temas","prio"].forEach(kk=>{ if(!Array.isArray(d.taskFilters[kk]))d.taskFilters[kk]=[]; });
     if("taskTemaFilter" in d)delete d.taskTemaFilter;
+    if(d.palette==="atelier")d.palette="carbon";   // nombre viejo de la paleta de fábrica
     d.taskFilters.status=d.taskFilters.status.filter(s=>STATUS[s]);
     d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
     d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
@@ -488,7 +490,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const sub=`${hasKids?a.nc+" sub · ":""}${a.ic} tarea${a.ic===1?"":"s"}${a.ic?` · ${a.dc}✓`:""}`;
       el.innerHTML=`<span class="nod"></span><span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}`;
       worldInner.appendChild(el); wireNeuron(el,node); });
-    document.getElementById("addLabel").textContent=selId?"Nuevo sub-tema":"Nuevo proyecto"; }
+    document.getElementById("addLabel").textContent=selId?"Nuevo sub-tema":"Nuevo proyecto";
+    avisoFiltroVacio(); }
+  function avisoFiltroVacio(){
+    let aviso=document.getElementById("mapEmpty");
+    const hayFiltro=(fPerson.value||fStatus.value);
+    const ninguno=hayFiltro&&!Object.values(state.nodes).some(n=>isBright(n));
+    if(!ninguno){ if(aviso)aviso.remove(); return; }
+    if(!aviso){ aviso=document.createElement("div"); aviso.id="mapEmpty"; aviso.className="mapempty"; viewport.appendChild(aviso); }
+    const quien=fPerson.value, estado=fStatus.value&&STATUS[fStatus.value]?STATUS[fStatus.value].l.toLowerCase():"";
+    aviso.innerHTML=`<b>Ningún tema queda en pie con este filtro</b><span>${
+      quien&&estado?"Nadie tiene tareas "+esc(estado)+" a nombre de "+esc(quien)+".":
+      quien?esc(quien)+" no tiene tareas a su nombre en ningún tema.":
+      "No hay tareas "+esc(estado)+" en ningún tema."}</span><button class="rowbtn" id="mapEmptyClear">Limpiar el filtro</button>`;
+    const b=aviso.querySelector("#mapEmptyClear");
+    if(b)b.addEventListener("click",()=>{ fPerson.value=""; fStatus.value=""; renderMap(); }); }
   function applyCam(){ world.style.transform=`translate(${cam.tx}px,${cam.ty}px) scale(${cam.s})`; }
   function fit(){ const ns=Object.values(state.nodes); const vw=viewport.clientWidth||960,vh=viewport.clientHeight||600;
     if(!ns.length){ cam.tx=vw/2-OX;cam.ty=vh/2-OY;cam.s=1;applyCam();return; }
@@ -930,7 +946,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // "Próximos eventos" se muestra con el calendario arriba: la lista sola queda
     // pelada, y con el mes delante se lee como una agenda.
     const ver=(id,on)=>{ const el=document.getElementById(id); if(el)el.hidden=!on; };
-    ver("calMount", todo||v==="cal"||v==="upcoming");
+    ver("calMount", todo||v==="cal");
     ver("upcoming", todo||v==="upcoming");
     ver("myTasks",  todo||v==="foco");
     ver("myNotes",  todo||v==="notas");
@@ -962,7 +978,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // el equipo y el respaldo.
   function renderConfig(){ const box=document.getElementById("config"); if(!box)return;
     const me=state.me||""; const yoM=miembroPorEmail(miEmail);
-    const paleta=state.palette||"atelier";
+    const paleta=state.palette||"carbon";
     const temaActual=state.theme||"";
     box.innerHTML=`<div class="cfg">
       <div class="cfgsec"><div class="lab">Vos</div>
@@ -1027,7 +1043,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.getElementById("cfgInvitarOk").addEventListener("click",invitar);
     inv.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); invitar(); } });
     renderTeamList();
-    const ph=document.getElementById("cfgPush"); if(ph&&window.__mesaPushControl)window.__mesaPushControl(ph);
+    // El control de avisos lo instala initPush() al entrar a la app real. Si no
+    // esta (por ejemplo en el banco de pruebas), la fila quedaba muda: un
+    // renglon con titulo y nada al lado, que parece un boton roto.
+    const ph=document.getElementById("cfgPush");
+    if(ph){ if(window.__mesaPushControl)window.__mesaPushControl(ph);
+      else ph.innerHTML='<span style="font-size:12.5px;color:var(--ink-faint)">No disponible en esta ventana.</span>'; }
   }
   function renderTeamList(){ const t=document.getElementById("cfgTeam"); if(!t)return;
     t.innerHTML=equipo.length
@@ -1073,13 +1094,61 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=`<div class="card notescard"><div class="lab" style="margin-bottom:8px" title="Privadas: solo las ves vos">${ICO.nota} Mis notas</div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
     const ta=box.querySelector("#myNotesArea"); ta.value=val;
     ta.addEventListener("input",e=>{ state.myNotes=state.myNotes||{}; state.myNotes[me]=e.target.value; save(); }); }
-  function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return; const today=ymdLocal(new Date()); const me=state.me;
-    const evs=(state.events||[]).filter(e=>e.date>=today).sort((a,b)=>(a.date+ (a.time||"")).localeCompare(b.date+(b.time||""))).slice(0,6);
-    if(!evs.length){ box.innerHTML=""; return; }
-    box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">${ICO.calendario} Próximos eventos</div>`+evs.map(ev=>{ const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
-      const tag=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':`<span class="evtag">${yes} van</span>`;
-      return `<div class="evrow" data-ev="${ev.id}"><div class="evrow-main"><b>${esc(ev.title)}</b><span class="evrow-meta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}${ev.desc?" · "+esc(ev.desc):""}</span></div>${tag}</div>`; }).join("")+`</div>`;
-    box.querySelectorAll("[data-ev]").forEach(r=>r.addEventListener("click",()=>openEvView(r.dataset.ev))); }
+  const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+  const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function fechaLarga(ds){ const [y,m,d]=String(ds).split("-").map(Number); if(!y)return ds;
+    const f=new Date(y,m-1,d); return DIAS[f.getDay()]+" "+d+" de "+MESES[m-1]; }
+  function cuantoFalta(ds){ const hoy=new Date(); hoy.setHours(0,0,0,0);
+    const [y,m,d]=String(ds).split("-").map(Number); const f=new Date(y,m-1,d);
+    const dias=Math.round((f-hoy)/86400000);
+    return dias===0?"hoy":dias===1?"mañana":dias<7?"en "+dias+" días":dias<14?"la semana que viene":"en "+Math.round(dias/7)+" semanas"; }
+  function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return;
+    const today=ymdLocal(new Date()); const me=state.me; const solaEnPantalla=panelView()==="upcoming";
+    // En el Panel completo es un resumen corto; siendo la unica cosa en
+    // pantalla no tiene sentido recortar a seis.
+    let evs=(state.events||[]).filter(e=>e.date>=today).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
+    if(!solaEnPantalla)evs=evs.slice(0,6);
+    if(!evs.length){ box.innerHTML=solaEnPantalla
+      ? `<div class="ph"><b>No hay nada agendado</b><div style="margin-top:6px;font-size:13px">Los eventos se crean tocando un día en el calendario.</div></div>`
+      : ""; return; }
+    if(!solaEnPantalla){
+      box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">${ICO.calendario} Próximos eventos</div>`+evs.map(ev=>{
+        const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
+        const tag=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':`<span class="evtag">${yes} van</span>`;
+        return `<div class="evrow" data-ev="${ev.id}"><div class="evrow-main"><b>${esc(ev.title)}</b><span class="evrow-meta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}${ev.desc?" · "+esc(ev.desc):""}</span></div>${tag}</div>`; }).join("")+`</div>`;
+    } else {
+      // Agenda: una ficha por evento, agrupada por dia.
+      let ultimoDia=""; let html="";
+      evs.forEach(ev=>{
+        if(ev.date!==ultimoDia){ ultimoDia=ev.date;
+          html+=`<div class="agdia"><span class="agfecha">${esc(fechaLarga(ev.date))}</span><span class="agcuando">${esc(cuantoFalta(ev.date))}</span></div>`; }
+        const rs=ev.rsvp||{}; const mine=rs[me];
+        const van=Object.keys(rs).filter(p=>rs[p]==="yes");
+        const noVan=Object.keys(rs).filter(p=>rs[p]==="no");
+        const sinResponder=allPeople().filter(p=>!rs[p]);
+        const tuya=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':'<span class="evtag">sin responder</span>';
+        html+=`<div class="agev" data-ev="${esc(ev.id)}">
+          <div class="aghora">${ev.time?esc(ev.time):"—"}</div>
+          <div class="agcuerpo">
+            <div class="agtit"><b>${esc(ev.title||"Evento")}</b>${tuya}</div>
+            ${ev.desc?`<div class="agdesc">${esc(ev.desc)}</div>`:""}
+            <div class="agpie">
+              ${van.length?`<span class="agq" title="${esc(van.join(", "))}">${ICO.si} ${van.length} ${van.length===1?"va":"van"}</span>`:""}
+              ${noVan.length?`<span class="agq" title="${esc(noVan.join(", "))}">${noVan.length} no ${noVan.length===1?"va":"van"}</span>`:""}
+              ${sinResponder.length?`<span class="agq agq-falta" title="${esc(sinResponder.join(", "))}">${sinResponder.length} sin responder</span>`:""}
+              <button class="agver" data-cal="${esc(ev.date)}">Ver en el calendario</button>
+            </div>
+          </div></div>`; });
+      box.innerHTML=html;
+    }
+    box.querySelectorAll("[data-ev]").forEach(r=>r.addEventListener("click",e=>{
+      if(e.target.closest("[data-cal]"))return; openEvView(r.dataset.ev); }));
+    box.querySelectorAll("[data-cal]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
+      // Llevar al calendario en el mes del evento, con el dia marcado.
+      const [y,m]=b.dataset.cal.split("-").map(Number); cal.y=y; cal.m=m-1;
+      state.panelView="cal"; save(); renderPanel();
+      const cel=document.querySelector('.calcell[data-day="'+b.dataset.cal+'"]');
+      if(cel){ cel.classList.add("resaltada"); cel.scrollIntoView({behavior:"smooth",block:"center"}); } })); }
   function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
     activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",label:k.title||"Tarea",color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
@@ -1372,11 +1441,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(ok)ok.addEventListener("click",()=>{ const me=state.me; if(!me)return; state.tasksSeen=state.tasksSeen||{};
       state.tasksSeen[me]=activeItems().filter(x=>ownersOf(x.k).includes(me)).map(x=>x.k.id);
       save(); box.classList.remove("on"); updateAvisos(); if(active==="panel")renderPanel(); }); }
-  function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
+  function applyTheme(t){ if(t)document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme");
+    // La barra del navegador toma el fondo de verdad: si no, el celular pinta
+    // un borde claro alrededor de una app oscura (o al revés).
+    const m=document.getElementById("themeColor");
+    if(m){ const bg=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(); if(bg)m.setAttribute("content",bg); } }
   // Paleta de fondo, aparte del claro/oscuro: cada una define sus tonos en ambos modos.
-  const PALETAS={atelier:"Atelier",bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
-  function applyPalette(p){ // Atelier es el tema de la casa: sin preferencia guardada, va Atelier.
-    document.documentElement.setAttribute("data-palette", (p&&PALETAS[p])?p:"atelier"); }
+  const PALETAS={carbon:"Carbón",bosque:"Bosque",papel:"Papel",pizarra:"Pizarra"};
+  function applyPalette(p){ // Carbón es la paleta de fábrica. "atelier" era su nombre viejo, de cuando
+    // el estilo y el color venían juntos: se migra en silencio.
+    if(p==="atelier")p="carbon";
+    document.documentElement.setAttribute("data-palette", (p&&PALETAS[p])?p:"carbon"); }
   document.getElementById("avisosBtn").addEventListener("click",e=>{ e.stopPropagation();
     const m=document.getElementById("avisosMenu");
     if(m.classList.contains("on")){ m.classList.remove("on"); return; }
@@ -1436,7 +1511,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(state.me){ state.tasksSeen=state.tasksSeen||{};
     if(!Array.isArray(state.tasksSeen[state.me]))
       state.tasksSeen[state.me]=activeItems().filter(x=>ownersOf(x.k).includes(state.me)).map(x=>x.k.id); }
-  applyTheme(state.theme||null); applyPalette(state.palette||"atelier");
+  applyTheme(state.theme||null); applyPalette(state.palette||"carbon");
   sweepArchive(); loadTreeOpen(); syncPeopleList();
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
   if(!seed) save();                                // base vacía: sembrar

@@ -1,41 +1,46 @@
   :root{
     --bg:#f3f0e8; --bg-2:#eae4d7; --panel:#fffdf8; --surface:#fffefb; --surface-2:#f1ece0; --surface-3:#e7e0cf;
-    --ink:#2c2a25; --ink-soft:#6c665a; --ink-faint:#a49c89;
+    --ink:#2c2a25; --ink-soft:#6c665a; --ink-faint:#6A6455;
     --line:#e3dccc; --line-soft:#efe9db;
-    --wood:#2f9e8a; --wood-deep:#238374;
+    --wood:#2f9e8a; --wood-deep:#1A6154;
     --olive:#3f9d6b; --clay:#c15b46; --sky:#4a86c4;
     /* jerarquía: un color propio por nivel, esquivando los tonos de estado (azul, verde hoja, amarillo, gris) */
     --l1:#0e7c72; --l2:#1fb0c9; --l3:#6d5bd0; --l4:#7fa640; --l5:#b5539e; --l6:#5a7d8c;
     --link:#8a6aa8;
     /* estado de la tarea */
-    --s-curso:#4a86c4; --s-espera:#d19a34; --s-sin:#9a9282; --s-listo:#3f9d6b; --s-bloq:#c3543c;
+    --s-curso:#4a86c4; --s-espera:#d19a34; --s-sin:#9a9282; --s-listo:#3f9d6b; --s-bloq:#A03D27;
     /* prioridad: gama cálida rojo → naranja → durazno (el naranja es bien rojizo para no chocar con el amarillo de "en espera") */
     --p-alta:#d32f2f; --p-media:#e2622a; --p-baja:#efa98a;
     --accent-week:#c9902f; --accent-priv:#7b5ea7;
-    --shadow:0 1px 2px rgba(60,50,30,.06),0 6px 18px rgba(60,50,30,.10);
-    --shadow-lg:0 16px 44px rgba(50,40,25,.20);
-    --font-ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    /* MATERIA Y GEOMETRÍA — ya no dependen de la paleta: son el estilo de la
+       aplicación. Una paleta cambia colores, no la forma de las cosas.
+       Radios chicos: los bordes apenas redondeados dan humanidad, pero la
+       geometría sigue siendo precisa. Y casi nada de sombra: la profundidad
+       la dan el tono, el borde y el espacio. */
+    --shadow:none;
+    --shadow-lg:0 20px 50px rgba(40,34,24,.24);
+    --font-ui:"Geist","Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-display:var(--font-ui);
     /* GEOMETRÍA, MATERIA Y TIPOGRAFÍA — un tema puede redefinir todo esto
        sin tocar una sola regla. Los radios eran 15 valores sueltos; ahora
        son una escala de 7 pasos. */
-    --r-xs:5px; --r-sm:8px; --r-ctl:9px; --r-md:11px; --r-card:13px; --r-panel:16px; --r-pill:20px;
+    --r-xs:3px; --r-sm:4px; --r-ctl:5px; --r-md:6px; --r-card:8px; --r-panel:10px; --r-pill:20px;
     --on-accent:#fff;   /* tinta sobre un relleno de acento */
     --on-primary:#fff;  /* tinta sobre el color de identidad (puede no ser el mismo blanco) */
     --on-person:#fff;   /* tinta sobre el color de una persona */
     --sheen:#fff;       /* brillo especular de los botones con relieve */
     --scrim:rgba(30,40,35,.34); --scrim-strong:rgba(30,40,35,.45);
-    --fill-primary:linear-gradient(180deg,var(--wood),var(--wood-deep));
-    --fill-mark:linear-gradient(150deg,var(--wood),var(--wood-deep));
+    --fill-primary:var(--wood);
+    --fill-mark:transparent;
     --map-bg:
       radial-gradient(1000px 560px at 18% -8%, color-mix(in srgb,var(--l2) 10%,transparent), transparent 60%),
       radial-gradient(1000px 560px at 86% 108%, color-mix(in srgb,var(--l3) 9%,transparent), transparent 60%), var(--bg);
-    --grid-op:.55; --grid-step:44px;
+    --grid-op:.5; --grid-step:40px;
     --font-mono:ui-monospace,"Geist Mono","IBM Plex Mono",Menlo,Consolas,monospace;
   }
   :root[data-theme="dark"]{
     --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
-    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#6f766c;
+    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#8D948A;
     --line:#343a35; --line-soft:#2a2f2b;
     --wood:#48c4ac; --wood-deep:#3aa892;
     --olive:#5cba82; --clay:#dd7a62; --sky:#6fa6dc;
@@ -44,12 +49,12 @@
     --s-curso:#6fa6dc; --s-espera:#e0b25a; --s-sin:#9a9282; --s-listo:#5cba82; --s-bloq:#dd7a62;
     --p-alta:#f2554e; --p-media:#f0834e; --p-baja:#e8b49c;
     --accent-week:#e0b25a; --accent-priv:#a98cd0;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.32);
-    --shadow-lg:0 16px 44px rgba(0,0,0,.55);
+    --shadow:none;
+    --shadow-lg:0 24px 64px rgba(0,0,0,.62);
   }
   @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
     --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
-    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#6f766c;
+    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#8D948A;
     --line:#343a35; --line-soft:#2a2f2b;
     --wood:#48c4ac; --wood-deep:#3aa892;
     --olive:#5cba82; --clay:#dd7a62; --sky:#6fa6dc;
@@ -58,8 +63,8 @@
     --s-curso:#6fa6dc; --s-espera:#e0b25a; --s-sin:#9a9282; --s-listo:#5cba82; --s-bloq:#dd7a62;
     --p-alta:#f2554e; --p-media:#f0834e; --p-baja:#e8b49c;
     --accent-week:#e0b25a; --accent-priv:#a98cd0;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.32);
-    --shadow-lg:0 16px 44px rgba(0,0,0,.55);
+    --shadow:none;
+    --shadow-lg:0 24px 64px rgba(0,0,0,.62);
   }}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg)}
@@ -566,34 +571,63 @@
   .teamrow .yo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--wood-deep);background:color-mix(in srgb,var(--wood) 16%,transparent);border-radius:var(--r-pill);padding:2px 8px;flex:none}
   :root[data-theme="dark"] .teamrow .yo,:root:not([data-theme="light"]) .teamrow .yo{color:var(--wood)}
 
-  /* PALETAS DE FONDO — cambian solo los neutros; los colores con significado
-     (estado, prioridad, nivel, personas) son los mismos en las tres. */
+  /* ══════════════ PALETAS ══════════════
+     Una paleta cambia COLOR, no forma: la tipografía, los radios, la ausencia
+     de sombra y la densidad son los mismos en las cuatro. Cada una define sus
+     neutros, su color de identidad y su rampa de jerarquía; los colores con
+     significado (estado, prioridad, personas) no cambian, porque el
+     significado no depende del fondo que elijas.
+
+     Bosque   verde profundo, la de siempre — vive en :root
+     Carbón   carbón y cobre — la de fábrica
+     Papel    papel, tinta y terracota
+     Pizarra  pizarra y acero                                              */
+
+  /* ── PAPEL ── */
   :root[data-palette="papel"]{
-    --bg:#f7f3ea; --bg-2:#efe8da; --panel:#fffdf7; --surface:#fffefa; --surface-2:#f3ece0; --surface-3:#e9e0cf;
-    --ink:#2b2721; --ink-soft:#6b6357; --ink-faint:#a39a89; --line:#e4dbc9; --line-soft:#f0e9db;
-  }
-  :root[data-palette="pizarra"]{
-    --bg:#eef1f4; --bg-2:#e4e8ed; --panel:#ffffff; --surface:#ffffff; --surface-2:#eef1f5; --surface-3:#e2e7ed;
-    --ink:#1e242b; --ink-soft:#5d6772; --ink-faint:#93a0ac; --line:#dde3ea; --line-soft:#eef2f6;
-  }
-  @media (prefers-color-scheme:dark){
-    :root[data-palette="papel"]:not([data-theme="light"]){
-      --bg:#211d18; --bg-2:#1a1713; --panel:#2a251e; --surface:#2f2a22; --surface-2:#28231c; --surface-3:#221e18;
-      --ink:#eee7da; --ink-soft:#b0a795; --ink-faint:#786f61; --line:#383127; --line-soft:#2c2721;
-    }
-    :root[data-palette="pizarra"]:not([data-theme="light"]){
-      --bg:#171b20; --bg-2:#12161a; --panel:#1f242b; --surface:#232931; --surface-2:#1d2229; --surface-3:#191e24;
-      --ink:#e6ecf2; --ink-soft:#a3b0bd; --ink-faint:#6d7985; --line:#2e353e; --line-soft:#242a31;
-    }
+    --bg:#F5F1E6; --bg-2:#EDE7D8; --panel:#FCFAF3; --surface:#FCFAF3; --surface-2:#F0EADC; --surface-3:#E5DDCB;
+    --ink:#2A2620; --ink-soft:#5B564C; --ink-faint:#6B665B; --line:#E0D7C4; --line-soft:#EDE7D9;
+    --wood:#9E5A2F; --wood-deep:#7E4522; --on-primary:#FCFAF3;
+    --l1:#9E5A2F; --l2:#6B7B4E; --l3:#4F7288; --l4:#8A6B41; --l5:#7E5A73; --l6:#5A6560;
+    --link:#6E5E78; --olive:#6B7B4E; --clay:#9E5A2F;
   }
   :root[data-palette="papel"][data-theme="dark"]{
-    --bg:#211d18; --bg-2:#1a1713; --panel:#2a251e; --surface:#2f2a22; --surface-2:#28231c; --surface-3:#221e18;
-    --ink:#eee7da; --ink-soft:#b0a795; --ink-faint:#786f61; --line:#383127; --line-soft:#2c2721;
+    --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
+    --ink:#EDE5D6; --ink-soft:#B0A794; --ink-faint:#8E877A; --line:#3A3226; --line-soft:#2C2620;
+    --wood:#D89A64; --wood-deep:#B87F4E; --on-primary:#1A1409;
+    --l1:#D89A64; --l2:#97A87A; --l3:#83A3BA; --l4:#C0A277; --l5:#B491AC; --l6:#86938D;
+    --link:#B49CC0; --olive:#97A87A; --clay:#D89A64;
+  }
+  @media (prefers-color-scheme:dark){ :root[data-palette="papel"]:not([data-theme="light"]){
+    --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
+    --ink:#EDE5D6; --ink-soft:#B0A794; --ink-faint:#8E877A; --line:#3A3226; --line-soft:#2C2620;
+    --wood:#D89A64; --wood-deep:#B87F4E; --on-primary:#1A1409;
+    --l1:#D89A64; --l2:#97A87A; --l3:#83A3BA; --l4:#C0A277; --l5:#B491AC; --l6:#86938D;
+    --link:#B49CC0; --olive:#97A87A; --clay:#D89A64;
+  }}
+
+  /* ── PIZARRA ── */
+  :root[data-palette="pizarra"]{
+    --bg:#ECEFF2; --bg-2:#E2E7EC; --panel:#FAFBFC; --surface:#FAFBFC; --surface-2:#E9EDF1; --surface-3:#DCE2E8;
+    --ink:#1C232A; --ink-soft:#545E68; --ink-faint:#646E78; --line:#D5DCE3; --line-soft:#E6EBF0;
+    --wood:#2C6488; --wood-deep:#1F4A67; --on-primary:#FAFBFC;
+    --l1:#2C6488; --l2:#47765F; --l3:#64578A; --l4:#7A6642; --l5:#874F6B; --l6:#4F5B66;
+    --link:#64578A; --olive:#47765F; --clay:#9A5340;
   }
   :root[data-palette="pizarra"][data-theme="dark"]{
-    --bg:#171b20; --bg-2:#12161a; --panel:#1f242b; --surface:#232931; --surface-2:#1d2229; --surface-3:#191e24;
-    --ink:#e6ecf2; --ink-soft:#a3b0bd; --ink-faint:#6d7985; --line:#2e353e; --line-soft:#242a31;
+    --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
+    --ink:#E2E8EE; --ink-soft:#A3AFBA; --ink-faint:#8A95A0; --line:#2A323B; --line-soft:#202730;
+    --wood:#74AEDC; --wood-deep:#5A90BC; --on-primary:#0B1015;
+    --l1:#74AEDC; --l2:#7FB89A; --l3:#A093D0; --l4:#C0A277; --l5:#CE8DAE; --l6:#8697A6;
+    --link:#A093D0; --olive:#7FB89A; --clay:#D08268;
   }
+  @media (prefers-color-scheme:dark){ :root[data-palette="pizarra"]:not([data-theme="light"]){
+    --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
+    --ink:#E2E8EE; --ink-soft:#A3AFBA; --ink-faint:#8A95A0; --line:#2A323B; --line-soft:#202730;
+    --wood:#74AEDC; --wood-deep:#5A90BC; --on-primary:#0B1015;
+    --l1:#74AEDC; --l2:#7FB89A; --l3:#A093D0; --l4:#C0A277; --l5:#CE8DAE; --l6:#8697A6;
+    --link:#A093D0; --olive:#7FB89A; --clay:#D08268;
+  }}
 
   /* El mapa vive dentro de Estructura, como una vista alternativa del árbol */
   .estviews{margin:0 0 16px;display:inline-flex}
@@ -635,16 +669,9 @@
      ══════════════════════════════════════════════════════════════════ */
 
   /* Geometría y tipografía: iguales en claro y oscuro. */
-  :root[data-palette="atelier"]{
-    /* Radios chicos: los bordes apenas redondeados dan humanidad, pero la
-       geometría sigue siendo precisa. */
-    --r-xs:3px; --r-sm:4px; --r-ctl:5px; --r-md:6px; --r-card:8px; --r-panel:10px; --r-pill:20px;
-    /* Una sola familia. La serif editorial se retira: acá el carácter lo
-       dan el peso, el interletrado y la composición, no el estilo de letra. */
-    --font-ui:"Geist","Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --font-display:var(--font-ui);
-
-    /* --- versión clara: papel + tinta + piedra + cobre --- */
+  /* CARBÓN — la paleta de la casa: carbón, cobre, oliva y piedra.
+     Su versión clara es papel, tinta, piedra y cobre. */
+  :root[data-palette="carbon"]{
     --bg:#EEECE6; --bg-2:#E7E4DC; --panel:#F6F4EF; --surface:#F6F4EF; --surface-2:#E9E6DE; --surface-3:#DFDBD1;
     --ink:#242522; --ink-soft:#5C5A54; --ink-faint:#66635C;
     --line:#D4D0C6; --line-soft:#E2DED5;
@@ -664,7 +691,7 @@
 
   /* --- versión oscura: la principal. Carbón y metal cálido. --- */
   /* Elegida a mano. */
-  :root[data-palette="atelier"][data-theme="dark"]{
+  :root[data-palette="carbon"][data-theme="dark"]{
     --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
     --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
     --line:#292C2E; --line-soft:#202326;
@@ -684,7 +711,7 @@
     --grid-op:.5; --grid-step:40px;
   }
   /* Siguiendo al sistema, igual que las otras paletas. */
-  @media (prefers-color-scheme:dark){ :root[data-palette="atelier"]:not([data-theme="light"]){
+  @media (prefers-color-scheme:dark){ :root[data-palette="carbon"]:not([data-theme="light"]){
     --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
     --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
     --line:#292C2E; --line-soft:#202326;
@@ -707,96 +734,95 @@
   /* ── ATELIER · composición ─────────────────────────────────────────
      Lo que no se puede expresar con un token: peso tipográfico, densidad,
      y la diferencia entre una caja y una superficie. Todo cuelga de
-     [data-palette="atelier"], así que ninguna de estas reglas toca a las
+     :root, así que ninguna de estas reglas toca a las
      otras paletas. ─────────────────────────────────────────────────── */
-  :root[data-palette="atelier"]{ --at:1 }
 
   /* La aplicación no necesita gritar: los títulos bajan a 500 y se cierran
      un poco de interletrado. Los 700/800 quedan solo para las etiquetas
      técnicas diminutas, donde el peso es legibilidad y no énfasis. */
-  [data-palette="atelier"] .h1,
-  [data-palette="atelier"] .focuscard h2,
-  [data-palette="atelier"] .modal h2,
-  [data-palette="atelier"] .login-box h1,
-  [data-palette="atelier"] .chathead,
-  [data-palette="atelier"] .calhead h3,
-  [data-palette="atelier"] .drivegroup h3,
-  [data-palette="atelier"] .estcol .colh .cname,
-  [data-palette="atelier"] .phead input.title,
-  [data-palette="atelier"] .brand b{font-weight:500;letter-spacing:-.012em}
-  [data-palette="atelier"] .navtab.on,
-  [data-palette="atelier"] .seg2 button.on,
-  [data-palette="atelier"] .segpal button.on,
-  [data-palette="atelier"] .subblock .sbh .sname,
-  [data-palette="atelier"] .kcard .kt{font-weight:500}
+  :root .h1,
+  :root .focuscard h2,
+  :root .modal h2,
+  :root .login-box h1,
+  :root .chathead,
+  :root .calhead h3,
+  :root .drivegroup h3,
+  :root .estcol .colh .cname,
+  :root .phead input.title,
+  :root .brand b{font-weight:500;letter-spacing:-.012em}
+  :root .navtab.on,
+  :root .seg2 button.on,
+  :root .segpal button.on,
+  :root .subblock .sbh .sname,
+  :root .kcard .kt{font-weight:500}
 
   /* Los datos van en monospace: son material de contraste, no tipografía
      principal. Números, contadores, horas, fechas. Nunca un párrafo. */
-  [data-palette="atelier"] .card .big,
-  [data-palette="atelier"] .kcol h4 .n,
-  [data-palette="atelier"] .calcell .dnum,
-  [data-palette="atelier"] .caldow,
-  [data-palette="atelier"] .neu .sub,
-  [data-palette="atelier"] .subblock .sbh .cnt,
-  [data-palette="atelier"] .drivegroup h3 .cnt,
-  [data-palette="atelier"] .chipcal,
-  [data-palette="atelier"] .fdrop>button .cnum,
-  [data-palette="atelier"] .rsvp .tally,
-  [data-palette="atelier"] .arow .ap{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  :root .card .big,
+  :root .kcol h4 .n,
+  :root .calcell .dnum,
+  :root .caldow,
+  :root .neu .sub,
+  :root .subblock .sbh .cnt,
+  :root .drivegroup h3 .cnt,
+  :root .chipcal,
+  :root .fdrop>button .cnum,
+  :root .rsvp .tally,
+  :root .arow .ap{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   /* El dato primero, la decoración después: el número puede ser grande,
      pero el rótulo que lo explica es diminuto y en versalita. */
-  [data-palette="atelier"] .card .big{font-size:30px;font-weight:500;letter-spacing:-.03em}
-  [data-palette="atelier"] .card .lab,
-  [data-palette="atelier"] .barlab,
-  [data-palette="atelier"] .cfgsec > .lab,
-  [data-palette="atelier"] .weekgoals .wglab,
-  [data-palette="atelier"] .sec .sh h3,
-  [data-palette="atelier"] .pctl label,
-  [data-palette="atelier"] .filt label,
-  [data-palette="atelier"] .chsec,
-  [data-palette="atelier"] .focuscard .flab,
-  [data-palette="atelier"] .phead .ey{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:500}
+  :root .card .big{font-size:30px;font-weight:500;letter-spacing:-.03em}
+  :root .card .lab,
+  :root .barlab,
+  :root .cfgsec > .lab,
+  :root .weekgoals .wglab,
+  :root .sec .sh h3,
+  :root .pctl label,
+  :root .filt label,
+  :root .chsec,
+  :root .focuscard .flab,
+  :root .phead .ey{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:500}
 
   /* Superficies, no cajas. El kanban dejaba una tarjeta adentro de otra
      tarjeta: la columna pasa a ser una zona delimitada por una línea, y las
      únicas superficies reales son las fichas. */
-  [data-palette="atelier"] .kcol,
-  [data-palette="atelier"] .estcol{background:transparent;border:none;border-top:1px solid var(--line);border-radius:0;padding:12px 10px 10px}
-  [data-palette="atelier"] .kcol.drop{background:color-mix(in srgb,var(--wood) 6%,transparent);border-top-color:var(--wood)}
-  [data-palette="atelier"] .estcol{border-top:1px solid var(--line);box-shadow:inset 0 2px 0 -1px var(--l2)}
-  [data-palette="atelier"] .kcol h4{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;font-weight:500;color:var(--ink-soft)}
-  [data-palette="atelier"] .kcard{border-left-width:2px}
+  :root .kcol,
+  :root .estcol{background:transparent;border:none;border-top:1px solid var(--line);border-radius:0;padding:12px 10px 10px}
+  :root .kcol.drop{background:color-mix(in srgb,var(--wood) 6%,transparent);border-top-color:var(--wood)}
+  :root .estcol{border-top:1px solid var(--line);box-shadow:inset 0 2px 0 -1px var(--l2)}
+  :root .kcol h4{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;font-weight:500;color:var(--ink-soft)}
+  :root .kcard{border-left-width:2px}
 
   /* Bordes finos que se descubren casi sin darse cuenta. El acento no
      ocupa un bloque entero: es una línea. */
-  [data-palette="atelier"] .navtab.on{background:var(--surface-2);box-shadow:inset 0 -2px 0 -1px var(--wood)}
-  [data-palette="atelier"] .nav.feat{background:var(--surface-2);border-color:var(--line)}
-  [data-palette="atelier"] .nav.feat .navtab{color:var(--ink-soft);font-weight:500}
-  [data-palette="atelier"] .nav.feat .navtab.on{background:var(--surface-2);color:var(--wood-deep);box-shadow:inset 0 -2px 0 -1px var(--wood)}
-  [data-palette="atelier"] .btn.on,
-  [data-palette="atelier"] .fdrop>button.act,
-  [data-palette="atelier"] .projsel button.on,
-  [data-palette="atelier"] .calcell.today{box-shadow:inset 2px 0 0 var(--wood)}
-  [data-palette="atelier"] .btn-primary{font-weight:500}
+  :root .navtab.on{background:var(--surface-2);box-shadow:inset 0 -2px 0 -1px var(--wood)}
+  :root .nav.feat{background:var(--surface-2);border-color:var(--line)}
+  :root .nav.feat .navtab{color:var(--ink-soft);font-weight:500}
+  :root .nav.feat .navtab.on{background:var(--surface-2);color:var(--wood-deep);box-shadow:inset 0 -2px 0 -1px var(--wood)}
+  :root .btn.on,
+  :root .fdrop>button.act,
+  :root .projsel button.on,
+  :root .calcell.today{box-shadow:inset 2px 0 0 var(--wood)}
+  :root .btn-primary{font-weight:500}
 
   /* Ni relieve ni plástico: los botones de asistencia son superficies
      planas que se distinguen por el borde y el tono. */
-  [data-palette="atelier"] .rsvp button{background:var(--surface-2);box-shadow:none}
-  [data-palette="atelier"] .rsvp button.yes.on{background:color-mix(in srgb,var(--s-listo) 20%,transparent);color:var(--s-listo);border-color:color-mix(in srgb,var(--s-listo) 45%,transparent);box-shadow:none}
-  [data-palette="atelier"] .rsvp button.no.on{background:color-mix(in srgb,var(--s-bloq) 20%,transparent);color:var(--s-bloq);border-color:color-mix(in srgb,var(--s-bloq) 45%,transparent);box-shadow:none}
+  :root .rsvp button{background:var(--surface-2);box-shadow:none}
+  :root .rsvp button.yes.on{background:color-mix(in srgb,var(--s-listo) 20%,transparent);color:var(--s-listo);border-color:color-mix(in srgb,var(--s-listo) 45%,transparent);box-shadow:none}
+  :root .rsvp button.no.on{background:color-mix(in srgb,var(--s-bloq) 20%,transparent);color:var(--s-bloq);border-color:color-mix(in srgb,var(--s-bloq) 45%,transparent);box-shadow:none}
 
   /* Hover apenas perceptible; la selección, un acento de un pixel. */
-  [data-palette="atelier"] .listline:hover,
-  [data-palette="atelier"] .arow:hover{background:var(--surface-2)}
-  [data-palette="atelier"] .evrow:hover{border-radius:0;box-shadow:inset 2px 0 0 var(--wood)}
+  :root .listline:hover,
+  :root .arow:hover{background:var(--surface-2)}
+  :root .evrow:hover{border-radius:0;box-shadow:inset 2px 0 0 var(--wood)}
 
   /* El mapa todavía no está rediseñado (eso es el paso siguiente), pero sus
      globos no pueden seguir siendo tarjetas con relieve sobre el carbón. */
-  [data-palette="atelier"] .neu{border-top-width:1px;box-shadow:inset 0 2px 0 -1px var(--line)}
-  [data-palette="atelier"] .neu[data-lvl="1"]{border-top-width:1px;box-shadow:inset 0 3px 0 -1px var(--l1)}
-  [data-palette="atelier"] .neu[data-lvl="2"]{border-top-width:1px;box-shadow:inset 0 2px 0 -1px var(--l2)}
-  [data-palette="atelier"] .neu:hover{box-shadow:inset 0 2px 0 -1px var(--line);border-color:var(--ink-faint);transform:translate(-50%,-50%)}
-  [data-palette="atelier"] .neu.sel{border-color:var(--wood);box-shadow:0 0 0 1px var(--wood),0 0 22px -6px var(--wood)}
+  :root .neu{border-top-width:1px;box-shadow:inset 0 2px 0 -1px var(--line)}
+  :root .neu[data-lvl="1"]{border-top-width:1px;box-shadow:inset 0 3px 0 -1px var(--l1)}
+  :root .neu[data-lvl="2"]{border-top-width:1px;box-shadow:inset 0 2px 0 -1px var(--l2)}
+  :root .neu:hover{box-shadow:inset 0 2px 0 -1px var(--line);border-color:var(--ink-faint);transform:translate(-50%,-50%)}
+  :root .neu.sel{border-color:var(--wood);box-shadow:0 0 0 1px var(--wood),0 0 22px -6px var(--wood)}
 
   /* ══════════════ MENÚ LATERAL ══════════════
      Las secciones se fueron de la barra superior a una columna propia, que se
@@ -840,8 +866,8 @@
     .sidebar .sbitem{justify-content:center;padding:9px 0}
   }
   /* En Atelier el rótulo de grupo es una etiqueta técnica, como los demás. */
-  [data-palette="atelier"] .sblab{font-family:var(--font-mono);font-weight:500}
-  [data-palette="atelier"] .sbitem.on{box-shadow:inset 2px 0 0 var(--wood)}
+  :root .sblab{font-family:var(--font-mono);font-weight:500}
+  :root .sbitem.on{box-shadow:inset 2px 0 0 var(--wood)}
 
   /* ══════════════ PORTADA ══════════════
      El título se veía negro porque la pantalla de acceso vive FUERA de #app,
@@ -863,38 +889,38 @@
      volumen. Al seleccionar un tema, lo relacionado se queda iluminado y el
      resto baja de presencia; eso lo resuelve la clase .dim desde app.js. */
   .neu .nod{display:none}
-  [data-palette="atelier"] .neu{background:transparent;border:none;box-shadow:none;padding:7px 9px;border-radius:var(--r-card)}
-  [data-palette="atelier"] .neu:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);box-shadow:none}
-  [data-palette="atelier"] .neu.sel{background:color-mix(in srgb,var(--wood) 9%,transparent);box-shadow:none}
-  [data-palette="atelier"] .neu .nod{display:block;width:11px;height:11px;border-radius:50%;margin:0 auto 8px;
+  :root .neu{background:transparent;border:none;box-shadow:none;padding:7px 9px;border-radius:var(--r-card)}
+  :root .neu:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);box-shadow:none}
+  :root .neu.sel{background:color-mix(in srgb,var(--wood) 9%,transparent);box-shadow:none}
+  :root .neu .nod{display:block;width:11px;height:11px;border-radius:50%;margin:0 auto 8px;
     background:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 14%,transparent);
     transition:box-shadow .28s ease,width .28s ease,height .28s ease}
-  [data-palette="atelier"] .neu[data-lvl="1"] .nod{width:15px;height:15px;box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 12%,transparent)}
-  [data-palette="atelier"] .neu[data-lvl="2"] .nod{width:13px;height:13px}
+  :root .neu[data-lvl="1"] .nod{width:15px;height:15px;box-shadow:0 0 0 6px color-mix(in srgb,var(--acc) 12%,transparent)}
+  :root .neu[data-lvl="2"] .nod{width:13px;height:13px}
   /* Bien adentro del árbol el punto se vacía: queda solo el anillo. */
-  [data-palette="atelier"] .neu.deep .nod{width:8px;height:8px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--acc)}
-  [data-palette="atelier"] .neu.sel .nod{box-shadow:0 0 0 1px var(--wood),0 0 20px 3px color-mix(in srgb,var(--wood) 38%,transparent)}
-  [data-palette="atelier"] .neu.dim{opacity:.3}
-  [data-palette="atelier"] .neu.dim:hover{opacity:.72}
-  [data-palette="atelier"] .neu .link-mark{left:auto;right:8px;bottom:5px}
-  [data-palette="atelier"] .neu .nm{font-weight:500}
-  [data-palette="atelier"] .neu[data-lvl="1"] .nm{font-weight:600}
+  :root .neu.deep .nod{width:8px;height:8px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--acc)}
+  :root .neu.sel .nod{box-shadow:0 0 0 1px var(--wood),0 0 20px 3px color-mix(in srgb,var(--wood) 38%,transparent)}
+  :root .neu.dim{opacity:.3}
+  :root .neu.dim:hover{opacity:.72}
+  :root .neu .link-mark{left:auto;right:8px;bottom:5px}
+  :root .neu .nm{font-weight:500}
+  :root .neu[data-lvl="1"] .nm{font-weight:600}
 
   /* El cobre de identidad es un color de RELLENO: como texto de 11 px sobre
      papel se queda corto (4.0). Donde hace de texto va el cobre profundo,
      que cierra en los dos modos. */
-  [data-palette="atelier"] .calcell.today .dnum,
-  [data-palette="atelier"] .profilerow .tinylink,
-  [data-palette="atelier"] .mini-add,
-  [data-palette="atelier"] .chadd,
-  [data-palette="atelier"] .fmenu .fclear,
-  [data-palette="atelier"] .kcol h4 .colact,
-  [data-palette="atelier"] .ppadd .addp,
-  [data-palette="atelier"] .pop .tiny,
-  [data-palette="atelier"] .undobar button,
-  [data-palette="atelier"] .filerow .fnm:hover,
-  [data-palette="atelier"] .projsel button.add,
-  [data-palette="atelier"] .myfoco .newchip{color:var(--wood-deep)}
+  :root .calcell.today .dnum,
+  :root .profilerow .tinylink,
+  :root .mini-add,
+  :root .chadd,
+  :root .fmenu .fclear,
+  :root .kcol h4 .colact,
+  :root .ppadd .addp,
+  :root .pop .tiny,
+  :root .undobar button,
+  :root .filerow .fnm:hover,
+  :root .projsel button.add,
+  :root .myfoco .newchip{color:var(--wood-deep)}
 
   /* ══════════════ BARRA SUPERIOR CONTEXTUAL ══════════════
      Las herramientas de Estructura viven acá arriba, no encima del mapa.
@@ -913,7 +939,7 @@
   .brand .btxt{display:flex;flex-direction:column;line-height:1.18;min-width:0}
   .brand .bsub{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);
     font-weight:600;white-space:nowrap}
-  [data-palette="atelier"] .brand .bsub{font-family:var(--font-mono);font-weight:500}
+  :root .brand .bsub{font-family:var(--font-mono);font-weight:500}
 
   /* ══════════════ MENÚ: una sola lista ══════════════ */
   .sbsep{display:block;height:1px;background:var(--line-soft);margin:9px 9px}
@@ -944,22 +970,22 @@
      sin volver a dibujar la caja: superficie sí, borde no.
      Y el punto pasa a ser un anillo que se completa con las tareas terminadas
      del tema. El dato ya se calculaba, solo estaba escrito en texto chico. */
-  [data-palette="atelier"] .neu{background:color-mix(in srgb,var(--surface) 90%,transparent);
+  :root .neu{background:color-mix(in srgb,var(--surface) 90%,transparent);
     border:none;box-shadow:none;padding:9px 11px 10px;border-radius:var(--r-card)}
-  [data-palette="atelier"] .neu:hover{background:color-mix(in srgb,var(--surface-3) 95%,transparent)}
-  [data-palette="atelier"] .neu.sel{background:color-mix(in srgb,var(--wood) 13%,var(--surface))}
-  [data-palette="atelier"] .neu.conprog .nod{
+  :root .neu:hover{background:color-mix(in srgb,var(--surface-3) 95%,transparent)}
+  :root .neu.sel{background:color-mix(in srgb,var(--wood) 13%,var(--surface))}
+  :root .neu.conprog .nod{
     background:conic-gradient(var(--acc) calc(var(--pct,0) * 1%), color-mix(in srgb,var(--acc) 20%,transparent) 0);
     -webkit-mask:radial-gradient(circle, #0000 0 4px, #000 4.7px);
             mask:radial-gradient(circle, #0000 0 4px, #000 4.7px)}
-  [data-palette="atelier"] .neu.conprog .nod{width:16px;height:16px;box-shadow:none}
-  [data-palette="atelier"] .neu[data-lvl="1"].conprog .nod{width:20px;height:20px;
+  :root .neu.conprog .nod{width:16px;height:16px;box-shadow:none}
+  :root .neu[data-lvl="1"].conprog .nod{width:20px;height:20px;
     -webkit-mask:radial-gradient(circle, #0000 0 5.4px, #000 6.2px);
             mask:radial-gradient(circle, #0000 0 5.4px, #000 6.2px)}
-  [data-palette="atelier"] .neu.deep.conprog .nod{width:13px;height:13px;
+  :root .neu.deep.conprog .nod{width:13px;height:13px;
     -webkit-mask:radial-gradient(circle, #0000 0 3.2px, #000 3.9px);
             mask:radial-gradient(circle, #0000 0 3.2px, #000 3.9px)}
-  [data-palette="atelier"] .neu.sel.conprog .nod{box-shadow:none;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--wood) 55%,transparent))}
+  :root .neu.sel.conprog .nod{box-shadow:none;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--wood) 55%,transparent))}
 
   /* ══════════════ DRIVE POR TEMA ══════════════
      Dos niveles: el macro-tema como encabezado, y adentro cada tema o sub-tema
@@ -973,8 +999,8 @@
   .dsublab{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);
     font-weight:700;margin:13px 0 6px 2px}
   .filerow.hered{opacity:.82}
-  [data-palette="atelier"] .dsub .dsubname,
-  [data-palette="atelier"] .dsublab{font-family:var(--font-mono);font-weight:500}
+  :root .dsub .dsubname,
+  :root .dsublab{font-family:var(--font-mono);font-weight:500}
 
   /* ══════════════ ICONOS DE LÍNEA ══════════════
      Reemplazan a los emojis. Toman el color del texto que tienen al lado, así
@@ -988,3 +1014,60 @@
   .btn .ico,.rowbtn .ico{margin-right:-1px}
   /* El contenedor del icono de archivo ya no lleva tamaño de emoji. */
   .filerow .fic,.msgfile .fic{font-size:0;line-height:0;display:inline-flex;align-items:center}
+
+
+  /* ══════════════ ANCHO UTIL ══════════════
+     Estructura y Tareas son tableros, no textos: cortarlos a 1080 px dejaba
+     el cuarto macro-tema a medias con la pantalla vacia al costado. Las
+     pestanas de lectura (Panel, Drive, Archivo, Configuracion) si conservan
+     el ancho comodo: un parrafo de 1600 px no se lee. */
+  #tab-estructura > .wrap,
+  #tab-tareas > .wrap{max-width:none;padding-left:22px;padding-right:22px}
+
+  /* El titulo y el buscador en la misma linea, el buscador contra la derecha. */
+  .tabhead{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 18px}
+  .tabhead .h1{margin:0;flex:0 0 auto}
+  .tabhead .srchbar{margin:0;flex:1 1 240px;justify-content:flex-end}
+  .tabhead .srch{flex:0 1 320px}
+
+  /* El selector Arbol/Mapa arrastraba un margen inferior de cuando vivia
+     dentro de la pestana: en la barra superior lo empujaba 8 px hacia arriba
+     y quedaba desalineado de la marca y de los botones del mapa. */
+  .topctx .estviews{margin:0}
+  .topctx{align-self:center}
+
+
+  /* ══════════════ AGENDA (Próximos eventos como vista propia) ══════════════
+     Cuando es la única cosa en pantalla deja de ser una lista de renglones y
+     pasa a ser una agenda: agrupada por día, con la hora al costado como en
+     un horario impreso. */
+  .agdia{display:flex;align-items:baseline;gap:10px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .agdia:first-child{margin-top:2px}
+  .agfecha{font-size:13px;font-weight:600;color:var(--ink);text-transform:capitalize}
+  .agcuando{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.07em}
+  .agev{display:flex;gap:16px;padding:11px 12px;border-radius:var(--r-card);cursor:pointer;
+    background:var(--surface);border:1px solid var(--line-soft);margin-bottom:7px}
+  .agev:hover{border-color:var(--wood)}
+  .aghora{flex:0 0 52px;font-size:13px;font-weight:600;color:var(--ink-soft);padding-top:1px;
+    font-variant-numeric:tabular-nums}
+  .agcuerpo{flex:1;min-width:0}
+  .agtit{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .agtit b{font-size:14px;font-weight:600}
+  .agdesc{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-top:4px}
+  .agpie{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:9px}
+  .agq{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-soft)}
+  .agq .ico{width:13px;height:13px}
+  .agq-falta{color:var(--ink-faint)}
+  .agver{margin-left:auto;font:inherit;font-size:11.5px;color:var(--wood-deep);background:none;
+    border:none;cursor:pointer;padding:2px 0;font-weight:600;white-space:nowrap}
+  .agver:hover{text-decoration:underline}
+  .calcell.resaltada{box-shadow:inset 0 0 0 2px var(--wood)}
+
+  /* Filtro que no deja nada en pie: el mapa gris entero parecía un error. */
+  .mapempty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:16;
+    display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel);
+    padding:18px 22px;box-shadow:var(--shadow-lg);max-width:min(340px,80%)}
+  .mapempty b{font-size:13.5px;font-weight:600}
+  .mapempty span{font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+  .mapempty .rowbtn{margin-top:3px}

@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="es" data-palette="atelier">
+<html lang="es" data-palette="carbon">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#EEECE6" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0D0F10" media="(prefers-color-scheme: dark)" />
+  <!-- Arranca en carbón porque la portada es siempre oscura; una vez adentro,
+       applyTheme() lo ata al fondo real de la paleta y el tema elegidos. -->
+  <meta name="theme-color" id="themeColor" content="#0D0F10" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -99,6 +100,7 @@
 
 
     <section class="tab" id="tab-estructura"><div class="wrap">
+      <div class="tabhead">
       <h1 class="h1">Estructura<span class="infob" tabindex="0">i<span class="infopop"><b>El árbol del proyecto</b><ul>
         <li>Cada columna es un <b>macro-tema</b>. Adentro están los sub-temas y las tareas.</li>
         <li>Tocá el botón <b>⤢</b> de la esquina del macro-tema (o hacé doble clic en él) para verlo desplegado a pantalla completa, con su objetivo y su estado actual.</li>
@@ -108,6 +110,7 @@
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
         <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span></h1>
       <div class="srchbar"><input class="srch" id="estSearch" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
+      </div>
 
       <div class="estwrap-mapa" id="estMapaWrap" hidden>
       <div class="viewport" id="viewport">
@@ -119,7 +122,7 @@
       <div class="estree" id="estree"></div>
     </div></section>
 
-    <section class="tab" id="tab-tareas"><div class="wrap" style="max-width:1200px">
+    <section class="tab" id="tab-tareas"><div class="wrap">
       <h1 class="h1">Tareas<span class="infob" tabindex="0">i<span class="infopop"><b>Cómo funciona esta pestaña</b><ul>
         <li><b>Vista</b> cambia cómo se agrupan las columnas: por estado, por persona o por prioridad. No filtra nada, solo reordena.</li>
         <li><b>Filtros</b> sí achica lo que se ve. Se pueden marcar varios a la vez y se cruzan entre sí: por ejemplo "En curso" + "Nico" + un tema.</li>
