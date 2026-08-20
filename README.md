@@ -1,4 +1,4 @@
-# Mesa de trabajo — Bosques de Agua / Boscora
+# Estudio — Bosques de Agua / Boscora
 
 App de organización de equipo. Vite + JS vanilla + Supabase (Postgres, Auth, Realtime).
 

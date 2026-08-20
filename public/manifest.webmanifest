@@ -1,7 +1,7 @@
 {
-  "name": "Mesa de trabajo · Bosques de Agua",
-  "short_name": "Mesa de trabajo",
-  "description": "Organización de equipo — Bosques de Agua y Boscora",
+  "name": "Estudio · Bosques de Agua",
+  "short_name": "Estudio",
+  "description": "El estudio de trabajo del equipo — Bosques de Agua y Boscora",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

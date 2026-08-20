@@ -9,17 +9,17 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Mesa de trabajo" />
+  <meta name="apple-mobile-web-app-title" content="Estudio" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <title>Mesa de trabajo · Bosques de Agua</title>
+  <title>Estudio · Bosques de Agua</title>
 </head>
 <body>
   <div id="login-screen" class="login-screen">
     <div class="login-box">
       <span class="brandmark" role="img" aria-label="Bosques de Agua"></span>
-      <h1>Mesa de trabajo</h1>
+      <h1>Estudio</h1>
       <p>Bosques de Agua · Boscora. Ingresá con tu email de equipo — te mandamos un enlace de acceso, sin contraseña.</p>
       <form id="login-form">
         <input type="email" id="login-email" placeholder="tu@email.com" autocomplete="email" required />
@@ -30,7 +30,7 @@
   </div>
 <div id="app">
   <header class="topbar">
-    <div class="brand"><img class="mark" src="/bda-isotipo.png" alt="Bosques de Agua" /><span class="btxt"><b>Mesa de trabajo</b><span class="bsub">Bosques de Agua</span></span></div>
+    <div class="brand"><img class="mark" src="/bda-isotipo.png" alt="Bosques de Agua" /><span class="btxt"><b>Estudio</b><span class="bsub">Bosques de Agua</span></span></div>
     <div class="topctx" id="topCtx" hidden>
       <div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div>
       <span class="ctxdiv" id="ctxDiv"></span>
@@ -164,6 +164,9 @@
         <li>El archivo <b>no se copia</b>: queda apuntando a Drive, así siempre ves la última versión.</li>
         <li>El link funciona para quien tenga acceso en Drive: compartí la carpeta con todo el equipo.</li></ul></span></span></h1>
       <div class="srchbar"><input class="srch" id="driveSearch" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
+      <div class="tbar"><span class="barlab">Ordenar por</span>
+        <div class="seg2" id="driveOrdenSeg"><button data-o="tema" class="on">Tema</button><button data-o="nombre">Nombre</button><button data-o="tipo">Tipo</button></div>
+        <span style="color:var(--ink-faint);font-size:12.5px" id="driveCuenta"></span></div>
       <div id="driveBody"></div>
     </div></section>
 

@@ -802,7 +802,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- DRIVE ----------
   // El filtro del Drive es una vista personal: vive acá, no en el estado, así
   // que filtrar no le cambia la pantalla a nadie más.
-  let driveQuery="", driveTema="", fmTarget=null;
+  let driveQuery="", driveTema="", driveOrden="tema", fmTarget=null;
   function openFileModal(target){ fmTarget=target; // target: {kind:"node"|"task"|"pick", node, task}
     document.getElementById("fmUrl").value=""; const fmn=document.getElementById("fmName"); fmn.value=""; fmn.dataset.touched="";
     const wrap=document.getElementById("fmWhereWrap"), sel=document.getElementById("fmWhere");
@@ -850,6 +850,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const porNodo=new Map();
     all.forEach(x=>{ if(!porNodo.has(x.node.id))porNodo.set(x.node.id,[]); porNodo.get(x.node.id).push(x); });
     const enOrden=raiz=>{ const out=[]; const bajar=id=>{ const n=N(id); if(!n)return; out.push(id); (n.children||[]).forEach(bajar); }; bajar(raiz); return out; };
+    // Un archivo colgado del proyecto mismo no tiene ruta por debajo: se muestra
+    // el nombre del proyecto para que la columna nunca quede vacía.
+    const ruta=x=>{ const p=pathOf(x.node.id).map(z=>z.name); const bajo=p.slice(1).join(" › ")||p[0]||"Proyecto";
+      return bajo+(x.task?" › "+(x.task.title||"Tarea"):""); };
+    const filaConRuta=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const r=ruta(x);
+      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button></div>`; };
     const fila=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const tarea=x.task?(x.task.title||"Tarea"):"";
       return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}</div>`; };
     const bloque=(titulo,color,ids)=>{ const conArchivos=ids.filter(id=>porNodo.has(id)); if(!conArchivos.length)return "";
@@ -861,12 +867,31 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         // repite el título de arriba no agrega nada.
         h+=(ruta?`<div class="dsub"><button class="dsubname" data-go="${id}">${esc(ruta)}</button><span class="cnt">${arr.length}</span></div>`:"")+arr.map(fila).join(""); });
       return h+"</div>"; };
-    const macros=macroList(); let html="";
-    macros.forEach(m=>{ html+=bloque(m.name,accentOf(m),enOrden(m.id)); });
-    // Lo que cuelga directo del proyecto, fuera de todo macro-tema.
-    const sueltos=[...porNodo.keys()].filter(id=>!macros.some(m=>inSubtree(id,m.id)));
-    if(sueltos.length) html+=bloque("Nivel proyecto","var(--ink-faint)",sueltos);
+    let html="";
+    if(driveOrden==="nombre"){
+      // Todo junto, alfabético, con la ruta de cada uno al costado.
+      html=all.slice().sort((a,b)=>(a.f.name||a.f.url).localeCompare(b.f.name||b.f.url,"es",{sensitivity:"base"}))
+        .map(filaConRuta).join("");
+    } else if(driveOrden==="tipo"){
+      // Agrupado por tipo de archivo, en el orden en que están declarados.
+      const orden=Object.keys(FKIND);
+      const porTipo=new Map();
+      all.forEach(x=>{ const k=FKIND[x.f.kind]?x.f.kind:"link"; if(!porTipo.has(k))porTipo.set(k,[]); porTipo.get(k).push(x); });
+      orden.filter(k=>porTipo.has(k)).forEach(k=>{ const arr=porTipo.get(k).slice()
+          .sort((a,b)=>(a.f.name||"").localeCompare(b.f.name||"","es",{sensitivity:"base"}));
+        html+=`<div class="drivegroup"><h3>${FKIND[k].i}${esc(FKIND[k].l)}<span class="cnt">${arr.length}</span></h3>`
+          +arr.map(filaConRuta).join("")+"</div>"; });
+    } else {
+      const macros=macroList();
+      macros.forEach(m=>{ html+=bloque(m.name,accentOf(m),enOrden(m.id)); });
+      // Lo que cuelga directo del proyecto, fuera de todo macro-tema.
+      const sueltos=[...porNodo.keys()].filter(id=>!macros.some(m=>inSubtree(id,m.id)));
+      if(sueltos.length) html+=bloque("Nivel proyecto","var(--ink-faint)",sueltos);
+    }
     box.innerHTML=html;
+    const cuenta=document.getElementById("driveCuenta");
+    if(cuenta)cuenta.textContent=all.length+(all.length===1?" archivo":" archivos");
+    document.querySelectorAll("#driveOrdenSeg [data-o]").forEach(b=>b.classList.toggle("on",b.dataset.o===driveOrden));
     box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go))); }
 
   // ---------- CHAT + EVENTOS ----------
@@ -1455,6 +1480,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("driveSearch").addEventListener("input",e=>{ driveQuery=e.target.value; renderDrive(); });
   document.getElementById("driveTema").addEventListener("change",e=>{ driveTema=e.target.value; renderDrive(); });
   document.getElementById("driveTemaClear").addEventListener("click",()=>{ driveTema=""; renderDrive(); });
+  document.querySelectorAll("#driveOrdenSeg [data-o]").forEach(b=>b.addEventListener("click",()=>{ driveOrden=b.dataset.o; renderDrive(); }));
   document.getElementById("driveAdd").addEventListener("click",()=>openFileModal({kind:"pick"}));
   document.getElementById("pAddFile").addEventListener("click",()=>{ const n=N(selId); if(!n)return; openFileModal({kind:"node",node:n}); });
   document.getElementById("tAddFile").addEventListener("click",()=>{ const k=curTask(); if(!k)return; openFileModal({kind:"task",task:k}); });
@@ -1535,7 +1561,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const data=JSON.stringify(stripShared(state),null,2);
     const fecha=new Date().toISOString().slice(0,10);
     try{ const b=new Blob([data],{type:"application/json"}); const a=document.createElement("a");
-      a.href=URL.createObjectURL(b); a.download=`mesa-de-trabajo-${fecha}.json`; document.body.appendChild(a); a.click(); a.remove();
+      a.href=URL.createObjectURL(b); a.download=`estudio-bda-${fecha}.json`; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
     catch(e){ note("No se pudo descargar el respaldo."); }
   }

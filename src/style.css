@@ -1091,3 +1091,12 @@
   ::-webkit-scrollbar-thumb:hover{background:var(--ink-faint);background-clip:padding-box}
   ::-webkit-scrollbar-corner{background:transparent}
   html{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
+
+
+  /* En los órdenes por nombre y por tipo, la ruta es lo único que dice de qué
+     tema salió el archivo: se vuelve el camino de vuelta a su ficha. */
+  .filerow .fpathgo{font:inherit;font-size:10.5px;color:var(--ink-faint);background:none;border:none;
+    padding:0;cursor:pointer;text-align:right;max-width:44%;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;flex:none}
+  .filerow .fpathgo:hover{color:var(--wood-deep);text-decoration:underline}
+  #tab-drive .tbar{margin:16px 0 10px}

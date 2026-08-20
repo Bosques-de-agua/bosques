@@ -10,7 +10,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", () => {});
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "Mesa de trabajo", body: "Tenés novedades." };
+  let payload = { title: "Estudio · Bosques de Agua", body: "Tenés novedades." };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch (e) {}

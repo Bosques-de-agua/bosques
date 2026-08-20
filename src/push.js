@@ -96,7 +96,7 @@ export function initPush() {
           if (p !== "granted") throw new Error("permiso denegado");
         }
         const reg = await navigator.serviceWorker.ready;
-        await reg.showNotification("Mesa de trabajo", {
+        await reg.showNotification("Estudio · Bosques de Agua", {
           body: "Aviso de prueba. Si ves esto, las notificaciones funcionan en este teléfono.",
           icon: "/icon-192.png",
           data: { url: "/" },
