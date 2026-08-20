@@ -77,6 +77,38 @@ export function initPush() {
     const existing = await currentSubscription().catch(() => null);
     render(btn, !!existing);
 
+    const probar = document.createElement("button");
+    probar.type = "button";
+    probar.className = "btn";
+    probar.style.marginLeft = "8px";
+    probar.textContent = "Probar";
+    probar.title = "Muestra un aviso de prueba en este teléfono";
+    host.appendChild(probar);
+
+    // No pasa por el servidor ni por Google: se lo pide directamente al
+    // sistema. Si este aviso aparece y los de verdad no, el problema está en
+    // la entrega; si tampoco aparece, está en este teléfono.
+    probar.addEventListener("click", async () => {
+      probar.disabled = true;
+      try {
+        if (Notification.permission !== "granted") {
+          const p = await Notification.requestPermission();
+          if (p !== "granted") throw new Error("permiso denegado");
+        }
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification("Mesa de trabajo", {
+          body: "Aviso de prueba. Si ves esto, las notificaciones funcionan en este teléfono.",
+          icon: "/icon-192.png",
+          data: { url: "/" },
+        });
+        aviso(host, "Pedido. Si no aparece nada, el teléfono está bloqueando los avisos.");
+      } catch (err) {
+        aviso(host, "Falló: " + String(err.message || err), true);
+      } finally {
+        probar.disabled = false;
+      }
+    });
+
     btn.addEventListener("click", async () => {
       btn.disabled = true;
       try {
@@ -106,4 +138,16 @@ function render(btn, on) {
   btn.dataset.on = on ? "1" : "0";
   btn.textContent = on ? "🔔 Activadas" : "🔕 Activar";
   btn.classList.toggle("on", on);
+}
+
+function aviso(host, texto, malo) {
+  const previo = host.querySelector(".push-aviso");
+  if (previo) previo.remove();
+  const el = document.createElement("span");
+  el.className = "push-aviso";
+  el.style.cssText =
+    "display:block;font-size:12px;margin-top:6px;color:" +
+    (malo ? "var(--s-bloq)" : "var(--ink-faint)");
+  el.textContent = texto;
+  host.appendChild(el);
 }
