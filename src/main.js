@@ -32,17 +32,22 @@ function showApp() {
   appRoot.classList.add("on");
 }
 
+// Quién entró y cómo salir. Vivía flotando arriba a la derecha, encima de la
+// campanita y del botón de tema: se tapaban entre sí. Ahora está al pie del
+// menú, debajo de Configuración, que es donde uno lo busca.
 function addSignOutPill(email) {
-  if (document.querySelector(".signout-pill")) return;
-  const pill = document.createElement("button");
-  pill.className = "signout-pill";
-  pill.type = "button";
-  pill.title = "Cerrar sesión";
-  pill.textContent = `${email} · Salir`;
-  pill.addEventListener("click", async () => {
+  const host = document.getElementById("sbUser");
+  if (!host || host.dataset.listo === "1") return;
+  host.dataset.listo = "1";
+  host.hidden = false;
+  host.innerHTML =
+    '<span class="sbmail" title="' + email + '">' + email + "</span>" +
+    '<button type="button" class="sbitem sbsalir" title="Cerrar sesión">' +
+    "<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M12.5 6V4.5A1.5 1.5 0 0 0 11 3H5.5A1.5 1.5 0 0 0 4 4.5v11A1.5 1.5 0 0 0 5.5 17H11a1.5 1.5 0 0 0 1.5-1.5V14\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M8.5 10h8m0 0-2.4-2.4M16.5 10l-2.4 2.4\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>" +
+    '<span class="sblbl">Salir</span></button>';
+  host.querySelector(".sbsalir").addEventListener("click", async () => {
     await supabase.auth.signOut();
   });
-  document.body.appendChild(pill);
 }
 
 async function launchApp(session) {

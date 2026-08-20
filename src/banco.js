@@ -73,4 +73,15 @@ cinta.style.cssText =
   "color:var(--on-accent);background:var(--accent-priv);pointer-events:none;opacity:.85";
 document.body.appendChild(cinta);
 
+// El banco no tiene login, pero muestra el pie del menú igual que la app real.
+const pie = document.getElementById("sbUser");
+if (pie) {
+  pie.hidden = false;
+  pie.innerHTML =
+    '<span class="sbmail" title="nico@ejemplo.org">nico@ejemplo.org</span>' +
+    '<button type="button" class="sbitem sbsalir" title="Cerrar sesión">' +
+    "<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M12.5 6V4.5A1.5 1.5 0 0 0 11 3H5.5A1.5 1.5 0 0 0 4 4.5v11A1.5 1.5 0 0 0 5.5 17H11a1.5 1.5 0 0 0 1.5-1.5V14\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><path d=\"M8.5 10h8m0 0-2.4-2.4M16.5 10l-2.4 2.4\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>" +
+    '<span class="sblbl">Salir</span></button>';
+}
+
 window.__app = app;
