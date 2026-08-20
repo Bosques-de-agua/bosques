@@ -38,13 +38,20 @@ try {
 
 const nada = async () => {};
 
+// Para auditar: el banco guarda lo ÚLTIMO que la app quiso mandarle al equipo
+// y a la tabla privada, sin mandarlo a ningún lado. Sirve para comprobar que
+// las preferencias personales no se cuelan en el payload compartido.
+window.__push = { compartido: null, privado: null, veces: 0 };
+const espiaCompartido = async (d) => { window.__push.compartido = d; window.__push.veces++; };
+const espiaPrivado = async (d) => { window.__push.privado = d; };
+
 const app = startApp({
   seed: null, // sin semilla, la app se siembra sola con su ejemplo
   priv: null,
   yo: team[0],
   team,
-  pushRemoteState: nada,
-  pushPrivateState: nada,
+  pushRemoteState: espiaCompartido,
+  pushPrivateState: espiaPrivado,
   saveMember: nada,
   inviteEmail: nada,
   refreshTeam: async () => team,

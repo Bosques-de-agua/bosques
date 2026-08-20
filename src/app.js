@@ -136,7 +136,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     grupo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 8h12M4 12.4h12M8.6 4L7.1 16M13.4 4L11.9 16\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>"
   };
-  const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
+  const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},word:{i:ICO.doc,l:"Word"},excel:{i:ICO.sheet,l:"Excel"},ppt:{i:ICO.slides,l:"PowerPoint"},image:{i:ICO.imagen,l:"Imagen"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
+  // Un PDF o un Word subidos a Drive tienen URL "drive.google.com/file/d/…/view":
+  // no dice nada del tipo. La segunda pista es la extension del nombre, que es
+  // lo que la persona escribe al vincularlo.
+  function kindOfName(n){ const x=String(n||"").toLowerCase();
+    if(/\.pdf$/.test(x))return "pdf";
+    if(/\.docx?$/.test(x)||/\.odt$/.test(x)||/\.rtf$/.test(x))return "word";
+    if(/\.xlsx?$/.test(x)||/\.csv$/.test(x)||/\.ods$/.test(x))return "excel";
+    if(/\.pptx?$/.test(x)||/\.odp$/.test(x))return "ppt";
+    if(/\.(png|jpe?g|gif|webp|heic|svg|tiff?)$/.test(x))return "image";
+    return null; }
+  function kindOf(url,name){ const porUrl=kindOfUrl(url);
+    // La URL manda cuando es un documento nativo de Google: ahi es exacta.
+    if(porUrl!=="file"&&porUrl!=="link")return porUrl;
+    return kindOfName(name)||kindOfName(url)||porUrl; }
   function kindOfUrl(u){ const s=String(u||"").toLowerCase();
     if(s.includes("docs.google.com/document"))return "doc";
     if(s.includes("docs.google.com/spreadsheets"))return "sheet";
@@ -274,7 +288,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";
     if(!d.taskFilters||typeof d.taskFilters!=="object")d.taskFilters={people:[],status:[],temas:[],prio:[]};
     ["people","status","temas","prio"].forEach(kk=>{ if(!Array.isArray(d.taskFilters[kk]))d.taskFilters[kk]=[]; });
-    if(d.taskTemaFilter&&!d.taskFilters.temas.length){ d.taskFilters.temas=[d.taskTemaFilter]; d.taskTemaFilter=""; }
+    if("taskTemaFilter" in d)delete d.taskTemaFilter;
     d.taskFilters.status=d.taskFilters.status.filter(s=>STATUS[s]);
     d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
     d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
@@ -736,7 +750,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function closeFM(){ document.getElementById("fileModal").classList.remove("on"); fmTarget=null; }
   function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta."); return; }
     if(!/^https?:\/\//i.test(url)){ note("El link tiene que empezar con http:// o https://"); return; }
-    const kind=kindOfUrl(url); const name=document.getElementById("fmName").value.trim()||(FKIND[kind]||FKIND.link).l;
+    const nombre=document.getElementById("fmName").value.trim(); const kind=kindOf(url,nombre); const name=nombre||(FKIND[kind]||FKIND.link).l;
     const f={id:"f"+uid(),url,name,kind,addedBy:state.me||"",addedAt:nowMs()};
     let owner=null, t=fmTarget;
     if(t.kind==="pick"){ const v=document.getElementById("fmWhere").value; const p=v.split(":");
@@ -798,7 +812,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
-    head.innerHTML=`<span>${esc(chanTitle(chatChan))}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
+    // chanTitle ya devuelve HTML (icono + nombre escapado): volver a escapar
+    // acá imprimía el SVG como texto.
+    head.innerHTML=`<span>${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
       <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
@@ -1310,7 +1326,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("fmCancel").addEventListener("click",closeFM);
   document.getElementById("fmSave").addEventListener("click",saveFM);
   document.getElementById("fileModal").addEventListener("click",e=>{ if(e.target.id==="fileModal")closeFM(); });
-  document.getElementById("fmUrl").addEventListener("input",e=>{ const nm=document.getElementById("fmName"); if(!nm.dataset.touched){ const k=kindOfUrl(e.target.value); nm.placeholder="Ej: "+(FKIND[k]||FKIND.link).l; } });
+  document.getElementById("fmUrl").addEventListener("input",e=>{ const nm=document.getElementById("fmName"); if(!nm.dataset.touched){ const k=kindOf(e.target.value,nm.value); nm.placeholder="Ej: "+(FKIND[k]||FKIND.link).l; } });
   document.getElementById("fmName").addEventListener("input",e=>{ e.target.dataset.touched=e.target.value?"1":""; });
   document.getElementById("fmName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveFM(); } });
   document.getElementById("askYes").addEventListener("click",()=>{ const cb=askCb, v=document.getElementById("askInput").value; closeAsk(); if(cb)cb(v); });
