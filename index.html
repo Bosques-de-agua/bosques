@@ -38,13 +38,16 @@
           <button class="btn" id="editMode"><svg viewBox="0 0 20 20" fill="none"><path d="M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Editar</button>
           <button class="btn btn-primary" id="addNode"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="addLabel">Nuevo tema</span></button>
           <span class="infob" tabindex="0" style="margin-left:2px;align-self:center">i<span class="infopop"><b>El mapa del proyecto</b><ul>
-            <li><b>Un clic</b> en un globo abre su ficha. <b>Doble clic</b> lo apaga, para ir despejando el mapa.</li>
+            <li><b>Un clic</b> en un globo abre su ficha.</li>
+            <li><b>Doble clic</b> enciende su rama: queda a la vista todo lo que cuelga de ese tema y todo lo que tiene vinculado. Doble clic otra vez, o en el fondo, para volver a ver todo.</li>
             <li><b>Arrastrá el fondo</b> para moverte; la rueda hace zoom y ⤢ encuadra todo.</li>
             <li><b>Vincular</b>: tocá dos temas para conectarlos, aunque estén en ramas distintas.</li>
             <li><b>Editar</b>: cambiá color y tamaño de un tema, o curvá las líneas arrastrándolas.</li>
-            <li>Los filtros de arriba atenúan los temas que no correspondan.</li></ul></span></span>
+            <li><b>Capas</b> esconde lo más hondo del árbol; <b>Persona</b> atenúa los temas donde esa persona no tiene nada.</li>
+            <li><b>Alt + clic</b> apaga una rama a mano, si querés despejar algo puntual.</li></ul></span></span>
       <div class="filt" id="filtPersona"><label>Persona</label><select id="fPerson"><option value="">Todas</option></select></div>
-      <div class="filt" id="filtEstado"><label>Estado</label><select id="fStatus"><option value="">Todos</option><option value="curso">En curso</option><option value="espera">En espera</option><option value="sin">Sin empezar</option><option value="listo">Terminado</option></select></div>
+      <!-- Las opciones las arma llenarFiltroCapa() según lo hondo que esté el árbol. -->
+      <div class="filt" id="filtCapa"><label>Capas</label><select id="fCapa"><option value="">Todas</option></select></div>
     </div>
     <div class="spacer"></div>
     <div class="filters">

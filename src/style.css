@@ -90,6 +90,8 @@
   .filt{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-ctl);padding:5px 9px}
   .filt label{color:var(--ink-faint);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
   .filt select{border:none;background:transparent;color:var(--ink);font:inherit;font-size:12.5px;outline:none;cursor:pointer;max-width:120px}
+  .filt.act{border-color:var(--wood);box-shadow:inset 0 0 0 1px var(--wood)}
+  .filt.act label{color:var(--wood-deep)}
   select option, .item select option{background:var(--panel);color:var(--ink);font-weight:500}
   .btn{font:inherit;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:var(--r-ctl);padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,background .15s,transform .05s}
   .btn:hover{border-color:var(--wood)}

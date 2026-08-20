@@ -441,25 +441,50 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   }
 
   const viewport=document.getElementById("viewport"),world=document.getElementById("world"),worldInner=document.getElementById("worldInner"),svg=document.getElementById("synapses"),handles=document.getElementById("handles");
-  const fPerson=document.getElementById("fPerson"),fStatus=document.getElementById("fStatus");
-  function matches(node){ const p=fPerson.value,s=fStatus.value; if(!p&&!s)return true; const a=agg(node); return (!p||a.owners.has(p))&&(!s||a.st.has(s)); }
+  const fPerson=document.getElementById("fPerson"),fCapa=document.getElementById("fCapa");
+  // El filtro de PERSONA atenúa: el tema sigue ahí, apagado, porque saber que
+  // existe pero que nadie lo tiene a su nombre es justamente el dato.
+  function matches(node){ const p=fPerson.value; if(!p)return true; return agg(node).owners.has(p); }
+  // El de CAPAS, en cambio, esconde: sirve para despejar, y un globo atenuado
+  // ocupa el mismo lugar que uno encendido. Es acumulativo ("hasta la capa N"),
+  // nunca "solo la capa N": una capa suelta dejaría globos colgando de nada.
+  function capaTope(){ const v=parseInt(fCapa.value,10); return v>0?v:0; }
+  function oculto(node){ const t=capaTope(); return t>0&&depthOf(node)>t; }
   function isOff(node){ let x=node; while(x){ if(off.has(x.id))return true; x=N(x.parent); } return false; }
   function isBright(node){ return !isOff(node)&&matches(node); }
+  function visible(node){ return !oculto(node); }
   // Vecindario de un tema: su padre, sus hijos y sus vínculos sueltos.
   function vecinos(id){ const v=new Set(); const n=N(id); if(!n)return v;
     if(n.parent)v.add(n.parent); (n.children||[]).forEach(c=>v.add(c)); (n.links||[]).forEach(l=>v.add(l));
     Object.values(state.nodes).forEach(o=>{ if((o.links||[]).includes(id))v.add(o.id); });
     return v; }
-  function enFoco(){ return selId?new Set([selId,...vecinos(selId)]):null; }
+  // Doble clic en un tema = encender su rama. Entra TODO lo que cuelga de él a
+  // cualquier profundidad (no solo los hijos directos, que era lo que dejaba
+  // apagada media rama), la rama de la que cuelga —para no perder de vista
+  // dónde está parado— y los vínculos sueltos ✦ de todo ese conjunto.
+  let focoRama=null;
+  function ramaDe(id){ const rama=new Set(); if(!N(id))return rama;
+    const bajar=x=>{ const k=N(x); if(!k||rama.has(x))return; rama.add(x); (k.children||[]).forEach(bajar); };
+    bajar(id);
+    pathOf(id).forEach(x=>rama.add(x.id));
+    // Un solo salto por los vínculos, y calculado sobre la rama YA cerrada: si
+    // se fuera agrandando el conjunto mientras se recorre, el resultado
+    // dependería del orden de las claves y terminaría siendo transitivo.
+    const s=new Set(rama);
+    rama.forEach(x=>{ const k=N(x); if(k)(k.links||[]).forEach(l=>s.add(l)); });
+    Object.values(state.nodes).forEach(o=>{ if((o.links||[]).some(l=>rama.has(l)))s.add(o.id); });
+    return s; }
+  function enFoco(){ if(focoRama&&N(focoRama))return ramaDe(focoRama);
+    return selId?new Set([selId,...vecinos(selId)]):null; }
 
   // Ya no hay selector de identidad: sos quien entró con su correo.
   function applyTabControls(name){
-    // Persona y Estado solo atenúan nodos del mapa: fuera de ahí no hacen nada,
+    // Persona y Capas solo actúan sobre el mapa: fuera de ahí no hacen nada,
     // así que no tienen por qué ocupar la barra.
     const est=name==="estructura", mapa=est&&estView()==="mapa";
     const ver=(id,on)=>{ const el=document.getElementById(id); if(el)el.style.display=on?"":"none"; };
     const ctx=document.getElementById("topCtx"); if(ctx)ctx.hidden=!est;
-    ["ctxDiv","linkMode","editMode","addNode","filtPersona","filtEstado"].forEach(id=>ver(id,mapa));
+    ["ctxDiv","linkMode","editMode","addNode","filtPersona","filtCapa"].forEach(id=>ver(id,mapa));
     const info=document.querySelector("#topCtx .infob"); if(info)info.style.display=mapa?"":"none";
     const s=document.getElementById("filtSos"); if(s)s.style.display="none";
     // Con las herramientas arriba, el mapa se queda con toda la página.
@@ -575,7 +600,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function edgeColor(e){ const m=EM()[e.key]||{}; return m.color||(e.type==="link"?cssv("--link"):accentOf(e.b)); }
   function edgeDash(e){ const m=EM()[e.key]||{}; const st=m.style||(e.type==="link"?"dash":"solid"); return st==="solid"?"":st==="dot"?"1.5 7":"7 7"; }
   function buildEdges(){ const list=edgeList(); let paths="",hits=""; const foco=enFoco();
-    list.forEach(e=>{ const on=isBright(e.a)&&isBright(e.b); const col=edgeColor(e),dash=edgeDash(e),d=edgeD(e.a,e.b);
+    list.forEach(e=>{ // una línea que va a un globo escondido por el filtro de capas no se dibuja
+      if(!visible(e.a)||!visible(e.b))return;
+      const on=isBright(e.a)&&isBright(e.b); const col=edgeColor(e),dash=edgeDash(e),d=edgeD(e.a,e.b);
       const tocaSel=!!selId&&(e.a.id===selId||e.b.id===selId);
       const grosor=on?(tocaSel?1.6:1):0.75;
       const opac=on?(!foco||tocaSel?0.72:0.14):0.1;
@@ -583,52 +610,84 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(editing&&on) hits+=`<path class="hit" data-key="${e.key}" d="${d}"/>`; });
     svg.innerHTML=paths+hits; svg.style.pointerEvents=editing?"auto":"none"; handles.innerHTML="";
     if(editing){ svg.querySelectorAll("path.hit").forEach(p=>p.addEventListener("click",ev=>{ ev.stopPropagation(); const e=list.find(x=>x.key===p.dataset.key); if(e)openEdgePop(e); }));
-      list.forEach(e=>{ if(!(isBright(e.a)&&isBright(e.b)))return; const c=ctrlOf(e.a,e.b); const h=document.createElement("div"); h.className="ehandle"; h.dataset.key=e.key; h.style.left=(OX+c.x)+"px"; h.style.top=(OY+c.y)+"px"; handles.appendChild(h); wireHandle(h,e); }); } }
+      list.forEach(e=>{ if(!visible(e.a)||!visible(e.b))return; if(!(isBright(e.a)&&isBright(e.b)))return; const c=ctrlOf(e.a,e.b); const h=document.createElement("div"); h.className="ehandle"; h.dataset.key=e.key; h.style.left=(OX+c.x)+"px"; h.style.top=(OY+c.y)+"px"; handles.appendChild(h); wireHandle(h,e); }); } }
   function wireHandle(h,e){ let drag=false,sx,sy,b0;
     h.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); drag=true; h.setPointerCapture(ev.pointerId); sx=ev.clientX;sy=ev.clientY; const m=EM()[e.key]||{}; b0=Object.assign({dx:0,dy:0},m.bend); });
     h.addEventListener("pointermove",ev=>{ if(!drag)return; const dx=(ev.clientX-sx)/cam.s,dy=(ev.clientY-sy)/cam.s; setEdgeMeta(e.key,{bend:{dx:b0.dx+dx,dy:b0.dy+dy}}); const c=ctrlOf(e.a,e.b); h.style.left=(OX+c.x)+"px"; h.style.top=(OY+c.y)+"px"; const d=edgeD(e.a,e.b); const pa=svg.querySelector(`path.edge[data-key="${e.key}"]`); if(pa)pa.setAttribute("d",d); const hi=svg.querySelector(`path.hit[data-key="${e.key}"]`); if(hi)hi.setAttribute("d",d); });
     h.addEventListener("pointerup",()=>{ if(!drag)return; drag=false; save(); renderMap(); }); }
   function renderMap(){ buildEdges(); const foco=enFoco();
     [...worldInner.querySelectorAll(".neu")].forEach(n=>n.remove());
-    Object.values(state.nodes).forEach(node=>{ const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
+    Object.values(state.nodes).forEach(node=>{ if(oculto(node))return;   // el filtro de capas no atenúa: saca
+      const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
       const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(foco&&!foco.has(node.id)?" dim":"")+(a.ic?" conprog":"");
-      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.setProperty("--pct",a.ic?Math.round(a.dc/a.ic*100):0); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
+      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.setProperty("--pct",a.ic?Math.round(a.dc/a.ic*100):0); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id;
+      el.title="Clic: abre la ficha · Doble clic: enciende la rama · Alt+clic: apaga";
       const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>avatarMarkup(o,"av",true)).join("");
       const outLinks=(node.links||[]).length;
       const sub=`${hasKids?a.nc+" sub · ":""}${a.ic} tarea${a.ic===1?"":"s"}${a.ic?` · ${a.dc}✓`:""}`;
       el.innerHTML=`<span class="nod"></span><span class="nm">${esc(node.name)}</span><span class="sub">${sub}</span>${avs?`<span class="avs">${avs}</span>`:''}${outLinks?`<span class="link-mark">✦ ${outLinks}</span>`:''}`;
       worldInner.appendChild(el); wireNeuron(el,node); });
     document.getElementById("addLabel").textContent=selId?"Nuevo sub-tema":"Nuevo proyecto";
-    avisoFiltroVacio(); }
+    llenarFiltroCapa(); avisoFiltroVacio(); }
+  // Las opciones se arman según lo hondo que esté el árbol de verdad: si nadie
+  // pasó de la capa 3, ofrecer "hasta la 5" sería ofrecer nada.
+  function llenarFiltroCapa(){ if(!fCapa)return;
+    if(document.activeElement===fCapa)return;             // no se le mueve el menú a alguien que lo tiene abierto
+    let hondo=1; Object.values(state.nodes).forEach(n=>{ const d=depthOf(n); if(d>hondo)hondo=d; });
+    const previo=fCapa.value;
+    let html='<option value="">Todas</option>';
+    for(let i=1;i<hondo;i++) html+=`<option value="${i}">Hasta la ${i}</option>`;
+    if(fCapa.dataset.hondo!==String(hondo)){ fCapa.innerHTML=html; fCapa.dataset.hondo=String(hondo); }
+    // Si el árbol se achicó y la capa elegida ya no existe, se vuelve a Todas.
+    fCapa.value=[...fCapa.options].some(o=>o.value===previo)?previo:"";
+    marcarFiltros(); }
+  // Un filtro puesto tiene que verse puesto: escondiendo la mitad del mapa y
+  // con la misma cara que apagado, la próxima persona no entiende qué le pasó.
+  function marcarFiltros(){
+    const p=document.getElementById("filtPersona"); if(p)p.classList.toggle("act",!!fPerson.value);
+    const c=document.getElementById("filtCapa"); if(c)c.classList.toggle("act",!!fCapa.value); }
   function avisoFiltroVacio(){
     let aviso=document.getElementById("mapEmpty");
-    const hayFiltro=(fPerson.value||fStatus.value);
-    const ninguno=hayFiltro&&!Object.values(state.nodes).some(n=>isBright(n));
+    // El de capas nunca puede vaciar el mapa: la capa 1 siempre queda en pie.
+    const quien=fPerson.value;
+    const ninguno=quien&&!Object.values(state.nodes).some(n=>isBright(n)&&visible(n));
     if(!ninguno){ if(aviso)aviso.remove(); return; }
     if(!aviso){ aviso=document.createElement("div"); aviso.id="mapEmpty"; aviso.className="mapempty"; viewport.appendChild(aviso); }
-    const quien=fPerson.value, estado=fStatus.value&&STATUS[fStatus.value]?STATUS[fStatus.value].l.toLowerCase():"";
-    aviso.innerHTML=`<b>Ningún tema queda en pie con este filtro</b><span>${
-      quien&&estado?"Nadie tiene tareas "+esc(estado)+" a nombre de "+esc(quien)+".":
-      quien?esc(quien)+" no tiene tareas a su nombre en ningún tema.":
-      "No hay tareas "+esc(estado)+" en ningún tema."}</span><button class="rowbtn" id="mapEmptyClear">Limpiar el filtro</button>`;
+    aviso.innerHTML=`<b>Ningún tema queda en pie con este filtro</b><span>${esc(quien)} no tiene tareas a su nombre en ningún tema.</span><button class="rowbtn" id="mapEmptyClear">Limpiar el filtro</button>`;
     const b=aviso.querySelector("#mapEmptyClear");
-    if(b)b.addEventListener("click",()=>{ fPerson.value=""; fStatus.value=""; renderMap(); }); }
+    if(b)b.addEventListener("click",()=>{ fPerson.value=""; renderMap(); }); }
   function applyCam(){ world.style.transform=`translate(${cam.tx}px,${cam.ty}px) scale(${cam.s})`; }
-  function fit(){ const ns=Object.values(state.nodes); const vw=viewport.clientWidth||960,vh=viewport.clientHeight||600;
+  // Encuadra lo que se está viendo: si el filtro de capas escondió lo hondo, no
+  // tiene sentido reservarle lugar en pantalla a globos que no están.
+  function fit(){ const ns=Object.values(state.nodes).filter(visible); const vw=viewport.clientWidth||960,vh=viewport.clientHeight||600;
     if(!ns.length){ cam.tx=vw/2-OX;cam.ty=vh/2-OY;cam.s=1;applyCam();return; }
     let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; ns.forEach(k=>{ const r=baseSize(k)/2+50; mnx=Math.min(mnx,k.x-r);mxx=Math.max(mxx,k.x+r);mny=Math.min(mny,k.y-r);mxy=Math.max(mxy,k.y+r); });
     const cw=Math.max(300,mxx-mnx),ch=Math.max(300,mxy-mny); cam.s=Math.max(.12,Math.min(vw/cw,vh/ch,1.1));
     cam.tx=vw/2-(OX+(mnx+mxx)/2)*cam.s; cam.ty=vh/2-(OY+(mny+mxy)/2)*cam.s; applyCam(); }
-  function focusNode(id){ const n=N(id); if(!n)return; pathOf(id).forEach(x=>off.delete(x.id)); selId=id; const vw=viewport.clientWidth,vh=viewport.clientHeight;
+  // Ir a un tema desde el buscador o desde otra pantalla tiene que dejarlo a la
+  // vista sí o sí: se le saca el apagado a toda su rama y, si el filtro de
+  // capas lo estaba escondiendo, se baja el filtro hasta donde vive.
+  function focusNode(id){ const n=N(id); if(!n)return; pathOf(id).forEach(x=>off.delete(x.id));
+    if(oculto(n)){ fCapa.value=""; llenarFiltroCapa(); }
+    selId=id; const vw=viewport.clientWidth,vh=viewport.clientHeight;
     world.style.transition="transform .4s cubic-bezier(.4,0,.2,1)"; cam.tx=vw/2-(OX+n.x)*cam.s; cam.ty=vh/2-(OY+n.y)*cam.s; applyCam(); setTimeout(()=>world.style.transition="",420); renderMap(); }
   let clickTimer=null;
   function wireNeuron(el,node){ let drag=false,moved=false,sx,sy,ox,oy;
     el.addEventListener("pointerdown",e=>{ if(e.button!==0)return; e.stopPropagation(); closePops(); drag=true; moved=false; el.setPointerCapture(e.pointerId); sx=e.clientX;sy=e.clientY;ox=node.x;oy=node.y; });
     el.addEventListener("pointermove",e=>{ if(!drag)return; const dx=(e.clientX-sx)/cam.s,dy=(e.clientY-sy)/cam.s; if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true; node.x=ox+dx; node.y=oy+dy; el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; buildEdges(); });
     el.addEventListener("pointerup",e=>{ if(!drag)return; drag=false; if(moved){ save(); return; } if(linking){ onLinkClick(node); return; }
+      // Apagar una rama a mano dejó de estar en el doble clic —ahora eso
+      // enciende— y pasó acá, que no se pisa con nada.
+      if(e.altKey||e.ctrlKey||e.metaKey){ toggleOff(node); return; }
       if(clickTimer){clearTimeout(clickTimer);clickTimer=null;} clickTimer=setTimeout(()=>{ clickTimer=null; if(editing)openAspect(node); else openPanel(node.id); },210); });
-    el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(clickTimer){clearTimeout(clickTimer);clickTimer=null;} if(linking||editing)return; toggleOff(node); }); }
-  function toggleOff(node){ if(off.has(node.id))off.delete(node.id); else off.add(node.id); renderMap(); }
+    el.addEventListener("dblclick",e=>{ e.stopPropagation(); if(clickTimer){clearTimeout(clickTimer);clickTimer=null;} if(linking||editing)return; toggleFoco(node); }); }
+  function toggleOff(node){ if(off.has(node.id))off.delete(node.id); else off.add(node.id); renderMap();
+    toast(off.has(node.id)?`Rama apagada · ${node.name}`:`Rama prendida · ${node.name}`); }
+  function toggleFoco(node){ const mismo=focoRama===node.id; focoRama=mismo?null:node.id;
+    // La rama encendida no puede quedar escondida por el filtro de capas.
+    if(focoRama&&oculto(node)){ fCapa.value=""; llenarFiltroCapa(); }
+    renderMap();
+    toast(mismo?"Vuelve a verse todo":`Rama encendida · ${node.name}`); }
   function onLinkClick(node){ if(!linkSrc){ linkSrc=node.id; renderMap(); toast("Elegí el segundo tema para vincular"); return; } if(linkSrc===node.id){ linkSrc=null; renderMap(); return; } addLinkBetween(linkSrc,node.id); linkSrc=null; toast("Vínculo creado ✦"); renderMap(); }
   function addLinkBetween(a,b){ const na=N(a),nb=N(b); if(!na||!nb)return; if(!na.links.includes(b))na.links.push(b); if(!nb.links.includes(a))nb.links.push(a); save(); }
   function removeLink(a,b){ const na=N(a),nb=N(b); if(na)na.links=na.links.filter(x=>x!==b); if(nb)nb.links=nb.links.filter(x=>x!==a); if(EM())delete EM()[keyFor(a,b)]; save(); }
@@ -638,7 +697,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const NEU_HUES=[210,168,150,90,45,28,8,340,300,265,190,120];
   const LINE_COLORS=["#8a6aa8","#2f9e8a","#4a86c4","#d19a34","#c15b46","#6f9a6a"];
   function openAspect(node){ closePops(); selId=node.id; renderMap(); const el=document.createElement("div"); el.className="pop"; const cur=node.hue!=null?node.hue:200;
-    el.innerHTML=`<div class="pop-h">Aspecto · ${esc(node.name)}</div><div class="pop-l">Color</div><div class="swatches">${NEU_HUES.map(hh=>`<span class="sw${node.hue===hh?' on':''}" data-h="${hh}" style="background:hsl(${hh} 45% 50%)"></span>`).join("")}</div><input type="range" class="hue" min="0" max="360" value="${cur}"><button class="tiny inherit">↺ Color por nivel (auto)</button><div class="pop-l">Tamaño</div><input type="range" class="size" min="0.6" max="2" step="0.05" value="${node.scale||1}"><div class="pop-actions"><button class="btn done">Listo</button></div>`;
+    el.innerHTML=`<div class="pop-h">Aspecto · ${esc(node.name)}</div><div class="pop-l">Color</div><div class="swatches">${NEU_HUES.map(hh=>`<span class="sw${node.hue===hh?' on':''}" data-h="${hh}" style="background:hsl(${hh} 45% 50%)"></span>`).join("")}</div><input type="range" class="hue" min="0" max="360" value="${cur}"><button class="tiny inherit">↺ Color por capa (auto)</button><div class="pop-l">Tamaño</div><input type="range" class="size" min="0.6" max="2" step="0.05" value="${node.scale||1}"><div class="pop-actions"><button class="btn done">Listo</button></div>`;
     viewport.appendChild(el); placePop(el,OX+node.x,OY+node.y);
     const liveS=()=>{ const e=document.querySelector(`.neu[data-id="${node.id}"]`); if(e)e.style.width=baseSize(node)+"px"; };
     el.querySelectorAll("[data-h]").forEach(s=>s.addEventListener("click",()=>{ node.hue=+s.dataset.h; save(); renderMap(); el.querySelectorAll(".sw").forEach(x=>x.classList.toggle("on",+x.dataset.h===node.hue)); el.querySelector(".hue").value=node.hue; }));
@@ -660,7 +719,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     viewport.addEventListener("pointerdown",e=>{ if(e.target.closest(".neu")||e.target.closest(".zoomctl")||e.target.closest(".maptools")||e.target.closest(".pop")||e.target.closest(".ehandle"))return; if(e.target.classList&&e.target.classList.contains("hit"))return; closePops(); pan=true;moved=false; viewport.classList.add("grabbing"); sx=e.clientX;sy=e.clientY;tx0=cam.tx;ty0=cam.ty; viewport.setPointerCapture(e.pointerId); });
     viewport.addEventListener("pointermove",e=>{ if(!pan)return; if(Math.abs(e.clientX-sx)>3||Math.abs(e.clientY-sy)>3)moved=true; cam.tx=tx0+(e.clientX-sx); cam.ty=ty0+(e.clientY-sy); applyCam(); });
     viewport.addEventListener("pointerup",()=>{ if(!pan)return; pan=false; viewport.classList.remove("grabbing"); if(!moved){ selId=null; document.querySelectorAll(".neu.sel").forEach(x=>x.classList.remove("sel")); } });
-    viewport.addEventListener("dblclick",e=>{ if(e.target.closest(".neu")||e.target.closest(".maptools"))return; off.clear(); renderMap(); toast("Todo prendido"); });
+    // Doble clic en el fondo: la salida de emergencia. Deshace las dos formas
+    // de haber achicado el mapa —lo apagado a mano y la rama encendida—, y
+    // también el filtro de capas, que si no sigue escondiendo en silencio.
+    viewport.addEventListener("dblclick",e=>{ if(e.target.closest(".neu")||e.target.closest(".maptools"))return;
+      off.clear(); focoRama=null; if(fCapa)fCapa.value=""; renderMap(); toast("Todo a la vista"); });
     viewport.addEventListener("wheel",e=>{ e.preventDefault(); closePops(); const r=viewport.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,wx=(mx-cam.tx)/cam.s,wy=(my-cam.ty)/cam.s,f=e.deltaY<0?1.12:1/1.12; cam.s=Math.max(.1,Math.min(3,cam.s*f)); cam.tx=mx-wx*cam.s; cam.ty=my-wy*cam.s; applyCam(); },{passive:false}); })();
   document.getElementById("zin").addEventListener("click",()=>{ closePops(); cam.s=Math.min(3,cam.s*1.2); applyCam(); });
   document.getElementById("zout").addEventListener("click",()=>{ closePops(); cam.s=Math.max(.1,cam.s/1.2); applyCam(); });
@@ -1187,7 +1250,6 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <div class="cfgsec"><div class="lab">Cómo se ve</div>
         <div class="cfgrow"><span class="lbl">Tema</span>
           <div class="segpal" id="cfgTema">
-            <button data-t="" class="${temaActual===""?"on":""}">Automático</button>
             <button data-t="light" class="${temaActual==="light"?"on":""}">Claro</button>
             <button data-t="dark" class="${temaActual==="dark"?"on":""}">Oscuro</button></div></div>
         <div class="cfgrow"><span class="lbl">Paleta de fondo</span>
@@ -1224,7 +1286,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const m=miembroPorEmail(miEmail); if(m)m.color=c;
       save(); renderActive(); }));
     document.getElementById("cfgTema").querySelectorAll("[data-t]").forEach(b=>b.addEventListener("click",()=>{
-      const t=b.dataset.t; state.theme=t||null; applyTheme(state.theme); save(); renderActive(); }));
+      state.theme=b.dataset.t; applyTheme(state.theme); save(); renderActive(); }));
     document.getElementById("cfgPal").querySelectorAll("[data-p]").forEach(b=>b.addEventListener("click",()=>{
       state.palette=b.dataset.p; applyPalette(state.palette); save(); renderActive(); }));
     document.getElementById("cfgBackup").addEventListener("click",descargarRespaldo);
@@ -1634,7 +1696,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("ntTitle").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); createNT(); } });
   ntModal.addEventListener("click",e=>{ if(e.target===ntModal)closeNT(); });
 
-  fPerson.addEventListener("change",renderActive); fStatus.addEventListener("change",renderActive);
+  fPerson.addEventListener("change",renderActive); fCapa.addEventListener("change",renderActive);
   document.getElementById("weekGoals").addEventListener("input",e=>{ state.weekGoals=e.target.value; save(); });
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
   document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
@@ -1681,9 +1743,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // detener la propagación, que es frágil cuando hay varios menús.
   document.addEventListener("click",e=>{ if(e.target.closest&&e.target.closest(".avisos"))return;
     const m=document.getElementById("avisosMenu"); if(m)m.classList.remove("on"); });
-  document.getElementById("themeBtn").addEventListener("click",()=>{ let cur=document.documentElement.getAttribute("data-theme");
-    if(!cur)cur=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; // sin esto, el 1er clic no hacía nada
-    const next=cur==="dark"?"light":"dark"; state.theme=next; applyTheme(next); save(); renderActive(); });
+  document.getElementById("themeBtn").addEventListener("click",()=>{
+    const next=state.theme==="dark"?"light":"dark"; state.theme=next; applyTheme(next); save(); renderActive(); });
   // Respaldo e importación: viven en Configuración, no en un botón de la barra.
   // El volcado del estado completo salía en pantalla y exponía datos de todos.
   function descargarRespaldo(){
@@ -1732,7 +1793,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(state.me){ state.tasksSeen=state.tasksSeen||{};
     if(!Array.isArray(state.tasksSeen[state.me]))
       state.tasksSeen[state.me]=activeItems().filter(x=>ownersOf(x.k).includes(state.me)).map(x=>x.k.id); }
-  applyTheme(state.theme||null); applyPalette(state.palette||"carbon");
+  // El tema ya no tiene opción "Automático": es claro u oscuro y se recuerda.
+  // A quien nunca eligió se le fija el que YA estaba viendo (el del sistema),
+  // así la app no le cambia de cara sola; de ahí en más manda su elección.
+  if(!state.theme){ state.theme=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; saveLocalPrefs(state); }
+  applyTheme(state.theme); applyPalette(state.palette||"carbon");
   sweepArchive(); loadTreeOpen(); syncPeopleList();
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
   if(!seed) save();                                // base vacía: sembrar
