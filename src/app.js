@@ -800,7 +800,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.querySelectorAll(".restore").forEach(b=>b.addEventListener("click",()=>{ const [nid,iid]=b.dataset.r.split("|"); let k=null; if(nid==="__priv")k=privL().find(x=>x.id===iid); else { const n=N(nid); k=n&&(n.items||[]).find(x=>x.id===iid); } if(!k)return; setStatus(k,"curso"); save(); renderArchivo(); refreshChrome(); })); }
 
   // ---------- DRIVE ----------
-  let driveQuery="", fmTarget=null;
+  // El filtro del Drive es una vista personal: vive acá, no en el estado, así
+  // que filtrar no le cambia la pantalla a nadie más.
+  let driveQuery="", driveTema="", fmTarget=null;
   function openFileModal(target){ fmTarget=target; // target: {kind:"node"|"task"|"pick", node, task}
     document.getElementById("fmUrl").value=""; const fmn=document.getElementById("fmName"); fmn.value=""; fmn.dataset.touched="";
     const wrap=document.getElementById("fmWhereWrap"), sel=document.getElementById("fmWhere");
@@ -825,10 +827,23 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     filesOf(owner).push(f); save(); closeFM(); renderActive();
     if(panelOpen&&N(selId))renderPanelBody(N(selId));
     if(taskOpen)renderTFiles(); }
+  function llenarFiltroDrive(){
+    const sel=document.getElementById("driveTema"); if(!sel)return;
+    const abierto=document.activeElement===sel;
+    if(!abierto) sel.innerHTML='<option value="">Todos los temas</option>'+nodeOptionsHTML(driveTema,true);
+    sel.value=driveTema;
+    const b=document.getElementById("driveTemaClear"); if(b)b.hidden=!driveTema;
+    sel.classList.toggle("act",!!driveTema); }
   function renderDrive(){ const box=document.getElementById("driveBody"); const q=norm(driveQuery.trim());
     let all=allFiles();
     if(q)all=all.filter(x=>norm(x.f.name).includes(q)||norm(x.f.url).includes(q)||norm(pathOf(x.node.id).map(z=>z.name).join(" ")).includes(q)||norm(x.task?x.task.title:"").includes(q));
-    if(!all.length){ box.innerHTML=`<div class="ph"><b>${driveQuery.trim()?"Sin resultados":"Todavía no hay archivos vinculados"}</b><div style="margin-top:6px;font-size:13px">${driveQuery.trim()?"Probá con otro nombre, o con el nombre del tema.":"Vinculá el primero desde la ficha de un tema o de una tarea."}</div></div>`; return; }
+    // Elegir un tema muestra lo suyo y lo de sus sub-temas: entrás a PNP y ves
+    // todo lo que cuelga de ahí, no solo lo pegado al tema exacto.
+    if(driveTema&&N(driveTema))all=all.filter(x=>inSubtree(x.node.id,driveTema));
+    else if(driveTema)driveTema="";
+    llenarFiltroDrive();
+    if(!all.length){ const filtrando=driveQuery.trim()||driveTema;
+      box.innerHTML=`<div class="ph"><b>${filtrando?"Sin resultados":"Todavía no hay archivos vinculados"}</b><div style="margin-top:6px;font-size:13px">${driveQuery.trim()?"Probá con otro nombre, o con el nombre del tema.":"Vinculá el primero desde la ficha de un tema o de una tarea."}</div></div>`; return; }
     // Un archivo pertenece al tema o sub-tema donde se lo vinculó. Se agrupa por
     // ese tema exacto y los temas se listan en el orden del árbol: así el Drive
     // es un espejo de la Estructura y no una lista suelta de links.
@@ -1438,6 +1453,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("groupModal").addEventListener("click",e=>{ if(e.target.id==="groupModal")closeGM(); });
   document.getElementById("gmName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveGM(); } });
   document.getElementById("driveSearch").addEventListener("input",e=>{ driveQuery=e.target.value; renderDrive(); });
+  document.getElementById("driveTema").addEventListener("change",e=>{ driveTema=e.target.value; renderDrive(); });
+  document.getElementById("driveTemaClear").addEventListener("click",()=>{ driveTema=""; renderDrive(); });
   document.getElementById("driveAdd").addEventListener("click",()=>openFileModal({kind:"pick"}));
   document.getElementById("pAddFile").addEventListener("click",()=>{ const n=N(selId); if(!n)return; openFileModal({kind:"node",node:n}); });
   document.getElementById("tAddFile").addEventListener("click",()=>{ const k=curTask(); if(!k)return; openFileModal({kind:"task",task:k}); });

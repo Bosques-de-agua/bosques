@@ -1,4 +1,5 @@
   :root{
+    color-scheme:light;
     --bg:#f3f0e8; --bg-2:#eae4d7; --panel:#fffdf8; --surface:#fffefb; --surface-2:#f1ece0; --surface-3:#e7e0cf;
     --ink:#2c2a25; --ink-soft:#6c665a; --ink-faint:#6A6455;
     --line:#e3dccc; --line-soft:#efe9db;
@@ -39,8 +40,9 @@
     --font-mono:ui-monospace,"Geist Mono","IBM Plex Mono",Menlo,Consolas,monospace;
   }
   :root[data-theme="dark"]{
-    --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
-    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#8D948A;
+    color-scheme:dark;
+    color-scheme:dark; --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
+    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#959C92;
     --line:#343a35; --line-soft:#2a2f2b;
     --wood:#48c4ac; --wood-deep:#3aa892;
     --olive:#5cba82; --clay:#dd7a62; --sky:#6fa6dc;
@@ -53,8 +55,8 @@
     --shadow-lg:0 24px 64px rgba(0,0,0,.62);
   }
   @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
-    --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
-    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#8D948A;
+    color-scheme:dark; --bg:#1e211f; --bg-2:#181b19; --panel:#262a27; --surface:#2b2f2c; --surface-2:#242825; --surface-3:#1f2320;
+    --ink:#e9ede8; --ink-soft:#a9b0a6; --ink-faint:#959C92;
     --line:#343a35; --line-soft:#2a2f2b;
     --wood:#48c4ac; --wood-deep:#3aa892;
     --olive:#5cba82; --clay:#dd7a62; --sky:#6fa6dc;
@@ -580,21 +582,21 @@
 
   /* ── PAPEL ── */
   :root[data-palette="papel"]{
-    --bg:#F5F1E6; --bg-2:#EDE7D8; --panel:#FCFAF3; --surface:#FCFAF3; --surface-2:#F0EADC; --surface-3:#E5DDCB;
+    color-scheme:light; --bg:#F5F1E6; --bg-2:#EDE7D8; --panel:#FCFAF3; --surface:#FCFAF3; --surface-2:#F0EADC; --surface-3:#E5DDCB;
     --ink:#2A2620; --ink-soft:#5B564C; --ink-faint:#6B665B; --line:#E0D7C4; --line-soft:#EDE7D9;
     --wood:#9E5A2F; --wood-deep:#7E4522; --on-primary:#FCFAF3;
     --l1:#9E5A2F; --l2:#6B7B4E; --l3:#4F7288; --l4:#8A6B41; --l5:#7E5A73; --l6:#5A6560;
     --link:#6E5E78; --olive:#6B7B4E; --clay:#9E5A2F;
   }
   :root[data-palette="papel"][data-theme="dark"]{
-    --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
+    color-scheme:dark; --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
     --ink:#EDE5D6; --ink-soft:#B0A794; --ink-faint:#8E877A; --line:#3A3226; --line-soft:#2C2620;
     --wood:#D89A64; --wood-deep:#B87F4E; --on-primary:#1A1409;
     --l1:#D89A64; --l2:#97A87A; --l3:#83A3BA; --l4:#C0A277; --l5:#B491AC; --l6:#86938D;
     --link:#B49CC0; --olive:#97A87A; --clay:#D89A64;
   }
   @media (prefers-color-scheme:dark){ :root[data-palette="papel"]:not([data-theme="light"]){
-    --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
+    color-scheme:dark; --bg:#191510; --bg-2:#131009; --panel:#221D16; --surface:#26211A; --surface-2:#1F1A14; --surface-3:#2B251D;
     --ink:#EDE5D6; --ink-soft:#B0A794; --ink-faint:#8E877A; --line:#3A3226; --line-soft:#2C2620;
     --wood:#D89A64; --wood-deep:#B87F4E; --on-primary:#1A1409;
     --l1:#D89A64; --l2:#97A87A; --l3:#83A3BA; --l4:#C0A277; --l5:#B491AC; --l6:#86938D;
@@ -603,21 +605,21 @@
 
   /* ── PIZARRA ── */
   :root[data-palette="pizarra"]{
-    --bg:#ECEFF2; --bg-2:#E2E7EC; --panel:#FAFBFC; --surface:#FAFBFC; --surface-2:#E9EDF1; --surface-3:#DCE2E8;
+    color-scheme:light; --bg:#ECEFF2; --bg-2:#E2E7EC; --panel:#FAFBFC; --surface:#FAFBFC; --surface-2:#E9EDF1; --surface-3:#DCE2E8;
     --ink:#1C232A; --ink-soft:#545E68; --ink-faint:#646E78; --line:#D5DCE3; --line-soft:#E6EBF0;
     --wood:#2C6488; --wood-deep:#1F4A67; --on-primary:#FAFBFC;
     --l1:#2C6488; --l2:#47765F; --l3:#64578A; --l4:#7A6642; --l5:#874F6B; --l6:#4F5B66;
     --link:#64578A; --olive:#47765F; --clay:#9A5340;
   }
   :root[data-palette="pizarra"][data-theme="dark"]{
-    --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
+    color-scheme:dark; --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
     --ink:#E2E8EE; --ink-soft:#A3AFBA; --ink-faint:#8A95A0; --line:#2A323B; --line-soft:#202730;
     --wood:#74AEDC; --wood-deep:#5A90BC; --on-primary:#0B1015;
     --l1:#74AEDC; --l2:#7FB89A; --l3:#A093D0; --l4:#C0A277; --l5:#CE8DAE; --l6:#8697A6;
     --link:#A093D0; --olive:#7FB89A; --clay:#D08268;
   }
   @media (prefers-color-scheme:dark){ :root[data-palette="pizarra"]:not([data-theme="light"]){
-    --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
+    color-scheme:dark; --bg:#0E1216; --bg-2:#0A0D10; --panel:#151A20; --surface:#191F26; --surface-2:#141920; --surface-3:#1E252D;
     --ink:#E2E8EE; --ink-soft:#A3AFBA; --ink-faint:#8A95A0; --line:#2A323B; --line-soft:#202730;
     --wood:#74AEDC; --wood-deep:#5A90BC; --on-primary:#0B1015;
     --l1:#74AEDC; --l2:#7FB89A; --l3:#A093D0; --l4:#C0A277; --l5:#CE8DAE; --l6:#8697A6;
@@ -687,7 +689,7 @@
   /* --- versión oscura: la principal. Carbón y metal cálido. --- */
   /* Elegida a mano. */
   :root[data-palette="carbon"][data-theme="dark"]{
-    --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
+    color-scheme:dark; --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
     --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
     --line:#292C2E; --line-soft:#202326;
     --wood:#C9A66B; --wood-deep:#A88C60;
@@ -707,7 +709,7 @@
   }
   /* Siguiendo al sistema, igual que las otras paletas. */
   @media (prefers-color-scheme:dark){ :root[data-palette="carbon"]:not([data-theme="light"]){
-    --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
+    color-scheme:dark; --bg:#0D0F10; --bg-2:#0A0B0C; --panel:#121416; --surface:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
     --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
     --line:#292C2E; --line-soft:#202326;
     --wood:#C9A66B; --wood-deep:#A88C60;
@@ -860,6 +862,7 @@
      Además la portada es siempre oscura, en cualquier tema — es la primera
      impresión de la app y el nombre tiene que resaltar sobre el carbón. */
   .login-screen{
+    color-scheme:dark;
     --bg:#0D0F10; --panel:#151719; --surface-2:#191C1E; --surface-3:#1E2123;
     --ink:#E6E1D8; --ink-soft:#AAA49A; --ink-faint:#8F8A80;
     --line:#292C2E; --wood:#C9A66B; --wood-deep:#C9A66B; --s-bloq:#C97263;
@@ -1070,3 +1073,21 @@
     white-space:normal;text-align:center;box-shadow:var(--shadow-lg)}
   .savestate.mal .rowbtn{background:transparent;border-color:#FFF1EC;color:#FFF1EC;font-weight:600;flex:none}
   .savestate.mal .rowbtn:hover{background:rgba(255,241,236,.18);color:#FFF1EC}
+
+
+  /* El filtro por tema del Drive, al lado del buscador. */
+  .drivetema{width:auto;max-width:280px;flex:0 1 240px;font-size:12.5px;padding:6px 9px;cursor:pointer}
+  .drivetema.act{border-color:var(--wood);box-shadow:inset 2px 0 0 var(--wood)}
+
+  /* ══════════════ BARRAS DE DESPLAZAMIENTO ══════════════
+     Por defecto el navegador las dibuja blancas y quedaban como una cicatriz
+     al costado del carbón. color-scheme le avisa al sistema en qué tema
+     estamos —eso arregla también los desplegables y los selectores de fecha
+     nativos— y encima se les da una forma más discreta. */
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--surface-3);border:3px solid transparent;
+    background-clip:padding-box;border-radius:var(--r-pill)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--ink-faint);background-clip:padding-box}
+  ::-webkit-scrollbar-corner{background:transparent}
+  html{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
