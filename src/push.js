@@ -134,9 +134,13 @@ export function initPush() {
   };
 }
 
+const ICONO_CAMPANA = '<svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3a4 4 0 0 0-4 4c0 3.5-1.2 4.6-1.6 5A.5.5 0 0 0 4.7 13h10.6a.5.5 0 0 0 .3-.9c-.4-.4-1.6-1.5-1.6-5a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.4 15.5a1.8 1.8 0 0 0 3.2 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const ICONO_CAMPANA_TACHADA = '<svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3a4 4 0 0 0-4 4c0 3.5-1.2 4.6-1.6 5A.5.5 0 0 0 4.7 13h10.6a.5.5 0 0 0 .3-.9c-.4-.4-1.6-1.5-1.6-5a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.4 15.5a1.8 1.8 0 0 0 3.2 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 4l12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
 function render(btn, on) {
   btn.dataset.on = on ? "1" : "0";
-  btn.textContent = on ? "🔔 Activadas" : "🔕 Activar";
+  // Iconos de línea, como en toda la aplicación: toman el color del texto.
+  btn.innerHTML = (on ? ICONO_CAMPANA : ICONO_CAMPANA_TACHADA) + (on ? " Activadas" : " Activar");
   btn.classList.toggle("on", on);
 }
 

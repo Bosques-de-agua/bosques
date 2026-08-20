@@ -1122,8 +1122,23 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.getElementById("cfgPal").querySelectorAll("[data-p]").forEach(b=>b.addEventListener("click",()=>{
       state.palette=b.dataset.p; applyPalette(state.palette); save(); renderActive(); }));
     document.getElementById("cfgBackup").addEventListener("click",descargarRespaldo);
+    // Se elige el archivo .json que se descargó. Pegarlo a mano era inviable:
+    // son decenas de miles de caracteres, y en un teléfono directamente no se
+    // puede. Queda el pegado como salida de emergencia por si el archivo no
+    // está a mano.
+    const fileRestore=document.getElementById("restoreFile");
     document.getElementById("cfgRestore").addEventListener("click",()=>{
-      dialog({title:"Importar respaldo",msg:"Pegá el contenido del archivo de respaldo.",input:true,placeholder:"{ … }",yes:"Importar",cb:t=>{ if(t&&t.trim())importarRespaldo(t.trim()); }}); });
+      if(fileRestore){ fileRestore.value=""; fileRestore.click(); }
+      else dialog({title:"Importar respaldo",msg:"Pegá el contenido del archivo de respaldo.",input:true,placeholder:"{ … }",yes:"Importar",cb:t=>{ if(t&&t.trim())importarRespaldo(t.trim()); }}); });
+    if(fileRestore&&!fileRestore.dataset.listo){ fileRestore.dataset.listo="1";
+      fileRestore.addEventListener("change",()=>{ const f=fileRestore.files&&fileRestore.files[0]; if(!f)return;
+        if(f.size>25*1024*1024){ note("Ese archivo es demasiado grande para ser un respaldo."); return; }
+        const lector=new FileReader();
+        lector.onerror=()=>note("No se pudo leer el archivo.");
+        lector.onload=()=>{ const txt=String(lector.result||"").trim();
+          if(!txt){ note("El archivo está vacío."); return; }
+          importarRespaldo(txt); };
+        lector.readAsText(f); }); }
     const inv=document.getElementById("cfgInvitar");
     const invitar=()=>{ const v=inv.value.trim(); if(!v)return;
       if(!inviteEmail){ note("Todavía no se puede invitar desde acá."); return; }
