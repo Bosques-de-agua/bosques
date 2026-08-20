@@ -43,11 +43,15 @@ const nada = async () => {};
 // las preferencias personales no se cuelan en el payload compartido.
 window.__push = { compartido: null, privado: null, veces: 0 };
 window.__fallaGuardado = false;
+// startApp() siembra el ejemplo, y sembrar ya dispara un guardado: ese primer
+// aviso llega ANTES de que exista `app`, así que no tiene a quién avisarle.
+// Se lo deja pasar en vez de romper el arranque con un error en consola.
+const avisar = (...a) => { try { app.mostrarEstadoGuardado(...a); } catch (e) {} };
 const espiaCompartido = async (d) => {
   window.__push.compartido = d; window.__push.veces++;
-  if (window.__fallaGuardado) { app.mostrarEstadoGuardado("error", { message: "fallo simulado" }); return; }
-  app.mostrarEstadoGuardado("guardando");
-  setTimeout(() => { if (!window.__fallaGuardado) app.mostrarEstadoGuardado("guardado"); }, 60);
+  if (window.__fallaGuardado) { avisar("error", { message: "fallo simulado" }); return; }
+  avisar("guardando");
+  setTimeout(() => { if (!window.__fallaGuardado) avisar("guardado"); }, 60);
 };
 const espiaPrivado = async (d) => { window.__push.privado = d; };
 
