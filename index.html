@@ -29,12 +29,26 @@
   </div>
 <div id="app">
   <header class="topbar">
-    <button class="btn btn-icon sbtoggle" id="sbToggle" title="Esconder el menú" aria-label="Esconder el menú" aria-expanded="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-    <div class="brand"><span class="mark"><img src="/bda-isotipo.png" alt="" /></span><b>Mesa de trabajo</b></div>
-    <div class="spacer"></div>
-    <div class="filters">
+    <div class="brand"><img class="mark" src="/bda-isotipo.png" alt="Bosques de Agua" /><span class="btxt"><b>Mesa de trabajo</b><span class="bsub">Bosques de Agua</span></span></div>
+    <div class="topctx" id="topCtx" hidden>
+      <div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div>
+      <span class="ctxdiv" id="ctxDiv"></span>
+          <button class="btn" id="linkMode"><svg viewBox="0 0 20 20" fill="none"><path d="M8 12l4-4M7 13a3 3 0 0 1 0-4l1-1M13 7a3 3 0 0 1 0 4l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Vincular</button>
+          <button class="btn" id="editMode"><svg viewBox="0 0 20 20" fill="none"><path d="M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Editar</button>
+          <button class="btn btn-primary" id="addNode"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="addLabel">Nuevo tema</span></button>
+          <span class="infob" tabindex="0" style="margin-left:2px;align-self:center">i<span class="infopop"><b>El mapa del proyecto</b><ul>
+            <li><b>Un clic</b> en un globo abre su ficha. <b>Doble clic</b> lo apaga, para ir despejando el mapa.</li>
+            <li><b>Arrastrá el fondo</b> para moverte; la rueda hace zoom y ⤢ encuadra todo.</li>
+            <li><b>Vincular</b>: tocá dos temas para conectarlos, aunque estén en ramas distintas.</li>
+            <li><b>Editar</b>: cambiá color y tamaño de un tema, o curvá las líneas arrastrándolas.</li>
+            <li>Los filtros de arriba atenúan los temas que no correspondan.</li></ul></span></span>
       <div class="filt" id="filtPersona"><label>Persona</label><select id="fPerson"><option value="">Todas</option></select></div>
       <div class="filt" id="filtEstado"><label>Estado</label><select id="fStatus"><option value="">Todos</option><option value="curso">En curso</option><option value="espera">En espera</option><option value="sin">Sin empezar</option><option value="listo">Terminado</option></select></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="filters">
+
+
       <div class="filt" id="filtSos" hidden></div>
       <div class="avisos">
         <button class="btn btn-icon" id="avisosBtn" title="Novedades" aria-label="Novedades"><svg viewBox="0 0 20 20" fill="none"><path d="M10 3a4 4 0 0 0-4 4c0 3.5-1.2 4.6-1.6 5A.5.5 0 0 0 4.7 13h10.6a.5.5 0 0 0 .3-.9c-.4-.4-1.6-1.5-1.6-5a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.4 15.5a1.8 1.8 0 0 0 3.2 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="navbadge" id="avisosBadge" hidden></span></button>
@@ -46,27 +60,23 @@
 
   <aside class="sidebar" id="sidebar" aria-label="Secciones">
     <nav class="sbgroup">
-      <div class="sblab">Mi espacio</div>
       <button class="navtab sbitem" data-tab="panel" title="Mi panel"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Mi panel</span></button>
       <div class="sbsubs" id="panelSubs">
-        <button class="sbsub" data-sec="calMount">Calendario</button>
-        <button class="sbsub" data-sec="upcoming">Próximos eventos</button>
-        <button class="sbsub" data-sec="myTasks">Mi foco</button>
-        <button class="sbsub" data-sec="myNotes">Mis notas</button>
+      <button class="sbsub" data-view="cal">Calendario</button>
+      <button class="sbsub" data-view="upcoming">Próximos eventos</button>
+      <button class="sbsub" data-view="foco">Mi foco</button>
+      <button class="sbsub" data-view="notas">Mis notas</button>
       </div>
-    </nav>
-    <nav class="sbgroup">
-      <div class="sblab">El proyecto</div>
-      <button class="navtab sbitem" data-tab="tareas" title="Tareas"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="4.5" height="14" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="4.5" height="9" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="3" width="2" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Tareas</span></button>
+      <span class="sbsep"></span>
       <button class="navtab sbitem" data-tab="estructura" title="Estructura"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5h12M7 10h9M10 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="sblbl">Estructura</span></button>
-    </nav>
-    <nav class="sbgroup">
-      <div class="sblab">Material</div>
+      <button class="navtab sbitem" data-tab="tareas" title="Tareas"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="4.5" height="14" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="4.5" height="9" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="3" width="2" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Tareas</span></button>
+      <span class="sbsep"></span>
       <button class="navtab sbitem" data-tab="chat" title="Chat"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6A1.5 1.5 0 0 1 14.5 13H8l-3.5 3v-3H5.5A1.5 1.5 0 0 1 4 11.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="sblbl">Chat</span><span class="navbadge" id="chatBadge" hidden></span></button>
       <button class="navtab sbitem" data-tab="drive" title="Drive"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 3h5l5 8.5h-5zM7.5 3l-5 8.5L5 16l5-8.5zM5 16h10l2.5-4.5H7.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="sblbl">Drive</span></button>
       <button class="navtab sbitem" data-tab="archivo" title="Archivo"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 8v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8M8 11h4" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Archivo</span></button>
     </nav>
     <div class="sbfoot">
+      <button class="sbitem sbtoggle" id="sbToggle" title="Plegar el menú" aria-expanded="true"><svg viewBox="0 0 20 20" fill="none"><path d="M11.5 6L7.5 10l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 4v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="sblbl">Plegar el menú</span></button>
       <button class="navtab sbitem" data-tab="config" title="Configuración"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.6v1.6M10 15.8v1.6M17.4 10h-1.6M4.2 10H2.6M15.2 4.8l-1.1 1.1M5.9 14.1l-1.1 1.1M15.2 15.2l-1.1-1.1M5.9 5.9L4.8 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="sblbl">Configuración</span></button>
     </div>
   </aside>
@@ -76,9 +86,9 @@
     <section class="tab" id="tab-panel"><div class="wrap">
       <h1 class="h1">Mi panel<span class="infob" tabindex="0">i<span class="infopop"><b>Tu día, solo lo tuyo</b><ul>
         <li>En el <b>calendario</b> ves los eventos del equipo y tus tareas con fecha. Tocá un día vacío para crear un evento.</li>
-        <li>Al abrir un evento tenés <b>📅 Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
+        <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
         <li><b>Tu foco</b> son las tareas del equipo a tu nombre, agrupadas por estado. El casillero las marca como terminadas.</li>
-        <li><b>🔒 Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
+        <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
         <li>Tu <b>foto</b> y <b>tu color</b> te identifican en toda la app.</li></ul></span></span></h1>
       <div id="calMount" style="margin-top:18px"></div>
@@ -98,21 +108,10 @@
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
         <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span></h1>
       <div class="srchbar"><input class="srch" id="estSearch" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
-      <div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div>
+
       <div class="estwrap-mapa" id="estMapaWrap" hidden>
       <div class="viewport" id="viewport">
         <div class="grid"></div>
-        <div class="maptools">
-          <button class="btn" id="linkMode"><svg viewBox="0 0 20 20" fill="none"><path d="M8 12l4-4M7 13a3 3 0 0 1 0-4l1-1M13 7a3 3 0 0 1 0 4l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Vincular</button>
-          <button class="btn" id="editMode"><svg viewBox="0 0 20 20" fill="none"><path d="M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Editar</button>
-          <button class="btn btn-primary" id="addNode"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="addLabel">Nuevo tema</span></button>
-          <span class="infob" tabindex="0" style="margin-left:2px;align-self:center">i<span class="infopop"><b>El mapa del proyecto</b><ul>
-            <li><b>Un clic</b> en un globo abre su ficha. <b>Doble clic</b> lo apaga, para ir despejando el mapa.</li>
-            <li><b>Arrastrá el fondo</b> para moverte; la rueda hace zoom y ⤢ encuadra todo.</li>
-            <li><b>Vincular</b>: tocá dos temas para conectarlos, aunque estén en ramas distintas.</li>
-            <li><b>Editar</b>: cambiá color y tamaño de un tema, o curvá las líneas arrastrándolas.</li>
-            <li>Los filtros de arriba atenúan los temas que no correspondan.</li></ul></span></span>
-        </div>
         <div class="world" id="world"><div class="worldInner" id="worldInner"><svg class="synapses" id="synapses" width="6000" height="4000"></svg><div class="handles" id="handles"></div></div></div>
         <div class="zoomctl"><button class="btn btn-icon" id="zin">＋</button><button class="btn btn-icon" id="zout">－</button><button class="btn btn-icon" id="zfit" title="Ver todo">⤢</button></div>
       </div>
@@ -125,7 +124,7 @@
         <li><b>Vista</b> cambia cómo se agrupan las columnas: por estado, por persona o por prioridad. No filtra nada, solo reordena.</li>
         <li><b>Filtros</b> sí achica lo que se ve. Se pueden marcar varios a la vez y se cruzan entre sí: por ejemplo "En curso" + "Nico" + un tema.</li>
         <li><b>Arrastrá una tarjeta</b> de una columna a otra para cambiarle el estado, el responsable o el tema, según la vista en la que estés.</li>
-        <li>El <b>casillero</b> de la tarjeta la marca como terminada. Las terminadas se archivan solas a los 7 días, o mandalas antes con el botón 🗃️.</li>
+        <li>El <b>casillero</b> de la tarjeta la marca como terminada. Las terminadas se archivan solas a los 7 días, o mandalas antes con el botón de archivar.</li>
         <li>Un clic en la tarjeta abre su ficha con objetivo, notas y responsables.</li>
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li></ul></span></span></h1>
       <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
@@ -149,7 +148,7 @@
         <div class="chatmain">
           <div class="chathead" id="chatHead"></div>
           <div class="msgs" id="msgs"></div>
-          <div class="composer"><button class="btn btn-icon" id="attachBtn" title="Adjuntar un archivo">📎</button><input type="file" id="chatFile" hidden><input id="msgInput" placeholder="Escribí un mensaje…"><button class="btn btn-primary" id="sendMsg">Enviar</button></div>
+          <div class="composer"><button class="btn btn-icon" id="attachBtn" title="Adjuntar un archivo"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M13.6 9.4l-4.3 4.3a2.6 2.6 0 0 1-3.7-3.7l5.1-5.1a1.8 1.8 0 0 1 2.5 2.5l-5 5a1 1 0 0 1-1.4-1.4l4.4-4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><input type="file" id="chatFile" hidden><input id="msgInput" placeholder="Escribí un mensaje…"><button class="btn btn-primary" id="sendMsg">Enviar</button></div>
         </div>
       </div>
     </section>
@@ -166,10 +165,10 @@
 
     <section class="tab" id="tab-archivo"><div class="wrap">
       <h1 class="h1">Archivo<span class="infob" tabindex="0">i<span class="infopop"><b>Lo que ya está hecho</b><ul>
-        <li>Una tarea terminada se archiva sola a los <b>7 días</b>, o la mandás antes con el botón 🗃️.</li>
+        <li>Una tarea terminada se archiva sola a los <b>7 días</b>, o la mandás antes con el botón de archivar.</li>
         <li>Se ordenan por fecha de archivado: <b>la última arriba</b>.</li>
         <li><b>Restaurar</b> la devuelve a su tema como "En curso".</li>
-        <li>Tus privadas archivadas aparecen marcadas 🔒 y solo las ves vos.</li></ul></span></span></h1>
+        <li>Tus privadas archivadas aparecen marcadas como privadas y solo las ves vos.</li></ul></span></span></h1>
       <div id="archivoBody"></div>
     </div></section>
   </main>
@@ -218,7 +217,7 @@
     <div class="sec"><div class="sh"><h3>Pertenece a</h3></div><div id="tBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="tAddFile">＋ archivo de Drive</button></div><div id="tFiles"></div></div>
   </div>
-  <div class="pfoot" style="display:flex;align-items:center;gap:8px"><button class="btn" id="tArch">🗃️ Archivar</button><div style="flex:1"></div><button class="btn danger" id="tDel">Eliminar</button></div>
+  <div class="pfoot" style="display:flex;align-items:center;gap:8px"><button class="btn" id="tArch"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="13" height="3.4" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7.4v7.1A1.5 1.5 0 0 0 6.5 16h7a1.5 1.5 0 0 0 1.5-1.5V7.4" stroke="currentColor" stroke-width="1.4"/><path d="M8.4 10.4h3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Archivar</button><div style="flex:1"></div><button class="btn danger" id="tDel">Eliminar</button></div>
 </aside>
 
 

@@ -778,7 +778,6 @@
   [data-palette="atelier"] .projsel button.on,
   [data-palette="atelier"] .calcell.today{box-shadow:inset 2px 0 0 var(--wood)}
   [data-palette="atelier"] .btn-primary{font-weight:500}
-  [data-palette="atelier"] .brand .mark{box-shadow:none;border:1px solid var(--line)}
 
   /* Ni relieve ni plástico: los botones de asistencia son superficies
      planas que se distinguen por el borde y el tono. */
@@ -894,4 +893,98 @@
   [data-palette="atelier"] .pop .tiny,
   [data-palette="atelier"] .undobar button,
   [data-palette="atelier"] .filerow .fnm:hover,
+  [data-palette="atelier"] .projsel button.add,
   [data-palette="atelier"] .myfoco .newchip{color:var(--wood-deep)}
+
+  /* ══════════════ BARRA SUPERIOR CONTEXTUAL ══════════════
+     Las herramientas de Estructura viven acá arriba, no encima del mapa.
+     Persona y Estado también: solo atenúan nodos, así que aparecen únicamente
+     con el mapa a la vista. */
+  .topctx{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .topctx[hidden]{display:none}
+  .ctxdiv{width:1px;height:20px;background:var(--line);align-self:center;flex:none;margin:0 2px}
+  .maptools{display:none}
+
+  /* La marca: el logotipo apoyado sobre el fondo de la aplicación, sin cuadro
+     ni marco, y el nombre en dos renglones. */
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand .mark{width:38px;height:38px;object-fit:contain;display:block;
+    background:none;border:none;border-radius:0;box-shadow:none;flex:none}
+  .brand .btxt{display:flex;flex-direction:column;line-height:1.18;min-width:0}
+  .brand .bsub{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);
+    font-weight:600;white-space:nowrap}
+  [data-palette="atelier"] .brand .bsub{font-family:var(--font-mono);font-weight:500}
+
+  /* ══════════════ MENÚ: una sola lista ══════════════ */
+  .sbsep{display:block;height:1px;background:var(--line-soft);margin:9px 9px}
+  .sidebar.rail .sbsep{margin:9px 4px}
+  .sbfoot .sbtoggle{display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;
+    border-radius:var(--r-ctl);font:inherit;font-size:13px;font-weight:500;color:var(--ink-faint);
+    background:none;border:none;cursor:pointer;text-align:left;white-space:nowrap}
+  .sbfoot .sbtoggle svg{width:16px;height:16px;flex:none;transition:transform .18s ease}
+  .sbfoot .sbtoggle:hover{color:var(--ink);background:var(--surface-2)}
+  .sidebar.rail .sbfoot .sbtoggle{justify-content:center;padding:9px 0}
+  .sidebar.rail .sbfoot .sbtoggle svg{transform:rotate(180deg)}
+  /* Las sub-secciones del Panel se ven siempre: el menú va desplegado. */
+  .sbsubs{display:flex;flex-direction:column;margin:3px 0 4px 21px;padding-left:3px;
+    border-left:1px solid var(--line-soft)}
+  .sidebar.rail .sbsubs{display:none}
+
+  /* ══════════════ EL MAPA, A PÁGINA COMPLETA ══════════════
+     Sin marco, sin márgenes y sin el título de la pestaña: estando en el mapa,
+     la pestaña ES el mapa. */
+  #tab-estructura.mapafull{overflow:hidden}
+  #tab-estructura.mapafull > .wrap{max-width:none;margin:0;padding:0;height:100%}
+  #tab-estructura.mapafull > .wrap > *{display:none}
+  #tab-estructura.mapafull .estwrap-mapa{display:block;position:absolute;inset:0;height:auto;min-height:0;
+    border:none;border-radius:0;box-shadow:none}
+
+  /* ══════════════ EL NODO: superficie tenue + anillo de avance ══════════════
+     Las letras necesitaban un fondo para leerse sobre el carbón; se lo damos
+     sin volver a dibujar la caja: superficie sí, borde no.
+     Y el punto pasa a ser un anillo que se completa con las tareas terminadas
+     del tema. El dato ya se calculaba, solo estaba escrito en texto chico. */
+  [data-palette="atelier"] .neu{background:color-mix(in srgb,var(--surface) 90%,transparent);
+    border:none;box-shadow:none;padding:9px 11px 10px;border-radius:var(--r-card)}
+  [data-palette="atelier"] .neu:hover{background:color-mix(in srgb,var(--surface-3) 95%,transparent)}
+  [data-palette="atelier"] .neu.sel{background:color-mix(in srgb,var(--wood) 13%,var(--surface))}
+  [data-palette="atelier"] .neu.conprog .nod{
+    background:conic-gradient(var(--acc) calc(var(--pct,0) * 1%), color-mix(in srgb,var(--acc) 20%,transparent) 0);
+    -webkit-mask:radial-gradient(circle, #0000 0 4px, #000 4.7px);
+            mask:radial-gradient(circle, #0000 0 4px, #000 4.7px)}
+  [data-palette="atelier"] .neu.conprog .nod{width:16px;height:16px;box-shadow:none}
+  [data-palette="atelier"] .neu[data-lvl="1"].conprog .nod{width:20px;height:20px;
+    -webkit-mask:radial-gradient(circle, #0000 0 5.4px, #000 6.2px);
+            mask:radial-gradient(circle, #0000 0 5.4px, #000 6.2px)}
+  [data-palette="atelier"] .neu.deep.conprog .nod{width:13px;height:13px;
+    -webkit-mask:radial-gradient(circle, #0000 0 3.2px, #000 3.9px);
+            mask:radial-gradient(circle, #0000 0 3.2px, #000 3.9px)}
+  [data-palette="atelier"] .neu.sel.conprog .nod{box-shadow:none;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--wood) 55%,transparent))}
+
+  /* ══════════════ DRIVE POR TEMA ══════════════
+     Dos niveles: el macro-tema como encabezado, y adentro cada tema o sub-tema
+     donde de verdad está vinculado el archivo. El nombre del tema lleva a su
+     ficha en Estructura. */
+  .dsub{display:flex;align-items:center;gap:8px;margin:12px 0 5px;padding-left:2px}
+  .dsub .dsubname{font:inherit;font-size:12px;font-weight:600;color:var(--ink-soft);background:none;
+    border:none;padding:0;cursor:pointer;text-align:left;letter-spacing:.02em}
+  .dsub .dsubname:hover{color:var(--wood-deep);text-decoration:underline}
+  .dsub .cnt{font-size:10.5px;color:var(--ink-faint);background:var(--surface-3);border-radius:var(--r-pill);padding:1px 7px}
+  .dsublab{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);
+    font-weight:700;margin:13px 0 6px 2px}
+  .filerow.hered{opacity:.82}
+  [data-palette="atelier"] .dsub .dsubname,
+  [data-palette="atelier"] .dsublab{font-family:var(--font-mono);font-weight:500}
+
+  /* ══════════════ ICONOS DE LÍNEA ══════════════
+     Reemplazan a los emojis. Toman el color del texto que tienen al lado, así
+     que un icono dentro de un botón de cobre sale en cobre y dentro de una
+     fila gris sale gris. Un emoji nunca puede hacer eso. */
+  .ico{width:15px;height:15px;display:inline-block;vertical-align:-3px;flex:none;color:inherit}
+  .filerow .fic .ico,.msgfile .fic .ico{width:17px;height:17px;vertical-align:-4px}
+  .chanitem .av .ico{width:14px;height:14px;vertical-align:-3px;color:var(--on-person)}
+  .kcard .kp .ico{width:13px;height:13px;vertical-align:-2px}
+  .card .lab .ico,.cfgsec > .lab .ico{width:14px;height:14px;vertical-align:-3px}
+  .btn .ico,.rowbtn .ico{margin-right:-1px}
+  /* El contenedor del icono de archivo ya no lleva tamaño de emoji. */
+  .filerow .fic,.msgfile .fic{font-size:0;line-height:0;display:inline-flex;align-items:center}

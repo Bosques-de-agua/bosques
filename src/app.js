@@ -1,7 +1,7 @@
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
-const LOCAL_KEYS=["me","theme","palette","navRail","tab","estProj","estFocus","estView","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -113,7 +113,30 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function confirmar(msg,cb,o){ dialog(Object.assign({title:"¿Confirmás?",msg,yes:"Sí, dale",cb:()=>cb()},o||{})); }
   function pedirTexto(title,placeholder,cb){ dialog({title,msg:"",input:true,placeholder,yes:"Agregar",cb:v=>{ if(v&&v.trim())cb(v.trim()); }}); }
   // ---------- archivos de Drive (vínculos, no copias) ----------
-  const FKIND={doc:{i:"📄",l:"Documento"},sheet:{i:"📊",l:"Hoja de cálculo"},slides:{i:"📽️",l:"Presentación"},form:{i:"📋",l:"Formulario"},folder:{i:"📁",l:"Carpeta"},pdf:{i:"📕",l:"PDF"},file:{i:"📎",l:"Archivo"},link:{i:"🔗",l:"Link"}};
+  // ICONOS DE LINEA — reemplazan a los emojis. Un emoji es un dibujo
+  // multicolor que pinta el sistema operativo: cambia según el dispositivo y
+  // no puede tomar el cobre ni el oliva del tema. Estos son monocromáticos y
+  // heredan el color del texto que tienen al lado.
+  const ICO={
+    doc:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M6 3h5l3 3v11H6z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><path d=\"M11 3v3h3M8 10h4M8 13h4\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg>",
+    sheet:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"4\" y=\"4\" width=\"12\" height=\"12\" rx=\"1.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4 8.5h12M8.5 8.5V16M4 12.3h12\" stroke=\"currentColor\" stroke-width=\"1.2\"/></svg>",
+    slides:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"13\" height=\"9\" rx=\"1.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M10 13.5v2.5M7.5 16h5\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    form:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"5\" y=\"3.5\" width=\"10\" height=\"13\" rx=\"1.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M8 7.5h4M8 10.5h4M8 13.5h2\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg>",
+    folder:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3.5 6.5A1.5 1.5 0 0 1 5 5h3l1.5 2H15a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 15 16H5a1.5 1.5 0 0 1-1.5-1.5z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/></svg>",
+    pdf:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M6 3h5l3 3v11H6z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><path d=\"M11 3v3h3\" stroke=\"currentColor\" stroke-width=\"1.3\"/><path d=\"M8 12.5h4\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>",
+    clip:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M13.6 9.4l-4.3 4.3a2.6 2.6 0 0 1-3.7-3.7l5.1-5.1a1.8 1.8 0 0 1 2.5 2.5l-5 5a1 1 0 0 1-1.4-1.4l4.4-4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    link:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M8.5 11.5l3-3M7.6 13.4a2.8 2.8 0 0 1 0-4l1.2-1.2M11.2 6.6l1.2-1.2a2.8 2.8 0 0 1 4 4l-1.2 1.2\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    imagen:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"13\" height=\"11\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M3.5 12.4l3.5-3 3 2.4 2.5-2 4 3.4\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><circle cx=\"7.4\" cy=\"8\" r=\"1.1\" stroke=\"currentColor\" stroke-width=\"1.2\"/></svg>",
+    archivar:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4\" width=\"13\" height=\"3.4\" rx=\"1\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M5 7.4v7.1A1.5 1.5 0 0 0 6.5 16h7a1.5 1.5 0 0 0 1.5-1.5V7.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M8.4 10.4h3.2\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    calendario:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"13\" height=\"11.5\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M3.5 8.6h13M7 3.5v3M13 3.5v3\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    reloj:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M10 6.4V10l2.6 1.6\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    candado:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"5\" y=\"9\" width=\"10\" height=\"7.5\" rx=\"1.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M7.5 9V7a2.5 2.5 0 0 1 5 0v2\" stroke=\"currentColor\" stroke-width=\"1.4\"/></svg>",
+    nota:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 4.5h10v8l-3 3H5z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><path d=\"M15 12.5h-3v3M7.6 8h4.8M7.6 11h3\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg>",
+    equipo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"7.6\" cy=\"8\" r=\"2.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M3.6 15.6c0-2.2 1.8-3.7 4-3.7s4 1.5 4 3.7\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/><path d=\"M13.4 6.2a2.4 2.4 0 0 1 0 4.6M14.4 12.4c1.3.5 2.1 1.7 2.1 3.2\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    grupo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 8h12M4 12.4h12M8.6 4L7.1 16M13.4 4L11.9 16\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
+    persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>"
+  };
+  const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
   function kindOfUrl(u){ const s=String(u||"").toLowerCase();
     if(s.includes("docs.google.com/document"))return "doc";
     if(s.includes("docs.google.com/spreadsheets"))return "sheet";
@@ -126,8 +149,24 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function filesOf(o){ if(!Array.isArray(o.files))o.files=[]; return o.files; }
   function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
     return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${onDel?`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
+  // Archivos que cuelgan de los sub-temas de un tema (y de sus tareas).
+  function filesHeredados(node){ const out=[];
+    const bajar=id=>{ const n=N(id); if(!n)return;
+      filesOf(n).forEach(f=>out.push({f,node:n,task:null}));
+      (n.items||[]).forEach(k=>filesOf(k).forEach(f=>out.push({f,node:n,task:k})));
+      (n.children||[]).forEach(bajar); };
+    (node.children||[]).forEach(bajar); return out; }
   function renderFileList(el,owner,after){ const fs=filesOf(owner);
-    el.innerHTML=fs.length?fs.map(f=>fileRow(f,true)).join(""):`<div class="empty">Sin archivos. Pegá el link de Drive con "＋ archivo de Drive".</div>`;
+    let html=fs.map(f=>fileRow(f,true)).join("");
+    // Entrás a un tema y ves todo lo que cuelga de ahí para abajo, no solo lo
+    // vinculado al tema exacto. Lo heredado va marcado con su ruta y no se
+    // puede desvincular desde acá: se desvincula donde vive.
+    const hered=Array.isArray(owner.children)?filesHeredados(owner):[];
+    if(hered.length) html+=`<div class="dsublab">De los sub-temas</div>`+hered.map(x=>{
+      const k=FKIND[x.f.kind]||FKIND.link;
+      const ruta=pathOf(x.node.id).map(z=>z.name).slice(pathOf(owner.id).length).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
+      return `<div class="filerow hered"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(ruta)}">${esc(ruta)}</span></div>`; }).join("");
+    el.innerHTML=html||`<div class="empty">Sin archivos. Pegá el link de Drive con "＋ archivo de Drive".</div>`;
     el.querySelectorAll("[data-delf]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.delf;
       confirmar("Se saca el link de acá. El archivo sigue intacto en Drive.",()=>{ owner.files=filesOf(owner).filter(f=>f.id!==id); save(); if(after)after(); },{title:"Desvincular archivo",yes:"Desvincular"}); })); }
   function allFiles(){ const out=[];
@@ -334,9 +373,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function enFoco(){ return selId?new Set([selId,...vecinos(selId)]):null; }
 
   // Ya no hay selector de identidad: sos quien entró con su correo.
-  function applyTabControls(name){ const P=name==="mapa"||name==="estructura"; const E=P;
-    document.getElementById("filtPersona").style.display=P?"":"none"; document.getElementById("filtEstado").style.display=E?"":"none";
-    const s=document.getElementById("filtSos"); if(s)s.style.display="none"; }
+  function applyTabControls(name){
+    // Persona y Estado solo atenúan nodos del mapa: fuera de ahí no hacen nada,
+    // así que no tienen por qué ocupar la barra.
+    const est=name==="estructura", mapa=est&&estView()==="mapa";
+    const ver=(id,on)=>{ const el=document.getElementById(id); if(el)el.style.display=on?"":"none"; };
+    const ctx=document.getElementById("topCtx"); if(ctx)ctx.hidden=!est;
+    ["ctxDiv","linkMode","editMode","addNode","filtPersona","filtEstado"].forEach(id=>ver(id,mapa));
+    const info=document.querySelector("#topCtx .infob"); if(info)info.style.display=mapa?"":"none";
+    const s=document.getElementById("filtSos"); if(s)s.style.display="none";
+    // Con las herramientas arriba, el mapa se queda con toda la página.
+    const secc=document.getElementById("tab-estructura"); if(secc)secc.classList.toggle("mapafull",mapa); }
   function showTab(name){ active=name; applyTabControls(name); acomodarMenu();
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
     document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
@@ -353,27 +400,30 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(sbToggle){ sbToggle.setAttribute("aria-expanded",rail?"false":"true");
       sbToggle.title=rail?"Mostrar el menú":"Esconder el menú"; } }
   function acomodarMenu(){
-    // Las sub-secciones son el índice del Panel: fuera del Panel no significan nada.
-    if(panelSubs)panelSubs.hidden=(active!=="panel");
-    pintarMenu(active==="chat" ? true : !!state.navRail); }
+    pintarMenu(active==="chat" ? true : !!state.navRail);
+    if(typeof marcarSubs==="function")marcarSubs(); }
   if(sbToggle) sbToggle.addEventListener("click",()=>{
     // En Chat el plegado es forzado: el botón lo abre por esta vez y no toca
     // tu preferencia, así el menú vuelve a como lo tenías al salir de ahí.
     if(active==="chat"){ pintarMenu(!plegado()); return; }
     state.navRail=!plegado(); save(); pintarMenu(state.navRail); });
   document.querySelectorAll(".sbsub").forEach(b=>b.addEventListener("click",()=>{
-    if(active!=="panel")showTab("panel");
-    document.querySelectorAll(".sbsub").forEach(x=>x.classList.toggle("on",x===b));
-    const el=document.getElementById(b.dataset.sec);
-    if(el)el.scrollIntoView({behavior:"smooth",block:"start"}); }));
+    state.panelView=b.dataset.view; save();
+    if(active!=="panel")showTab("panel"); else renderPanel(); }));
+  // "Mi panel" vuelve a mostrarlo entero.
+  const itemPanel=document.querySelector('.sbitem[data-tab="panel"]');
+  if(itemPanel)itemPanel.addEventListener("click",()=>{ state.panelView=""; save();
+    if(active==="panel")renderPanel(); },true);
 
   function renderActive(){ refreshChrome();
     if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); }
   // Estructura tiene dos vistas del mismo árbol: en columnas o como mapa.
-  function estView(){ return state.estView==="mapa"?"mapa":"arbol"; }
+  let vistaEst="arbol";
+  function estView(){ return vistaEst==="mapa"?"mapa":"arbol"; }
   function renderEstructuraTab(){ const esMapa=estView()==="mapa";
     const seg=document.getElementById("estViewSeg"); if(seg)seg.querySelectorAll("[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===(esMapa?"mapa":"arbol")));
     const wrap=document.getElementById("estMapaWrap"); if(wrap)wrap.hidden=!esMapa;
+    applyTabControls(active);
     const arbol=document.getElementById("estree"); if(arbol)arbol.hidden=esMapa;
     const srch=document.querySelector("#tab-estructura .srchbar"); if(srch)srch.style.display=esMapa?"none":"";
     if(esMapa){ renderMap(); requestAnimationFrame(()=>{ if(!cam._init){ fit(); cam._init=1; } applyCam(); }); }
@@ -417,8 +467,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderMap(){ buildEdges(); const foco=enFoco();
     [...worldInner.querySelectorAll(".neu")].forEach(n=>n.remove());
     Object.values(state.nodes).forEach(node=>{ const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
-      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(foco&&!foco.has(node.id)?" dim":"");
-      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
+      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(foco&&!foco.has(node.id)?" dim":"")+(a.ic?" conprog":"");
+      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.setProperty("--pct",a.ic?Math.round(a.dc/a.ic*100):0); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id; el.title="Clic: detalle · Doble clic: apagar";
       const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>avatarMarkup(o,"av",true)).join("");
       const outLinks=(node.links||[]).length;
       const sub=`${hasKids?a.nc+" sub · ":""}${a.ic} tarea${a.ic===1?"":"s"}${a.ic?` · ${a.dc}✓`:""}`;
@@ -501,7 +551,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         if(norm(k.title).includes(q)||norm(k.notas).includes(q)||norm(k.objetivo).includes(q)||norm(ownersOf(k).join(" ")).includes(q))
           res.push({kind:"Tarea",color:cssv(STATUS[k.status].v),name:k.title||"Tarea",trail:pathOf(n.id).map(z=>z.name).join(" › "),go:()=>openTask(n.id,k.id)}); }); });
     info.textContent=res.length?`${res.length} resultado${res.length===1?"":"s"}`:"";
-    if(!res.length){ estree.innerHTML=`<div class="ph"><div class="big">🔍</div><b>Sin resultados</b><div style="margin-top:6px;font-size:13px">No hay temas ni tareas que digan “${esc(estQuery.trim())}”.</div></div>`; return; }
+    if(!res.length){ estree.innerHTML=`<div class="ph"><b>Sin resultados</b><div style="margin-top:6px;font-size:13px">No hay temas ni tareas que digan “${esc(estQuery.trim())}”.</div></div>`; return; }
     estree.innerHTML=res.slice(0,80).map((r,i)=>`<div class="resline" data-r="${i}"><span class="rk" style="background:${r.color}">${r.kind}</span><span class="rt"><b>${hl(r.name)}</b><span>${esc(r.trail)}</span></span><span class="go" style="color:var(--ink-faint)">↗</span></div>`).join("")
       +(res.length>80?`<div class="empty">…y ${res.length-80} más. Afiná la búsqueda.</div>`:"");
     estree.querySelectorAll("[data-r]").forEach(el=>el.addEventListener("click",()=>res[+el.dataset.r].go())); }
@@ -643,7 +693,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?'<button class="karch" title="Mandar al archivo">🗃️</button>':""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">📅 ${esc(k.due)}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?'<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>':""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -666,8 +716,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderArchivo(){ const box=document.getElementById("archivoBody");
     const at=k=>k.archivedAt||k.doneAt||0;
     const arch=allItems().filter(x=>x.k.archived).concat(privL().filter(k=>k.archived).map(k=>({k,node:null,priv:true}))).sort((a,b)=>at(b.k)-at(a.k));
-    if(!arch.length){ box.innerHTML=`<div class="ph"><div class="big">🗃️</div><b>Nada archivado todavía</b><div style="margin-top:6px;font-size:13px">Cuando marques una tarea como terminada se archiva sola a los ${ARCH_DAYS} días — o mandala vos con el botón 🗃️ de la tarjeta.</div></div>`; return; }
-    box.innerHTML=`<div class="card">${arch.map(x=>{ const path=x.priv?"🔒 Privada":pathOf(x.node.id).map(p=>p.name).join(" › "); const t=at(x.k); const dstr=t?new Date(t).toLocaleDateString():""; return `<div class="arow"><span>✓ ${esc(x.k.title||"Tarea")}</span><span class="ap">${esc(path)}${dstr?" · archivada "+esc(dstr):""}</span><button class="btn restore" data-r="${x.priv?"__priv":x.node.id}|${x.k.id}">Restaurar</button></div>`; }).join("")}</div>`;
+    if(!arch.length){ box.innerHTML=`<div class="ph"><b>Nada archivado todavía</b><div style="margin-top:6px;font-size:13px">Cuando marques una tarea como terminada se archiva sola a los ${ARCH_DAYS} días — o mandala vos con el botón ${ICO.archivar} de la tarjeta.</div></div>`; return; }
+    box.innerHTML=`<div class="card">${arch.map(x=>{ const path=x.priv?"Privada":pathOf(x.node.id).map(p=>p.name).join(" › "); const t=at(x.k); const dstr=t?new Date(t).toLocaleDateString():""; return `<div class="arow"><span>✓ ${esc(x.k.title||"Tarea")}</span><span class="ap">${esc(path)}${dstr?" · archivada "+esc(dstr):""}</span><button class="btn restore" data-r="${x.priv?"__priv":x.node.id}|${x.k.id}">Restaurar</button></div>`; }).join("")}</div>`;
     box.querySelectorAll(".restore").forEach(b=>b.addEventListener("click",()=>{ const [nid,iid]=b.dataset.r.split("|"); let k=null; if(nid==="__priv")k=privL().find(x=>x.id===iid); else { const n=N(nid); k=n&&(n.items||[]).find(x=>x.id===iid); } if(!k)return; setStatus(k,"curso"); save(); renderArchivo(); refreshChrome(); })); }
 
   // ---------- DRIVE ----------
@@ -699,18 +749,29 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderDrive(){ const box=document.getElementById("driveBody"); const q=norm(driveQuery.trim());
     let all=allFiles();
     if(q)all=all.filter(x=>norm(x.f.name).includes(q)||norm(x.f.url).includes(q)||norm(pathOf(x.node.id).map(z=>z.name).join(" ")).includes(q)||norm(x.task?x.task.title:"").includes(q));
-    if(!all.length){ box.innerHTML=`<div class="ph"><div class="big">📂</div><b>${driveQuery.trim()?"Sin resultados":"Todavía no hay archivos vinculados"}</b><div style="margin-top:6px;font-size:13px">${driveQuery.trim()?"Probá con otra palabra.":"Vinculá el primero con el botón de arriba, o desde la ficha de cualquier tema o tarea."}</div></div>`; return; }
-    const macros=macroList(); const groups=new Map(); const sueltos=[];
-    all.forEach(x=>{ const m=macros.find(mm=>inSubtree(x.node.id,mm.id));
-      if(m){ if(!groups.has(m.id))groups.set(m.id,[]); groups.get(m.id).push(x); } else sueltos.push(x); });
-    let html="";
-    macros.forEach(m=>{ const arr=groups.get(m.id); if(!arr||!arr.length)return;
-      html+=`<div class="drivegroup"><h3><span class="orb" style="background:${accentOf(m)}"></span>${esc(m.name)}<span class="cnt">${arr.length}</span></h3>`
-        +arr.map(x=>{ const k=FKIND[x.f.kind]||FKIND.link; const p=pathOf(x.node.id).map(z=>z.name).slice(1).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
-          return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(p)}">${esc(p)}</span><button class="x" data-go="${x.node.id}" title="Ir al tema">↗</button></div>`; }).join("")+`</div>`; });
-    if(sueltos.length) html+=`<div class="drivegroup"><h3><span class="orb" style="background:var(--ink-faint)"></span>Nivel proyecto<span class="cnt">${sueltos.length}</span></h3>`
-      +sueltos.map(x=>{ const k=FKIND[x.f.kind]||FKIND.link; const p=pathOf(x.node.id).map(z=>z.name).join(" › ")+(x.task?" › "+(x.task.title||"Tarea"):"");
-        return `<div class="filerow"><span class="fic">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath">${esc(p)}</span><button class="x" data-go="${x.node.id}" title="Ir al tema">↗</button></div>`; }).join("")+`</div>`;
+    if(!all.length){ box.innerHTML=`<div class="ph"><b>${driveQuery.trim()?"Sin resultados":"Todavía no hay archivos vinculados"}</b><div style="margin-top:6px;font-size:13px">${driveQuery.trim()?"Probá con otro nombre, o con el nombre del tema.":"Vinculá el primero desde la ficha de un tema o de una tarea."}</div></div>`; return; }
+    // Un archivo pertenece al tema o sub-tema donde se lo vinculó. Se agrupa por
+    // ese tema exacto y los temas se listan en el orden del árbol: así el Drive
+    // es un espejo de la Estructura y no una lista suelta de links.
+    const porNodo=new Map();
+    all.forEach(x=>{ if(!porNodo.has(x.node.id))porNodo.set(x.node.id,[]); porNodo.get(x.node.id).push(x); });
+    const enOrden=raiz=>{ const out=[]; const bajar=id=>{ const n=N(id); if(!n)return; out.push(id); (n.children||[]).forEach(bajar); }; bajar(raiz); return out; };
+    const fila=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const tarea=x.task?(x.task.title||"Tarea"):"";
+      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}</div>`; };
+    const bloque=(titulo,color,ids)=>{ const conArchivos=ids.filter(id=>porNodo.has(id)); if(!conArchivos.length)return "";
+      const total=conArchivos.reduce((a,id)=>a+porNodo.get(id).length,0);
+      let h=`<div class="drivegroup"><h3><span class="orb" style="background:${color}"></span>${esc(titulo)}<span class="cnt">${total}</span></h3>`;
+      conArchivos.forEach(id=>{ const arr=porNodo.get(id);
+        const ruta=pathOf(id).map(z=>z.name).slice(2).join(" › ");
+        // Lo vinculado al macro-tema mismo va suelto: un sub-encabezado que
+        // repite el título de arriba no agrega nada.
+        h+=(ruta?`<div class="dsub"><button class="dsubname" data-go="${id}">${esc(ruta)}</button><span class="cnt">${arr.length}</span></div>`:"")+arr.map(fila).join(""); });
+      return h+"</div>"; };
+    const macros=macroList(); let html="";
+    macros.forEach(m=>{ html+=bloque(m.name,accentOf(m),enOrden(m.id)); });
+    // Lo que cuelga directo del proyecto, fuera de todo macro-tema.
+    const sueltos=[...porNodo.keys()].filter(id=>!macros.some(m=>inSubtree(id,m.id)));
+    if(sueltos.length) html+=bloque("Nivel proyecto","var(--ink-faint)",sueltos);
     box.innerHTML=html;
     box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go))); }
 
@@ -725,12 +786,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(chan.startsWith("grp:")){ const g=groupOf(chan); if(!g)return []; return g.msgs||(g.msgs=[]); }
     const other=chan.slice(3), me=state.me||""; if(!me||!other||other===me)return [];
     const k=dmKey(me,other); return state.chat.dm[k]||(state.chat.dm[k]=[]); }
-  function chanTitle(chan){ if(chan==="team")return "👥 Equipo"; const g=groupOf(chan); if(g)return "👪 "+g.name; return "💬 "+chan.slice(3); }
+  function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return ICO.grupo+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
   function renderChat(){ const me=state.me;
     if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
     const list=document.getElementById("chanList");
-    list.innerHTML=`<div class="chsec">Canales</div><div class="chanitem ${chatChan==="team"?"on":""}" data-ch="team"><span class="av" style="background:var(--wood)">👥</span>Equipo</div>`+
-      myGroups().map(g=>`<div class="chanitem ${chatChan==="grp:"+g.id?"on":""}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">👪</span><span class="chname">${esc(g.name)}</span></div>`).join("")+
+    list.innerHTML=`<div class="chsec">Canales</div><div class="chanitem ${chatChan==="team"?"on":""}" data-ch="team"><span class="av" style="background:var(--wood)">${ICO.equipo}</span>Equipo</div>`+
+      myGroups().map(g=>`<div class="chanitem ${chatChan==="grp:"+g.id?"on":""}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">${ICO.grupo}</span><span class="chname">${esc(g.name)}</span></div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
       allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}">${avatarMarkup(p,"av")}<span class="chname">${esc(p)}</span></div>`).join("");
@@ -745,7 +806,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
-    if(!me){ box.innerHTML=`<div class="ph"><div class="big">💬</div><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
+    if(!me){ box.innerHTML=`<div class="ph"><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
     inp.disabled=false; const msgs=msgsOf(chatChan);
     box.innerHTML=msgs.length?msgs.map(m=>msgHTML(m,me)).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
@@ -754,10 +815,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     seenMap()[chatChan]=msgs.length; save(); updateChatBadge(); box.scrollTop=box.scrollHeight; }
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   function msgHTML(m,me){ if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
-      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div><div class="evtitle" style="cursor:pointer">📅 ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div></div>`; }
+      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div><div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div></div>`; }
     const mm=(m.from===me);
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
-      const ic=/^image\//.test(f.type)?"🖼️":/pdf/.test(f.type)?"📕":/sheet|excel|csv/.test(f.type)?"📊":/word|document/.test(f.type)?"📄":"📎";
+      const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
@@ -802,8 +863,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(ev.desc)p.set("details",ev.desc);
     return "https://calendar.google.com/calendar/render?"+p.toString(); }
   function openEvView(id){ const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; const box=document.getElementById("evBox"); const me=state.me;
-    const rows=allPeople().map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"✅ Voy":v==="no"?"❌ No voy":"— sin responder"}</span></div>`; }).join("");
-    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>📅 ${esc(ev.date)}${ev.time?" · ⏰ "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">📅 Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
+    const rows=allPeople().map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"Voy":v==="no"?"No voy":"— sin responder"}</span></div>`; }).join("");
+    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>${ICO.calendario} ${esc(ev.date)}${ev.time?" · "+ICO.reloj+" "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">${ICO.calendario} Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelectorAll("[data-rv]").forEach(b=>b.addEventListener("click",()=>{ setRsvp(id,b.dataset.rv); openEvView(id); }));
     box.querySelector("#evEdit").addEventListener("click",()=>openEvEdit(id));
@@ -846,7 +907,24 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const DOWL=["lun","mar","mié","jue","vie","sáb","dom"];
   function ymdLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); } renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); }
+  const VISTAS_PANEL={"":"Mi panel",cal:"Calendario",upcoming:"Próximos eventos",foco:"Mi foco",notas:"Mis notas"};
+  function panelView(){ return VISTAS_PANEL[state.panelView]!==undefined?state.panelView:""; }
+  function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); }
+    const v=panelView(), todo=v==="";
+    // "Próximos eventos" se muestra con el calendario arriba: la lista sola queda
+    // pelada, y con el mes delante se lee como una agenda.
+    const ver=(id,on)=>{ const el=document.getElementById(id); if(el)el.hidden=!on; };
+    ver("calMount", todo||v==="cal"||v==="upcoming");
+    ver("upcoming", todo||v==="upcoming");
+    ver("myTasks",  todo||v==="foco");
+    ver("myNotes",  todo||v==="notas");
+    const h=document.querySelector("#tab-panel .h1");
+    if(h&&h.firstChild&&h.firstChild.nodeType===3)h.firstChild.nodeValue=VISTAS_PANEL[v];
+    renderCalendar(); renderUpcoming(); renderMyTasks(); renderMyNotes(); marcarSubs(); }
+  function marcarSubs(){ const v=panelView();
+    document.querySelectorAll(".sbsub").forEach(b=>b.classList.toggle("on", active==="panel"&&b.dataset.view===v));
+    const mp=document.querySelector('.sbitem[data-tab="panel"]');
+    if(mp)mp.classList.toggle("on", active==="panel"); }
   function renderConfigTab(){ renderProfile(); renderConfig(); }
   function renderProfile(){ const box=document.getElementById("profile"); if(!box)return; const me=state.me;
     if(!me){ box.innerHTML=""; return; }
@@ -976,20 +1054,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(document.activeElement&&document.activeElement.id==="myNotesArea")return;
     if(!me){ box.innerHTML=""; return; }
     const val=(state.myNotes&&state.myNotes[me])||"";
-    box.innerHTML=`<div class="card notescard"><div class="lab" style="margin-bottom:8px" title="Privadas: solo las ves vos">📝 Mis notas</div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
+    box.innerHTML=`<div class="card notescard"><div class="lab" style="margin-bottom:8px" title="Privadas: solo las ves vos">${ICO.nota} Mis notas</div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
     const ta=box.querySelector("#myNotesArea"); ta.value=val;
     ta.addEventListener("input",e=>{ state.myNotes=state.myNotes||{}; state.myNotes[me]=e.target.value; save(); }); }
   function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return; const today=ymdLocal(new Date()); const me=state.me;
     const evs=(state.events||[]).filter(e=>e.date>=today).sort((a,b)=>(a.date+ (a.time||"")).localeCompare(b.date+(b.time||""))).slice(0,6);
     if(!evs.length){ box.innerHTML=""; return; }
-    box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">🗓️ Próximos eventos</div>`+evs.map(ev=>{ const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
-      const tag=mine==="yes"?'<span class="evtag yes">✅ vas</span>':mine==="no"?'<span class="evtag no">❌ no vas</span>':`<span class="evtag">${yes} van</span>`;
+    box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">${ICO.calendario} Próximos eventos</div>`+evs.map(ev=>{ const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
+      const tag=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':`<span class="evtag">${yes} van</span>`;
       return `<div class="evrow" data-ev="${ev.id}"><div class="evrow-main"><b>${esc(ev.title)}</b><span class="evrow-meta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}${ev.desc?" · "+esc(ev.desc):""}</span></div>${tag}</div>`; }).join("")+`</div>`;
     box.querySelectorAll("[data-ev]").forEach(r=>r.addEventListener("click",()=>openEvView(r.dataset.ev))); }
   function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
     activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",label:k.title||"Tarea",color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
-    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",label:"🔒 "+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",label:(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
     (state.events||[]).forEach(ev=>push(ev.date,{type:"event",label:ev.title,id:ev.id}));
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
@@ -1004,7 +1082,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else openEvView(c.id); })); }
   function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
-    if(!me){ box.innerHTML=`<div class="ph"><div class="big">👋</div><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; return; }
+    if(!me){ box.innerHTML=`<div class="ph"><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; return; }
     const allMine=activeItems().filter(x=>ownersOf(x.k).includes(me));
     state.tasksSeen=state.tasksSeen||{}; const seenSet=new Set(state.tasksSeen[me]||[]); const news=allMine.filter(x=>!seenSet.has(x.k.id));
     // el panel muestra SIEMPRE todo lo tuyo salvo que vos filtres acá mismo
@@ -1018,8 +1096,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +PRORD.map(p=>`<label class="fopt"><input type="checkbox" data-pf="${p}"${pf.includes(p)?" checked":""}><span class="sd" style="background:${cssv(PRIO[p].v)}"></span><span class="lbl">${PRIO[p].l}</span></label>`).join("")
       +`<label class="fopt"><input type="checkbox" data-pf="__none"${pf.includes("__none")?" checked":""}><span class="sd" style="background:${cssv("--ink-faint")}"></span><span class="lbl">Sin prioridad</span></label>`
       +(pf.length?`<button class="fclear">Ver todas</button>`:"")+`</div></div>`;
-    box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">🔒 ＋ tarea privada</button>${filtBtn}</span></div>`+
-      (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>🔒 Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
+    box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}</span></div>`+
+      (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${prioTag(k)}</div>`).join("")+`</div>`:"")+
       (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
     box.querySelectorAll("[data-task]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask(r.dataset.node,r.dataset.task); }));
@@ -1062,7 +1140,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderTBelong(){ const k=curTask(); if(!k)return; const box=document.getElementById("tBelong");
     document.getElementById("tKind").textContent=isPriv()?"Tarea privada":"Tarea";
     if(isPriv()){
-      box.innerHTML=`<div class="subrow" style="cursor:default;border-left:3px solid var(--accent-priv)"><span class="orb" style="background:var(--accent-priv)"></span><span class="t"><b>🔒 Tarea privada</b><span>Solo la ves vos — no aparece para el equipo</span></span></div>`
+      box.innerHTML=`<div class="subrow" style="cursor:default;border-left:3px solid var(--accent-priv)"><span class="orb" style="background:var(--accent-priv)"></span><span class="t"><b>${ICO.candado} Tarea privada</b><span>Solo la ves vos — no aparece para el equipo</span></span></div>`
         +`<div style="margin-top:8px"><label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:4px">Pasarla al equipo</label><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="pick" id="tMoveNode" style="flex:1 1 190px"></select><button class="btn" id="tMoveGo">Compartir</button></div></div>`;
       document.getElementById("tMoveNode").innerHTML=nodeOptionsHTML("",true);
       document.getElementById("tMoveGo").addEventListener("click",()=>{ const n=N(document.getElementById("tMoveNode").value); if(!n){ note("Elegí a qué tema la querés pasar."); return; }
@@ -1074,7 +1152,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const node=N(selTaskNode); if(!node)return;
     const path=pathOf(selTaskNode); const label=path[path.length-1].name; const trail=path.map(p=>p.name).slice(0,-1).join(" › ")||"raíz";
     box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><span class="go">↗</span></div>`
-      +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">🔒 Convertir en tarea privada</button>`;
+      +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">${ICO.candado} Convertir en tarea privada</button>`;
     document.getElementById("tGoNode").addEventListener("click",()=>{ closeTask(); openPanel(selTaskNode); });
     document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note("No pudimos identificarte."); return; }
       confirmar("La tarea sale del tema y pasa a tu panel privado: nadie más la va a ver y queda solo a tu nombre.",()=>{
@@ -1094,7 +1172,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function closeTask(){ taskOpen=false; taskDrawer.classList.remove("on"); scrim.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); if(active==="panel")renderPanel(); }
   function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done;
     tTitle.classList.toggle("done",!!k.done);
-    const ab=document.getElementById("tArch"); if(ab)ab.textContent=k.done?"🗃️ Archivar":"🗃️ Terminar y archivar";
+    const ab=document.getElementById("tArch"); if(ab)ab.textContent=k.done?"${ICO.archivar} Archivar":"${ICO.archivar} Terminar y archivar";
     syncTaskDots(k); }
   function syncTaskDots(k){ tDot.style.background=cssv(STATUS[k.status].v); tDot.title=STATUS[k.status].l;
     const pd=document.getElementById("tPrioDot"); if(!pd)return; const pr=prioOf(k);
@@ -1134,7 +1212,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   pCtx.addEventListener("input",()=>{ const n=N(selId); if(n){n.contexto=pCtx.value;save();} });
   pCtx.addEventListener("change",()=>renderActive());
   document.getElementById("enterBtn").addEventListener("click",()=>{ if(!selId)return;
-    state.estView="mapa"; closePanel(); showTab("estructura");
+    vistaEst="mapa"; closePanel(); showTab("estructura");
     requestAnimationFrame(()=>focusNode(selId)); });
   document.getElementById("addSub").addEventListener("click",()=>{ if(selId)addSubTo(selId); });
   document.getElementById("addTaskBtn").addEventListener("click",()=>{ const n=N(selId); if(!n)return; closePanel(); openNewTask({nodeId:n.id}); });
@@ -1191,7 +1269,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderNtOwners(){ peoplePick(document.getElementById("ntOwners"),()=>ntOwnersArr,renderNtOwners); }
   // los proyectos raíz no llevan tareas propias: van como encabezado inerte, no como opción elegible
   function nodeOptionsHTML(sel,noPriv){ const out=[];
-    if(!noPriv&&state.me)out.push(`<option value="__priv"${sel==="__priv"?" selected":""}>🔒 Privada — solo la ves vos</option>`);
+    if(!noPriv&&state.me)out.push(`<option value="__priv"${sel==="__priv"?" selected":""}>Privada — solo la ves vos</option>`);
     const walk=(id,depth)=>{ const n=N(id); if(!n)return;
       if(depth===1) out.push(`<option disabled>── ${esc(n.name)} ──</option>`);
       else { const pad="　".repeat(depth-2)+(depth>2?"› ":""); out.push(`<option value="${n.id}"${n.id===sel?" selected":""}>${esc(pad+n.name)}</option>`); }
@@ -1243,7 +1321,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("estSearch").addEventListener("input",e=>{ estQuery=e.target.value; renderEstructura(); });
   document.getElementById("estSearchClear").addEventListener("click",()=>{ estQuery=""; document.getElementById("estSearch").value=""; renderEstructura(); });
   document.getElementById("estViewSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return;
-    state.estView=b.dataset.v; save(); renderEstructuraTab(); });
+    vistaEst=b.dataset.v; renderEstructuraTab(); });
   document.getElementById("newTaskBtn").addEventListener("click",()=>openNewTask());
   document.getElementById("ntCancel").addEventListener("click",closeNT);
   document.getElementById("ntCreate").addEventListener("click",createNT);
@@ -1351,7 +1429,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const TABS=["panel","tareas","chat","drive","archivo","estructura","config"];
   active=state.tab||"panel";
   if(active==="personal")active="panel";
-  if(active==="mapa"){ active="estructura"; state.estView="mapa"; }
+  if(active==="mapa"){ active="estructura"; }
   if(!TABS.includes(active))active="panel";
   showTab(active);
   window.addEventListener("resize",()=>{ if(active==="estructura"&&estView()==="mapa")applyCam(); });
