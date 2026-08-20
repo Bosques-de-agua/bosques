@@ -96,11 +96,19 @@ async function sendTo(
   if (destinos) query = query.in("email", destinos);
   const { data: subs } = await query;
 
+  // Sin estos registros, un envío que falla no deja rastro: la función igual
+  // devuelve 200 y el aviso simplemente no llega, sin explicación.
+  console.log(`envio "${title}" → ${(subs || []).length} suscripcion(es)`);
+
   await Promise.all(
     (subs || []).map((s: any) =>
       webpush
         .sendNotification(s.subscription, JSON.stringify({ title, body, url }))
+        .then(() => console.log(`entregado → ${s.email}`))
         .catch(async (err: any) => {
+          console.error(
+            `FALLO → ${s.email} · estado ${err?.statusCode} · ${err?.body || err?.message || err}`
+          );
           // 404/410 = el navegador ya no existe: se limpia la suscripción muerta.
           if (err?.statusCode === 404 || err?.statusCode === 410) {
             await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
