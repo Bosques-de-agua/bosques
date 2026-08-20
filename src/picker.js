@@ -86,6 +86,18 @@ function pedirToken() {
         }
         clienteToken.callback = (r) => {
           if (r && r.access_token) {
+            // Google puede devolver un token PERFECTAMENTE VÁLIDO pero sin el
+            // permiso de Drive adentro, si ese permiso no está declarado en la
+            // pantalla de consentimiento. Después el selector falla con un 401
+            // que no dice nada de nada. Mirar acá qué concedió de verdad
+            // convierte ese misterio en una instrucción.
+            const concedidos = String((r && r.scope) || "");
+            if (concedidos && !concedidos.includes("drive.file")) {
+              falla(new Error(
+                "Google dio el permiso pero SIN el acceso a Drive. Hay que declararlo en Google Auth Platform → Acceso a los datos: agregar .../auth/drive.file y apretar Guardar abajo de todo. Concedido: " + concedidos
+              ));
+              return;
+            }
             token = r.access_token;
             tokenVence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
             listo(token);
