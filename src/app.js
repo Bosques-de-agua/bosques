@@ -1,7 +1,7 @@
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen","focoVista","tareasVista","verSinEnc"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -280,6 +280,41 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.values(state.nodes).forEach(n=>{ encsOf(n).forEach(o=>s.add(o)); (n.items||[]).forEach(k=>{ ownersOf(k).forEach(o=>s.add(o)); }); });
     Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>ownersOf(k).forEach(o=>s.add(o))));
     return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
+  // ---------- TEMAS A CARGO ----------
+  // Un tema con encargado es una responsabilidad en sí misma, aparte de las
+  // tareas que tenga adentro: el que lo tiene a cargo responde por el tema
+  // entero. Hasta ahora eso solo se veía en Estructura, tema por tema, así que
+  // nadie podía preguntarse "¿de qué estoy a cargo?" y tener una respuesta.
+  function rutaDe(n){ return pathOf(n.id).map(z=>z.name); }
+  const ordenTema=(a,b)=>rutaDe(a).join(" › ").localeCompare(rutaDe(b).join(" › "));
+  function temasConEnc(){ return Object.values(state.nodes).filter(n=>encsOf(n).length).sort(ordenTema); }
+  // Un proyecto (la raíz) no es un tema: no se lo cuenta entre los que están
+  // sin encargado, o la lista arrancaría siempre con dos avisos falsos.
+  function temasSinEnc(){ return Object.values(state.nodes).filter(n=>n.kind!=="project"&&!encsOf(n).length).sort(ordenTema); }
+  function temasDe(p){ return temasConEnc().filter(n=>encsOf(n).includes(p)); }
+  // Las cuentas de un tema son las de TODA su rama: quien está a cargo de un
+  // macro-tema responde también por lo que cuelga de él.
+  function temaCuentas(n,quien){ const a=agg(n); let mias=0;
+    if(quien)ramaIds(n.id).forEach(id=>{ const x=N(id); if(!x)return;
+      (x.items||[]).forEach(k=>{ if(!k.archived&&!k.done&&ownersOf(k).includes(quien))mias++; }); });
+    return {tot:a.ic,pend:a.ic-a.dc,subs:a.nc,mias}; }
+  function cuentaTema(c){ if(!c.tot)return `<span class="tcnt vacio">sin tareas todavía</span>`;
+    return `<span class="tcnt">${c.pend?`<b>${c.pend}</b> sin terminar`:"todo al día"} · ${c.tot} en total</span>`; }
+  function temaLinea(n,me){ const ruta=rutaDe(n), nombre=ruta[ruta.length-1], trail=ruta.slice(0,-1).join(" › ");
+    const c=temaCuentas(n,me), otros=encsOf(n).filter(p=>p!==me);
+    return `<div class="temaline" data-tema="${n.id}"><span class="orb" style="background:${accentOf(n)}"></span>`
+      +`<span class="tlm"><span class="tlt">${esc(nombre)}</span>${trail?`<span class="tlp" title="${esc(ruta.join(" › "))}">${esc(trail)}</span>`:""}</span>`
+      +(c.mias?`<span class="tmias" title="Tareas de este tema a tu nombre">${c.mias} tuya${c.mias===1?"":"s"}</span>`:"")
+      +cuentaTema(c)
+      +(otros.length?`<span class="tavs" title="También a cargo: ${esc(otros.join(", "))}">${otros.map(p=>avatarMarkup(p,"av2",true)).join("")}</span>`:"")
+      +`</div>`; }
+  function temaCard(n){ const ruta=rutaDe(n), c=temaCuentas(n,"");
+    const el=document.createElement("div"); el.className="kcard tcard"; el.style.borderLeftColor=accentOf(n);
+    el.innerHTML=`<div class="kt"><span class="ktt">${esc(ruta[ruta.length-1])}</span></div>`
+      +`<div class="kp"><span>${esc(ruta.slice(0,-1).join(" › ")||"raíz")}</span></div>`
+      +(n.contexto?`<div class="ctxline tctx">${esc(n.contexto)}</div>`:"")
+      +`<div class="kp">${cuentaTema(c)}${c.subs?`<span class="tsub">${c.subs} sub-tema${c.subs===1?"":"s"}</span>`:""}</div>`;
+    el.addEventListener("click",()=>openPanel(n.id)); return el; }
   function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",dueTime:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
   function archiveTask(k){ if(k.status!=="listo")setStatus(k,"listo"); if(!k.doneAt)k.doneAt=nowMs(); k.archived=true; k.archivedAt=nowMs(); }
   function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; }
@@ -979,7 +1014,19 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const cl=menu.querySelector(".fclear"); if(cl)cl.addEventListener("click",()=>{ tfil()[key]=[]; openFdrop=key; save(); renderTareas(); }); });
     const ca=document.getElementById("clearFilters"); if(ca)ca.addEventListener("click",()=>{ state.taskFilters={people:[],status:[],temas:[],prio:[]}; openFdrop=null; save(); renderTareas(); }); }
   document.addEventListener("click",()=>{ if(!openFdrop)return; document.querySelectorAll(".fmenu.on").forEach(m=>m.classList.remove("on")); openFdrop=null; });
+  // La pestaña tiene dos lecturas del mismo trabajo: las tareas sueltas y los
+  // temas con su encargado, que es un piso más arriba.
+  const tareasVista=()=>state.tareasVista==="temas"?"temas":"tareas";
   function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg)wg.value=state.weekGoals||"";
+    const v=tareasVista();
+    const seg=document.getElementById("tareasViewSeg");
+    if(seg)seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+    const tb=document.querySelector("#tab-tareas .tbar"), tb2=document.querySelector("#tab-tareas .tbar2");
+    if(tb)tb.hidden=v==="temas"; if(tb2)tb2.hidden=v==="temas";
+    const bar=document.getElementById("temasBar"), board=document.getElementById("temasBoard");
+    if(bar)bar.hidden=v!=="temas"; if(board)board.hidden=v!=="temas";
+    kanban.hidden=v==="temas";
+    if(v==="temas"){ renderTemasBoard(); return; }
     renderFilterBar(); const f=tfil(); const items=filteredItems(); kanban.innerHTML="";
     document.getElementById("taskCount").textContent=items.length+(items.length===1?" tarea":" tareas");
     // Agrupar por tema se sacó: generaba una columna por cada tema con tareas
@@ -990,6 +1037,31 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       people.forEach(p=>{ if(f.people.length&&!f.people.includes(p))return; kanban.appendChild(makeCol(p,avColor(p),groups[p],{person:p})); });
       if(!f.people.length||f.people.includes("__none")) kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
     else { STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); } }
+  // Los temas, en columnas por encargado: la misma lectura que "por persona"
+  // de las tareas, un piso más arriba. Los que no tienen encargado quedan
+  // afuera —son la mayoría y taparían lo demás—, pero se pueden pedir: ver
+  // qué quedó sin dueño es justamente para lo que sirve esta vista.
+  function renderTemasBoard(){ const board=document.getElementById("temasBoard"), bar=document.getElementById("temasBar");
+    if(!board)return;
+    const conEnc=temasConEnc(), sinEnc=temasSinEnc(), verSin=!!state.verSinEnc;
+    const porPersona=new Map();
+    conEnc.forEach(n=>encsOf(n).forEach(p=>{ if(!porPersona.has(p))porPersona.set(p,[]); porPersona.get(p).push(n); }));
+    // El equipo va siempre, aunque no tenga ningún tema: una columna vacía
+    // dice algo. Un nombre suelto que quedó de antes, solo si tiene temas.
+    const delEquipo=new Set(nombresEquipo());
+    const gente=allPeople().filter(p=>delEquipo.has(p)||porPersona.has(p));
+    if(bar){ bar.innerHTML=`<span class="barlab">Temas</span><span class="tbinfo">${conEnc.length} con encargado · ${sinEnc.length} sin encargado</span><div style="flex:1"></div>`
+        +(sinEnc.length?`<button class="rowbtn" id="toggleSinEnc">${verSin?"Ocultar":"Ver"} los ${sinEnc.length} sin encargado</button>`:"");
+      const tg=document.getElementById("toggleSinEnc");
+      if(tg)tg.addEventListener("click",()=>{ state.verSinEnc=!state.verSinEnc; save(); renderTemasBoard(); }); }
+    board.innerHTML="";
+    gente.forEach(p=>board.appendChild(colTemas(p,porPersona.get(p)||[],avatarMarkup(p,"kwho",true))));
+    if(verSin)board.appendChild(colTemas("Sin encargado",sinEnc,`<span style="width:9px;height:9px;border-radius:50%;background:${cssv("--ink-faint")}"></span>`));
+    if(!gente.length&&!verSin)board.innerHTML=`<div class="ph">Todavía no hay encargados. Se ponen en la ficha de cada tema, en Estructura.</div>`; }
+  function colTemas(titulo,temas,marca){ const col=document.createElement("div"); col.className="kcol";
+    col.innerHTML=`<h4>${marca}${esc(titulo)}<span class="n">${temas.length}</span></h4>`;
+    if(!temas.length)col.innerHTML+=`<div class="colvacia">Sin temas a cargo</div>`;
+    temas.forEach(n=>col.appendChild(temaCard(n))); return col; }
   function inSubtree(nodeId,ancId){ let x=N(nodeId); while(x){ if(x.id===ancId)return true; x=N(x.parent); } return false; }
   function makeCol(title,color,items,meta){ const col=document.createElement("div"); col.className="kcol"; col.dataset.status=meta.status||""; col.dataset.person=meta.person==null?"__none":meta.person; col.dataset.node=meta.node||""; if(meta.prio!=null)col.dataset.prio=meta.prio;
     const archAll=(meta.status==="listo"&&items.length)?`<button class="colact" data-archall>archivar todas</button>`:"";
@@ -1024,6 +1096,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     c.addEventListener("pointercancel",()=>{ if(ds&&ds.clone)ds.clone.remove(); ds=null; c.classList.remove("dragging"); dragCard=null; });
     return c; }
   document.getElementById("groupSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; taskGroup=b.dataset.g; document.querySelectorAll("#groupSeg button").forEach(x=>x.classList.toggle("on",x===b)); renderTareas(); });
+  document.getElementById("tareasViewSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; state.tareasVista=b.dataset.v; save(); renderTareas(); });
 
   // ---------- ARCHIVO ----------
   function renderArchivo(){ const box=document.getElementById("archivoBody");
@@ -1727,7 +1800,19 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +PRORD.map(p=>`<label class="fopt"><input type="checkbox" data-pf="${p}"${pf.includes(p)?" checked":""}><span class="sd" style="background:${cssv(PRIO[p].v)}"></span><span class="lbl">${PRIO[p].l}</span></label>`).join("")
       +`<label class="fopt"><input type="checkbox" data-pf="__none"${pf.includes("__none")?" checked":""}><span class="sd" style="background:${cssv("--ink-faint")}"></span><span class="lbl">Sin prioridad</span></label>`
       +(pf.length?`<button class="fclear">Ver todas</button>`:"")+`</div></div>`;
-    box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}</span></div>`+
+    // Dos lecturas de lo mismo: lo que tenés que hacer y de lo que estás a
+    // cargo. El botón de tarea privada y el filtro de prioridad son de las
+    // tareas, así que en la otra pestaña no aparecen.
+    const vf=focoVista(), misTemas=temasDe(me);
+    const seg=`<div class="seg2 focoseg" id="focoSeg"><button data-fv="tareas"${vf==="tareas"?' class="on"':""}>Tus tareas<span class="segn">${allMine.length+allPriv.length}</span></button><button data-fv="temas"${vf==="temas"?' class="on"':""}>Tus temas<span class="segn">${misTemas.length}</span></button></div>`;
+    const resumen=vf==="temas"
+      ? `${misTemas.length?`${misTemas.length} tema${misTemas.length===1?"":"s"} a tu cargo`:"ningún tema a tu cargo"}`
+      : `${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}`;
+    const cabecera=`<div class="myfoco"><span class="mfl"><b>Tu foco</b>${seg}<span class="mfc">${resumen}</span></span><span class="mfr">${vf==="tareas"?`<button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}`:""}</span></div>`;
+    if(vf==="temas"){ box.innerHTML=cabecera+temasDelFoco(misTemas,me);
+      box.querySelectorAll("[data-tema]").forEach(r=>r.addEventListener("click",()=>openPanel(r.dataset.tema)));
+      wireFocoSeg(); return; }
+    box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
       (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
@@ -1744,7 +1829,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     pfm.querySelectorAll("[data-pf]").forEach(cb=>cb.addEventListener("change",()=>{ const v=cb.dataset.pf, i=pf.indexOf(v);
       if(cb.checked){ if(i<0)pf.push(v); } else if(i>=0)pf.splice(i,1); save(); renderMyTasks(); document.getElementById("panelFilt").querySelector(".fmenu").classList.add("on"); }));
     const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
-    const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); }); }
+    const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); });
+    wireFocoSeg(); }
+  const focoVista=()=>state.focoVista==="temas"?"temas":"tareas";
+  function wireFocoSeg(){ const s=document.getElementById("focoSeg"); if(!s)return;
+    s.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; state.focoVista=b.dataset.fv; save(); renderMyTasks(); }); }
+  // Tus temas, agrupados por proyecto: son de dos mundos distintos y mezclados
+  // se leen mal. Cada renglón lleva las cuentas de TODA su rama, que es lo que
+  // uno quiere saber cuando responde por un tema entero.
+  function temasDelFoco(temas,me){
+    if(!temas.length)return `<div class="ph" style="margin-top:14px"><b>No sos encargado de ningún tema.</b><div style="margin-top:6px;font-size:13px">Los encargados se ponen en la ficha de cada tema, en Estructura. Un tema con encargado aparece acá aunque no tenga ninguna tarea adentro.</div></div>`;
+    const porProy=new Map();
+    temas.forEach(n=>{ const r=pathOf(n.id)[0]; const k=r?r.id:"__"; if(!porProy.has(k))porProy.set(k,{proy:r,arr:[]}); porProy.get(k).arr.push(n); });
+    return [...porProy.values()].map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${g.proy?accentOf(g.proy):cssv("--ink-faint")}"></span>${esc(g.proy?g.proy.name:"Sin proyecto")} · ${g.arr.length}</div>`
+      +g.arr.map(n=>temaLinea(n,me)).join("")+`</div>`).join(""); }
 
   // ---------- panel lateral ----------
   const drawer=document.getElementById("drawer"),scrim=document.getElementById("scrim");

@@ -225,8 +225,44 @@
   .card.notescard{border-left:3px solid var(--accent-priv)}
   .myfoco{font-size:13.5px;color:var(--ink-soft);margin:2px 4px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .myfoco b{color:var(--ink)}
-  .myfoco .mfl{flex:1 1 auto;min-width:0}
+  .myfoco .mfl{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .myfoco .mfr{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .myfoco .mfc{min-width:0}
+  /* Las dos lecturas de Tu foco: lo que tenés que hacer y de lo que estás a cargo. */
+  .focoseg{flex:none}
+  .focoseg .segn{margin-left:6px;font-size:10.5px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:var(--r-pill);padding:1px 6px}
+  .focoseg button.on .segn{color:var(--ink-soft)}
+  /* Un tema a cargo. Dos renglones: el nombre manda, la ruta acompaña. */
+  .temaline{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line-soft);font-size:13px;cursor:pointer}
+  .temaline:last-child{border-bottom:none}
+  .temaline:hover{background:color-mix(in srgb,var(--wood) 6%,transparent);border-radius:var(--r-ctl)}
+  .temaline .orb{width:9px;height:9px;border-radius:50%;flex:none}
+  .temaline .tlm{flex:1 1 auto;min-width:0}
+  .temaline .tlt{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .temaline .tlp{display:block;font-size:11px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .temaline .tcnt{flex:none;font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
+  .temaline .tcnt.vacio{color:var(--ink-faint)}
+  .temaline .tmias{flex:none;font-size:11px;font-weight:700;color:var(--wood-deep);background:color-mix(in srgb,var(--wood) 18%,transparent);border-radius:var(--r-pill);padding:2px 8px;white-space:nowrap}
+  :root[data-theme="dark"] .temaline .tmias,:root:not([data-theme="light"]) .temaline .tmias{color:var(--wood)}
+  /* En pantalla angosta la cuenta baja a su propio renglón. Es nowrap y no
+     cede, así que compartiendo línea le dejaba veinte píxeles al nombre del
+     tema, que es lo único que de verdad hay que poder leer. */
+  @media (max-width:620px){
+    .temaline{flex-wrap:wrap;row-gap:3px}
+    .temaline .tcnt{flex:1 0 100%;order:3;padding-left:19px}
+  }
+  .temaline .tavs{flex:none;display:flex}
+  .temaline .tavs .av2{margin-left:-5px}
+  .temaline .tavs .av2:first-child{margin-left:0}
+  /* La tarjeta de un tema en la vista por encargado. */
+  .tcard{cursor:pointer}
+  .tcard .tctx{margin-top:6px;font-size:11px}
+  .tcard .tcnt{font-size:10.5px}
+  .tcard .tsub{margin-left:auto;font-size:10.5px;color:var(--ink-faint)}
+  .kcol .colvacia{font-size:11.5px;color:var(--ink-faint);padding:4px 4px 8px}
+  .temasbar .tbinfo{font-size:12.5px;color:var(--ink-faint)}
+  /* El atributo hidden no le gana a un display:flex propio. */
+  .tbar[hidden],.tbar2[hidden],.kanban[hidden]{display:none}
   .evrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line-soft);cursor:pointer}
   .evrow:last-child{border-bottom:none}
   .evrow:hover{background:var(--surface-2);border-radius:var(--r-sm)}

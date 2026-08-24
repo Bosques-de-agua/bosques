@@ -95,7 +95,7 @@
       <h1 class="h1">Mi panel<span class="infob" tabindex="0">i<span class="infopop"><b>Tu día, solo lo tuyo</b><ul>
         <li>En el <b>calendario</b> ves los eventos del equipo y tus tareas con fecha. Tocá un día vacío para crear un evento.</li>
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
-        <li><b>Tu foco</b> son las tareas del equipo a tu nombre, agrupadas por estado. El casillero las marca como terminadas.</li>
+        <li><b>Tu foco</b> tiene dos pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas), y <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama.</li>
         <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
         <li>Tu <b>foto</b> y <b>tu color</b> te identifican en toda la app.</li></ul></span></span></h1>
@@ -138,11 +138,14 @@
         <li><b>Arrastrá una tarjeta</b> de una columna a otra para cambiarle el estado, el responsable o el tema, según la vista en la que estés.</li>
         <li>El <b>casillero</b> de la tarjeta la marca como terminada. Las terminadas se archivan solas a los 7 días, o mandalas antes con el botón de archivar.</li>
         <li>Un clic en la tarjeta abre su ficha con objetivo, notas y responsables.</li>
-        <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li></ul></span></span></h1>
+        <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
+        <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button></div></h1>
       <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
+      <div class="tbar temasbar" id="temasBar" hidden></div>
+      <div class="kanban temaboard" id="temasBoard" hidden></div>
     </div></section>
 
 
