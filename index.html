@@ -26,7 +26,7 @@
       <h1>Estudio</h1>
       <p>Bosques de Agua · Boscora. Ingresá con tu email de equipo — te mandamos un enlace de acceso, sin contraseña.</p>
       <form id="login-form">
-        <input type="email" id="login-email" spellcheck="false" placeholder="tu@email.com" autocomplete="email" required />
+        <input type="email" id="login-email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="tu@email.com" autocomplete="email" required />
         <button type="submit" class="btn btn-primary enter-btn">Enviar enlace de acceso</button>
       </form>
       <div class="status" id="login-status"></div>
@@ -118,7 +118,7 @@
         <li>Podés <b>arrastrar una tarea</b> de un tema a otro.</li>
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
         <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span><div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div></h1>
-      <div class="srchbar"><input class="srch" id="estSearch" spellcheck="false" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
+      <div class="srchbar"><input class="srch" id="estSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
       </div>
 
       <div class="estwrap-mapa" id="estMapaWrap" hidden>
@@ -140,9 +140,9 @@
         <li>Un clic en la tarjeta abre su ficha con objetivo, notas y responsables.</li>
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
         <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button></div></h1>
-      <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
+      <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" autocapitalize="sentences" autocorrect="on" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
-      <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" spellcheck="false" placeholder="Buscar tarea…"></div>
+      <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
       <div class="tbar temasbar" id="temasBar" hidden></div>
       <div class="kanban temaboard" id="temasBoard" hidden></div>
@@ -164,7 +164,7 @@
           <div class="chathead" id="chatHead"></div>
           <div class="msgs" id="msgs"></div>
           <div class="replybar" id="replyBar" hidden></div>
-          <div class="composer"><button class="btn btn-icon" id="attachBtn" title="Adjuntar un archivo"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M13.6 9.4l-4.3 4.3a2.6 2.6 0 0 1-3.7-3.7l5.1-5.1a1.8 1.8 0 0 1 2.5 2.5l-5 5a1 1 0 0 1-1.4-1.4l4.4-4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><input type="file" id="chatFile" hidden><input type="file" id="restoreFile" accept="application/json,.json" hidden><button class="btn btn-icon" id="emojiBtn" title="Emojis" aria-label="Emojis"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="7.6" cy="8.4" r="1" fill="currentColor"/><circle cx="12.4" cy="8.4" r="1" fill="currentColor"/><path d="M7 12.2a3.6 3.6 0 0 0 6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button><input id="msgInput" placeholder="Escribí un mensaje…"><button class="btn btn-primary" id="sendMsg">Enviar</button></div>
+          <div class="composer"><button class="btn btn-icon" id="attachBtn" title="Adjuntar un archivo"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M13.6 9.4l-4.3 4.3a2.6 2.6 0 0 1-3.7-3.7l5.1-5.1a1.8 1.8 0 0 1 2.5 2.5l-5 5a1 1 0 0 1-1.4-1.4l4.4-4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><input type="file" id="chatFile" hidden><input type="file" id="restoreFile" accept="application/json,.json" hidden><button class="btn btn-icon" id="emojiBtn" title="Emojis" aria-label="Emojis"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="7.6" cy="8.4" r="1" fill="currentColor"/><circle cx="12.4" cy="8.4" r="1" fill="currentColor"/><path d="M7 12.2a3.6 3.6 0 0 0 6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button><input id="msgInput" autocapitalize="sentences" autocorrect="on" placeholder="Escribí un mensaje…"><button class="btn btn-primary" id="sendMsg">Enviar</button></div>
         </div>
       </div>
     </section>
@@ -175,7 +175,7 @@
         <li>Para sumar algo: copiá el link desde Drive y pegalo con <b>＋ vincular archivo</b>.</li>
         <li>El archivo <b>no se copia</b>: queda apuntando a Drive, así siempre ves la última versión.</li>
         <li>El link funciona para quien tenga acceso en Drive: compartí la carpeta con todo el equipo.</li></ul></span></span></h1>
-      <div class="srchbar"><input class="srch" id="driveSearch" spellcheck="false" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
+      <div class="srchbar"><input class="srch" id="driveSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
       <div class="tbar"><span class="barlab">Ordenar por</span>
         <div class="seg2" id="driveOrdenSeg"><button data-o="tema" class="on">Tema</button><button data-o="nombre">Nombre</button><button data-o="tipo">Tipo</button></div>
         <span style="color:var(--ink-faint);font-size:12.5px" id="driveCuenta"></span></div>
@@ -200,19 +200,19 @@
   <div class="phead">
     <button class="btn btn-icon close" id="closePanel" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="ey"><span class="dot" id="pDot"></span><span id="pKind">Tema</span></div>
-    <input class="title" id="pTitle" aria-label="Nombre">
+    <input class="title" id="pTitle" autocapitalize="sentences" autocorrect="on" aria-label="Nombre">
     <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Encargados del tema</label><div class="ppick" id="pEncs"></div></div></div>
     <button class="btn enter-btn" id="enterBtn"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>Ver en el mapa</button>
   </div>
   <div class="pbody">
-    <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="pObj" rows="2" placeholder="¿Qué busca este tema?"></textarea></div>
-    <div class="sec"><div class="sh"><h3>Estado actual</h3></div><textarea class="txt" id="pCtx" rows="3" placeholder="¿En qué se está trabajando ahora?"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="pObj" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="¿Qué busca este tema?"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Estado actual</h3></div><textarea class="txt" id="pCtx" autocapitalize="sentences" autocorrect="on" rows="3" placeholder="¿En qué se está trabajando ahora?"></textarea></div>
     <div class="sec" id="pTasksSec"><div class="sh"><h3>Tareas</h3><button class="mini-add" id="addTaskBtn">＋ tarea</button></div><div id="itemList"></div></div>
     <div class="sec"><div class="sh"><h3>Sub-temas</h3><button class="mini-add" id="addSub">＋ sub-tema</button></div><div id="subList"></div></div>
     <div class="sec" id="pBelongSec"><div class="sh"><h3>Pertenece a</h3></div><div id="pBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="pAddFile">＋ archivo de Drive</button></div><div id="pFiles"></div></div>
     <div class="sec" id="pLinksSec"><div class="sh"><h3>Vínculos con otros temas</h3><button class="mini-add" id="addLink">＋ vincular</button></div><div style="position:relative"><!-- Clase propia y específica a propósito: "picker" a secas la usa también el
-     selector de Google, y nuestra regla le apagaba la ventana. --><div class="linkpick" id="picker"><input class="txt" id="pickSearch" spellcheck="false" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
+     selector de Google, y nuestra regla le apagaba la ventana. --><div class="linkpick" id="picker"><input class="txt" id="pickSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
   </div>
   <div class="pfoot"><button class="btn danger" id="delNode">Eliminar tema</button></div>
 </aside>
@@ -221,7 +221,7 @@
   <div class="phead">
     <button class="btn btn-icon close" id="closeTask" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="ey"><span id="tKind">Tarea</span></div>
-    <div class="titlerow"><input type="checkbox" id="tDoneChk" class="bigchk" title="Marcar como terminada"><input class="title" id="tTitle" aria-label="Título de la tarea"></div>
+    <div class="titlerow"><input type="checkbox" id="tDoneChk" class="bigchk" title="Marcar como terminada"><input class="title" id="tTitle" autocapitalize="sentences" autocorrect="on" aria-label="Título de la tarea"></div>
     <div class="pctl">
       <div class="c"><label><span class="dotlab" id="tDot"></span>Estado</label><select class="pick" id="tStatus"><option value="sin">Sin empezar</option><option value="curso">En curso</option><option value="espera">En espera</option><option value="listo">Terminado</option></select></div>
       <div class="c"><label><span class="dotlab" id="tPrioDot"></span>Prioridad</label><select class="pick" id="tPrio"><option value="">— sin prioridad —</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></div>
@@ -235,8 +235,8 @@
     </div>
   </div>
   <div class="pbody">
-    <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="tObj" rows="2" placeholder="¿Para qué es esta tarea?"></textarea></div>
-    <div class="sec"><div class="sh"><h3>Notas</h3></div><textarea class="txt" id="tNotas" rows="5" placeholder="En qué está, avances, contexto…"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="tObj" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="¿Para qué es esta tarea?"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Notas</h3></div><textarea class="txt" id="tNotas" autocapitalize="sentences" autocorrect="on" rows="5" placeholder="En qué está, avances, contexto…"></textarea></div>
     <div class="sec"><div class="sh"><h3>Pertenece a</h3></div><div id="tBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="tAddFile">＋ archivo de Drive</button></div><div id="tFiles"></div></div>
   </div>
@@ -249,7 +249,7 @@
 <div class="modal" id="groupModal"><div class="box" style="width:min(440px,92vw)">
   <h2 id="gmTitle">Nuevo grupo</h2>
   <p>Un canal aparte con solo algunas personas del equipo. Los que no estén adentro no lo ven.</p>
-  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nombre del grupo</label><input class="txt" id="gmName" placeholder="Ej: Siembra directa"></div></div>
+  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nombre del grupo</label><input class="txt" id="gmName" autocapitalize="sentences" autocorrect="on" placeholder="Ej: Siembra directa"></div></div>
   <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Quiénes están</label><div id="gmMembers" class="gmlist"></div></div></div>
   <div class="row"><button class="btn danger" id="gmDel">Eliminar grupo</button><div style="flex:1"></div><button class="btn" id="gmCancel">Cancelar</button><button class="btn btn-primary" id="gmSave">Guardar</button></div>
 </div></div>
@@ -260,14 +260,14 @@
        de dónde sale el archivo. Al revés, el selector de Google resolvía las
        dos primeras por su cuenta y no quedaba forma de cambiarlas. -->
   <div class="pctl" id="fmWhereWrap"><div class="c" style="flex:1 1 100%"><label>Vincularlo a</label><select class="pick" id="fmWhere"></select></div></div>
-  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Cómo lo van a ver</label><input class="txt" id="fmName" placeholder="Ej: Borrador carta de intención"><span class="fmhint">Si lo dejás vacío, se usa el nombre que tiene en Drive.</span></div></div>
+  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Cómo lo van a ver</label><input class="txt" id="fmName" autocapitalize="sentences" autocorrect="on" placeholder="Ej: Borrador carta de intención"><span class="fmhint">Si lo dejás vacío, se usa el nombre que tiene en Drive.</span></div></div>
   <div class="fmsep" id="fmSep"><span>el archivo</span></div>
   <!-- El selector de Google solo aparece si están cargadas sus variables. -->
   <div class="fmpick" id="fmPickWrap" hidden>
     <button type="button" class="btn btn-primary" id="fmPick">Elegir de mi Drive</button>
     <span class="fmpickhint">Trae el link y el tipo solos. Si elegís varios, se vinculan todos.</span>
   </div>
-  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Link de Drive</label><input class="txt" id="fmUrl" spellcheck="false" placeholder="https://docs.google.com/…"><span class="fmhint">O abrilo en Drive, copiá el link de la barra del navegador y pegalo acá. El archivo queda en Drive: la app solo guarda el link.</span></div></div>
+  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Link de Drive</label><input class="txt" id="fmUrl" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://docs.google.com/…"><span class="fmhint">O abrilo en Drive, copiá el link de la barra del navegador y pegalo acá. El archivo queda en Drive: la app solo guarda el link.</span></div></div>
   <div class="row"><div style="flex:1"></div><button class="btn" id="fmCancel">Cancelar</button><button class="btn btn-primary" id="fmSave">Vincular</button></div>
 </div></div>
 
@@ -287,7 +287,7 @@
 <div class="modal" id="askModal"><div class="box" style="width:min(430px,92vw)">
   <h2 id="askTitle">Confirmar</h2>
   <p id="askMsg"></p>
-  <input class="txt" id="askInput" style="display:none">
+  <input class="txt" id="askInput" autocapitalize="sentences" autocorrect="on" style="display:none">
   <select class="pick" id="askSelect" style="display:none;width:100%"></select>
   <div class="row"><div style="flex:1"></div><button class="btn" id="askNo">Cancelar</button><button class="btn btn-primary" id="askYes">Sí</button></div>
 </div></div>
@@ -295,7 +295,7 @@
 <div class="modal" id="ntModal"><div class="box" style="width:min(470px,92vw)">
   <h2>Nueva tarea</h2>
   <p>Elegí a qué tema pertenece y quién la lleva.</p>
-  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿Qué hay que hacer?</label><input class="txt" id="ntTitle" placeholder="Título de la tarea"></div></div>
+  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿Qué hay que hacer?</label><input class="txt" id="ntTitle" autocapitalize="sentences" autocorrect="on" placeholder="Título de la tarea"></div></div>
   <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Tema al que pertenece</label><select class="pick" id="ntNode"></select></div></div>
   <div class="pctl">
     <div class="c" style="flex:1 1 100%"><label>Responsables</label><div class="ppick" id="ntOwners"></div></div>

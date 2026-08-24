@@ -1594,7 +1594,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function openEvEdit(id){ const ev=(state.events||[]).find(e=>e.id===id); if(ev)evForm(ev); }
   function evForm(ev,presetDate){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date());
     const da0=ev?ev.date:((presetDate&&/^\d{4}-\d{2}-\d{2}$/.test(presetDate))?presetDate:today);
-    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar al equipo"}</button></div>`;
+    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" autocapitalize="sentences" autocorrect="on" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar al equipo"}</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelector("#evCancel").addEventListener("click",()=>{ if(ev)openEvView(ev.id); else closeEv(); });
     box.querySelector("#evTitle").focus();
@@ -1704,7 +1704,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=`<div class="cfg">
       <div class="cfgsec"><div class="lab">Vos</div>
         <div class="cfgrow"><span class="lbl">Tu nombre<small>Así te ven los demás en toda la app</small></span>
-          <input class="txt" id="cfgNombre" value="${esc(me)}" maxlength="40"><button class="btn" id="cfgNombreOk">Guardar</button></div>
+          <input class="txt" id="cfgNombre" autocapitalize="sentences" autocorrect="on" value="${esc(me)}" maxlength="40"><button class="btn" id="cfgNombreOk">Guardar</button></div>
         <div class="cfgrow"><span class="lbl">Tu correo<small>Con este entrás; no se puede cambiar</small></span>
           <span style="font-size:12.5px;color:var(--ink-faint)">${esc(miEmail||"—")}</span></div>
         <div class="cfgrow"><span class="lbl">Tu color<small>Te identifica en tarjetas, columnas y filtros</small></span>
@@ -1725,7 +1725,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <div class="cfgsec"><div class="lab">Equipo</div>
         <div id="cfgTeam"></div>
         <div class="cfgrow"><span class="lbl">Sumar a alguien<small>Recibe acceso con su propio correo</small></span>
-          <input class="txt" spellcheck="false" id="cfgInvitar" placeholder="correo@ejemplo.com" type="email"><button class="btn" id="cfgInvitarOk">Habilitar</button></div>
+          <input class="txt" spellcheck="false" id="cfgInvitar" autocapitalize="off" autocorrect="off" placeholder="correo@ejemplo.com" type="email"><button class="btn" id="cfgInvitarOk">Habilitar</button></div>
       </div>
       <div class="cfgsec"><div class="lab">Respaldo</div>
         <div class="cfgrow"><span class="lbl">Descargar una copia<small>Todo el contenido del equipo en un archivo</small></span>
@@ -1844,7 +1844,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
           <button class="notabtn" data-baja="${esc(n.id)}" title="Bajar"${i===notas.length-1?" disabled":""}>↓</button>
           <button class="notabtn del" data-borra="${esc(n.id)}" title="Borrar esta nota">✕</button>
         </div>
-        <textarea id="nota-${esc(n.id)}" class="notesarea" placeholder="Escribí acá…">${esc(n.text||"")}</textarea>
+        <textarea id="nota-${esc(n.id)}" class="notesarea" placeholder="Escribí acá…" autocapitalize="sentences" autocorrect="on">${esc(n.text||"")}</textarea>
       </div>`).join("");
     box.innerHTML=`<div class="card notescard">
       <div class="notashead"><div class="lab" title="Privadas: solo las ves vos">${ICO.nota} Mis notas</div>
