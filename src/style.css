@@ -231,6 +231,25 @@
   .evtag.yes{background:color-mix(in srgb,var(--s-curso) 20%,transparent);color:var(--s-curso)}
   .evtag.no{background:color-mix(in srgb,var(--s-bloq) 18%,transparent);color:var(--s-bloq)}
   .notesarea{width:100%;min-height:170px;font:inherit;font-size:13.5px;line-height:1.55;color:var(--ink);background:transparent;border:none;outline:none;resize:vertical}
+  /* Varias notas: cada una es su propia hoja, separadas por una línea fina en
+     vez de por cajas, que a cinco notas serían cinco marcos apilados. */
+  .notashead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .notashead .lab{margin:0}
+  .notashead .rowbtn{margin-left:auto;flex:none}
+  .notarow{border-top:1px solid var(--line-soft);padding-top:8px;margin-top:10px}
+  .notarow:first-of-type{border-top:none;padding-top:0;margin-top:0}
+  .notarow .notesarea{min-height:96px}
+  .notabar{display:flex;align-items:center;gap:2px;min-height:22px}
+  .notafecha{font:400 10.5px/1 var(--font-mono);color:var(--ink-faint);letter-spacing:.02em}
+  /* Los controles asoman al pasar por encima de la nota; en pantalla táctil no
+     hay "pasar por encima", así que ahí se ven siempre. */
+  .notabtn{opacity:0;transition:opacity .12s;background:none;border:none;color:var(--ink-faint);cursor:pointer;
+    font-size:12px;line-height:1;padding:4px 5px;border-radius:var(--r-sm)}
+  .notarow:hover .notabtn,.notabtn:focus-visible{opacity:1}
+  .notabtn:hover{background:var(--surface-2);color:var(--ink)}
+  .notabtn:disabled{opacity:0!important;pointer-events:none}
+  .notabtn.del:hover{color:#8E2F1D}
+  @media (hover:none){ .notabtn{opacity:.6} }
   .navbadge{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;margin-left:6px;border-radius:var(--r-pill);background:var(--s-bloq);color:var(--on-accent);font-size:9.5px;font-weight:700}
   .navbadge[hidden]{display:none}
   .myfoco .newchip{background:color-mix(in srgb,var(--wood) 20%,transparent);color:var(--wood-deep);border-radius:var(--r-pill);padding:2px 9px;font-weight:700;cursor:pointer;margin-left:2px}

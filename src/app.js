@@ -432,13 +432,28 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
   }
   // Mi porción privada: es lo único que sube a la tabla con permisos.
+  // Las notas pasaron de ser un solo texto a ser varias. La migración es
+  // perezosa y a prueba de todo: si lo guardado es el texto viejo, se convierte
+  // en una nota; si es cualquier otra cosa, se arranca vacío. Nunca se descarta
+  // contenido sin convertirlo, porque de esto no hay otra copia en ningún lado.
+  function fechaCorta(ts){ try{ return new Date(ts).toLocaleDateString(); }catch(e){ return ""; } }
+  function notasDe(quien){ const m=state.myNotes||(state.myNotes={});
+    let v=m[quien];
+    if(typeof v==="string"){ v=v.trim()?[{id:"nt"+uid(),text:v,ts:nowMs()}]:[]; m[quien]=v; }
+    if(!Array.isArray(v))v=m[quien]=[];
+    return v; }
   function myPrivateSlice(){ const me=state.me; if(!me)return null;
-    return { privTasks:(state.privTasks||{})[me]||[], myNotes:(state.myNotes||{})[me]||"" }; }
+    return { privTasks:(state.privTasks||{})[me]||[], myNotes:notasDe(me) }; }
   function mountPrivate(p){ const me=state.me; if(!me||!p)return;
     state.privTasks=state.privTasks||{}; state.myNotes=state.myNotes||{};
     if(Array.isArray(p.privTasks))state.privTasks[me]=p.privTasks;
-    if(typeof p.myNotes==="string")state.myNotes[me]=p.myNotes; }
-  function applyPrivateState(p){ mountPrivate(p); if(active==="panel")renderPanel(); }
+    // Se aceptan las dos formas: el texto viejo de una sola nota y la lista
+    // nueva. notasDe() convierte lo que haga falta al leerlo.
+    if(typeof p.myNotes==="string"||Array.isArray(p.myNotes))state.myNotes[me]=p.myNotes; }
+  // Lo privado también llega de afuera: desde tu otro dispositivo. Y también
+  // pisa lo que estás escribiendo en este instante, así que va el mismo cuidado
+  // que con el estado del equipo.
+  function applyPrivateState(p){ mountPrivate(p); reaplicarEdicionEnCurso(); if(active==="panel")renderPanel(); }
   // Los datos privados vivían dentro de la fila compartida del equipo. La primera
   // vez que entrás, tu porción se copia a tu tabla y se saca de ahí.
   // Regla dura: se toca SOLO la porción propia, nunca la de otra persona.
@@ -521,10 +536,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     {id:"tObj",    set:v=>{ const k=curTask(); if(k)k.objetivo=v; }},
     {id:"tNotas",  set:v=>{ const k=curTask(); if(k)k.notas=v; }},
     {id:"weekGoals", set:v=>{ state.weekGoals=v; }},
-    {id:"myNotesArea", set:v=>{ state.myNotes=state.myNotes||{}; if(state.me)state.myNotes[state.me]=v; }},
   ];
   function reaplicarEdicionEnCurso(){
     const el=document.activeElement; if(!el||!el.id)return;
+    // Las notas ya no son una sola: cada una tiene su propio campo, así que no
+    // pueden estar en la lista de arriba, que va por id fijo. Se reconocen por
+    // el prefijo y se busca la que corresponda.
+    if(el.id.indexOf("nota-")===0){ const me=state.me; if(!me)return;
+      const n=notasDe(me).find(x=>x.id===el.id.slice(5));
+      if(n)n.text=el.value;
+      return; }
     const e=EDITORES.find(x=>x.id===el.id); if(!e)return;
     try{ e.set(el.value); }catch(err){ console.error("No se pudo reaplicar la edición en curso:",err); }
   }
@@ -1504,13 +1525,48 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     state.me=nuevo;
     if(saveMember)saveMember({email:miEmail,name:nuevo}).catch(()=>{});
     save(); refreshChrome(); renderActive(); note(`Ahora sos "${nuevo}" para todo el equipo.`,"Nombre actualizado"); }
-  function renderMyNotes(){ const box=document.getElementById("myNotes"); if(!box)return; const me=state.me;
-    if(document.activeElement&&document.activeElement.id==="myNotesArea")return;
+  function renderMyNotes(forzar){ const box=document.getElementById("myNotes"); if(!box)return; const me=state.me;
+    // Si estás escribiendo en una nota, no se vuelve a dibujar la lista: te
+    // sacaría el cursor de adentro a mitad de una frase. Pero el guardia es
+    // SOLO para los redibujados que no pediste vos: agregar, borrar o mover
+    // tienen que dibujarse sí o sí. Sin esa distinción, apretar "＋ nota" con
+    // el cursor adentro de otra no mostraba la nueva, y lo que escribías
+    // después terminaba pisando la nota anterior.
+    const foco=document.activeElement;
+    if(!forzar&&foco&&foco.id&&foco.id.indexOf("nota-")===0)return;
     if(!me){ box.innerHTML=""; return; }
-    const val=(state.myNotes&&state.myNotes[me])||"";
-    box.innerHTML=`<div class="card notescard"><div class="lab" style="margin-bottom:8px" title="Privadas: solo las ves vos">${ICO.nota} Mis notas</div><textarea id="myNotesArea" class="notesarea" placeholder="Recordatorios, ideas, pendientes personales… lo que quieras."></textarea></div>`;
-    const ta=box.querySelector("#myNotesArea"); ta.value=val;
-    ta.addEventListener("input",e=>{ state.myNotes=state.myNotes||{}; state.myNotes[me]=e.target.value; save(); }); }
+    const notas=notasDe(me);
+    const filas=notas.map((n,i)=>`<div class="notarow" data-nota="${esc(n.id)}">
+        <div class="notabar">
+          <span class="notafecha">${n.ts?esc(fechaCorta(n.ts)):""}</span>
+          <div style="flex:1"></div>
+          <button class="notabtn" data-sube="${esc(n.id)}" title="Subir"${i===0?" disabled":""}>↑</button>
+          <button class="notabtn" data-baja="${esc(n.id)}" title="Bajar"${i===notas.length-1?" disabled":""}>↓</button>
+          <button class="notabtn del" data-borra="${esc(n.id)}" title="Borrar esta nota">✕</button>
+        </div>
+        <textarea id="nota-${esc(n.id)}" class="notesarea" placeholder="Escribí acá…">${esc(n.text||"")}</textarea>
+      </div>`).join("");
+    box.innerHTML=`<div class="card notescard">
+      <div class="notashead"><div class="lab" title="Privadas: solo las ves vos">${ICO.nota} Mis notas</div>
+        <button class="rowbtn" id="notaNueva">＋ nota</button></div>
+      ${notas.length?filas:`<div class="empty">Todavía no tenés ninguna. Sumá la primera con "＋ nota".</div>`}</div>`;
+
+    box.querySelector("#notaNueva").addEventListener("click",()=>{
+      notasDe(me).unshift({id:"nt"+uid(),text:"",ts:nowMs()}); save(); renderMyNotes(true);
+      const primera=box.querySelector(".notarow textarea"); if(primera)primera.focus(); });
+    box.querySelectorAll("[data-nota] textarea").forEach(ta=>{
+      ta.addEventListener("input",()=>{ const id=ta.id.slice(5); const n=notasDe(me).find(x=>x.id===id); if(!n)return; n.text=ta.value; save(); }); });
+    box.querySelectorAll("[data-borra]").forEach(b=>b.addEventListener("click",()=>{
+      const id=b.dataset.borra; const arr=notasDe(me); const n=arr.find(x=>x.id===id); if(!n)return;
+      const seguir=()=>{ const i=arr.findIndex(x=>x.id===id); if(i>=0)arr.splice(i,1); save(); renderMyNotes(true); };
+      // Una nota vacía no merece una pregunta; una escrita, sí. De esto no hay
+      // respaldo en ningún lado: es lo único que solo tenés vos.
+      if(!(n.text||"").trim())seguir();
+      else confirmar("Se borra para siempre. Nadie más tiene una copia.",seguir,{title:"Borrar la nota",yes:"Borrar"}); }));
+    const mover=(id,paso)=>{ const arr=notasDe(me); const i=arr.findIndex(x=>x.id===id); const j=i+paso;
+      if(i<0||j<0||j>=arr.length)return; const t=arr[i]; arr[i]=arr[j]; arr[j]=t; save(); renderMyNotes(true); };
+    box.querySelectorAll("[data-sube]").forEach(b=>b.addEventListener("click",()=>mover(b.dataset.sube,-1)));
+    box.querySelectorAll("[data-baja]").forEach(b=>b.addEventListener("click",()=>mover(b.dataset.baja,1))); }
   const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
   const MESES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   function fechaLarga(ds){ const [y,m,d]=String(ds).split("-").map(Number); if(!y)return ds;
