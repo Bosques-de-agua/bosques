@@ -810,6 +810,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const estree=document.getElementById("estree");
   function moveTask(itemId,fromId,toId,beforeId){ if(beforeId===itemId)return; // soltarla sobre sí misma no hace nada
     const from=N(fromId),to=N(toId); if(!from||!to)return; const idx=(from.items||[]).findIndex(x=>x.id===itemId); if(idx<0)return; const [it]=from.items.splice(idx,1); to.items=to.items||[]; let j=to.items.length; if(beforeId){ const bi=to.items.findIndex(x=>x.id===beforeId); if(bi>=0)j=bi; } to.items.splice(j,0,it); save(); }
+  // Mudar una tarea a otro tema desde su propia ficha. Reusa moveTask(), el
+  // mismo camino que el arrastre en el árbol, así que no hay dos formas de
+  // mover una tarea que puedan desincronizarse.
+  function pedirNuevoTema(k){ const desde=selTaskNode; const actual=N(desde); if(!actual)return;
+    const ops=[]; const walk=(id,depth)=>{ const n=N(id); if(!n)return;
+      ops.push({v:id,l:(depth>1?"　".repeat(depth-1)+"› ":"")+n.name});
+      (n.children||[]).forEach(c=>walk(c,depth+1)); };
+    state.roots.forEach(r=>walk(r,1));
+    dialog({title:"Cambiar de tema",
+      msg:`"${k.title||"La tarea"}" pasa al tema que elijas. Se va del actual: no queda en los dos.`,
+      select:ops, value:desde, yes:"Mover",
+      cb:v=>{ if(!v||v===desde)return; const destino=N(v); if(!destino)return;
+        moveTask(k.id,desde,v,null);
+        selTaskNode=v;                       // la ficha sigue abierta sobre la misma tarea
+        save(); renderActive(); renderTBelong(); renderTFiles();
+        toast(`"${k.title||"Tarea"}" ahora está en "${destino.name}"`); }}); }
   function quickTask(node){ treeOpen.add(node.id); saveTreeOpen(); openNewTask({nodeId:node.id}); }
   function encChip(node){ return encsOf(node).map(p=>`<span class="encchip">${avatarMarkup(p,"av")}${esc(p)}</span>`).join(" "); }
   function renderEstBusqueda(){ const q=norm(estQuery.trim()); const info=document.getElementById("estSearchInfo"), clr=document.getElementById("estSearchClear");
@@ -1745,9 +1761,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return; }
     const node=N(selTaskNode); if(!node)return;
     const path=pathOf(selTaskNode); const label=path[path.length-1].name; const trail=path.map(p=>p.name).slice(0,-1).join(" › ")||"raíz";
-    box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><span class="go">↗</span></div>`
+    box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><button class="fed" id="tReparent" title="Cambiar de tema">${ICO.lapiz}</button><span class="go">↗</span></div>`
       +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">${ICO.candado} Convertir en tarea privada</button>`;
-    document.getElementById("tGoNode").addEventListener("click",()=>{ closeTask(); openPanel(selTaskNode); });
+    document.getElementById("tGoNode").addEventListener("click",e=>{ if(e.target.closest("#tReparent"))return; closeTask(); openPanel(selTaskNode); });
+    document.getElementById("tReparent").addEventListener("click",e=>{ e.stopPropagation(); pedirNuevoTema(k); });
     document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note("No pudimos identificarte."); return; }
       confirmar("La tarea sale del tema y pasa a tu panel privado: nadie más la va a ver y queda solo a tu nombre.",()=>{
         const n=N(selTaskNode); const i=(n.items||[]).findIndex(x=>x.id===selTaskId); if(i<0)return; const [it]=n.items.splice(i,1); it.priv=true; it.owners=[me];
