@@ -186,6 +186,12 @@
   .encchip .av{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:8.5px;font-weight:700;color:var(--on-person)}
   .subblock{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--l3);border-radius:var(--r-md);margin-bottom:8px;box-shadow:var(--shadow)}
   .subblock .sbh{display:flex;align-items:center;gap:8px;padding:8px 10px}
+  /* El agarre del sub-tema aparece al pasar por encima: siempre visible sería
+     una columna de puntitos repetida en cada renglón del árbol. */
+  .gripsub{margin-left:auto;color:var(--ink-faint);cursor:grab;font-size:11px;letter-spacing:-2px;opacity:0;transition:opacity .12s;flex:none}
+  .subblock .sbh:hover .gripsub{opacity:.75}
+  .estcol.dragging,.subblock.dragging{opacity:.4}
+  @media (hover:none){ .gripsub{opacity:.5} }
   .subblock .sbh .car{width:16px;height:16px;display:grid;place-items:center;color:var(--ink-faint);cursor:pointer;transition:transform .15s;font-size:9px;flex:none}
   .subblock .sbh .car.open{transform:rotate(90deg)}
   .subblock .sbh .sname{font-weight:600;font-size:13px;cursor:pointer;flex:1;min-width:0}
