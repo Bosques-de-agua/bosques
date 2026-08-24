@@ -885,6 +885,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     estree.innerHTML=res.slice(0,80).map((r,i)=>`<div class="resline" data-r="${i}"><span class="rk" style="background:${r.color}">${r.kind}</span><span class="rt"><b>${hl(r.name)}</b><span>${esc(r.trail)}</span></span><span class="go" style="color:var(--ink-faint)">↗</span></div>`).join("")
       +(res.length>80?`<div class="empty">…y ${res.length-80} más. Afiná la búsqueda.</div>`:"");
     estree.querySelectorAll("[data-r]").forEach(el=>el.addEventListener("click",()=>res[+el.dataset.r].go())); }
+  // El "estado actual" es un párrafo, no una etiqueta: en las columnas del
+  // árbol tapaba la lista de temas y no se leía igual. Se muestra solo en la
+  // vista desplegada, que es adonde uno va a leer de qué se trata un tema.
+  let desplegado=false;
   function renderEstructura(){ const roots=state.roots.map(N).filter(Boolean);
     const sc=document.getElementById("estSearchClear"); if(sc)sc.hidden=!estQuery.trim();
     if(estQuery.trim()){ renderEstBusqueda(); return; }
@@ -898,7 +902,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     estree.querySelectorAll("[data-proj]").forEach(b=>b.addEventListener("click",()=>{ state.estProj=b.dataset.proj; state.estFocus=""; save(); renderEstructura(); }));
     estree.querySelector("[data-addproj]").addEventListener("click",addProject);
     const body=document.getElementById("estbody");
-    if(state.estFocus && N(state.estFocus)){ renderFocus(body,N(state.estFocus)); return; }
+    if(state.estFocus && N(state.estFocus)){ desplegado=true; renderFocus(body,N(state.estFocus)); return; }
+    desplegado=false;
     const bd=document.createElement("div"); bd.className="estboard";
     if(!macros.length) bd.innerHTML=`<div class="empty">"${esc(proj.name)}" no tiene temas todavía.</div>`;
     macros.forEach(macro=>bd.appendChild(colFor(macro)));
@@ -921,7 +926,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     sub.appendChild(add); wireDrop(sub,macro); wrap.appendChild(sub); body.appendChild(wrap); }
   function colFor(macro){ const col=document.createElement("div"); col.className="estcol"; col.style.borderTopColor=accentOf(macro);
     const head=document.createElement("div"); head.className="colh";
-    head.innerHTML=`<div class="top"><span class="orb" style="background:${accentOf(macro)}"></span><span class="cname">${esc(macro.name)}</span><button class="colexp" title="Desplegar este tema">⤢</button></div>${macro.contexto?`<div class="ctxline">${esc(macro.contexto)}</div>`:""}${encsOf(macro).length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${encChip(macro)}</div>`:""}`;
+    head.innerHTML=`<div class="top"><span class="orb" style="background:${accentOf(macro)}"></span><span class="cname">${esc(macro.name)}</span><button class="colexp" title="Desplegar este tema">⤢</button></div>${encsOf(macro).length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${encChip(macro)}</div>`:""}`;
     head.style.cursor="pointer"; head.title="Doble clic para ver desplegado";
     const expand=()=>{ if(colClickTimer){clearTimeout(colClickTimer);colClickTimer=null;} state.estFocus=macro.id; save(); renderEstructura(); };
     head.querySelector(".colexp").addEventListener("click",e=>{ e.stopPropagation(); expand(); });
@@ -943,7 +948,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     arrastrarTema(head,wrap,node);
     wrap.appendChild(head);
     if(open){ const inner=document.createElement("div"); inner.className="sbin"; inner.dataset.drop=node.id;
-      if(node.contexto){ const cx=document.createElement("div"); cx.className="ctxline"; cx.style.margin="2px 0 6px"; cx.textContent=node.contexto; inner.appendChild(cx); }
+      if(node.contexto&&desplegado){ const cx=document.createElement("div"); cx.className="ctxline"; cx.style.margin="2px 0 6px"; cx.textContent=node.contexto; inner.appendChild(cx); }
       (node.items||[]).filter(k=>!k.archived).forEach(k=>inner.appendChild(taskRow(node,k)));
       (node.children||[]).map(N).filter(Boolean).forEach(c=>inner.appendChild(subBlock(c)));
       const add=document.createElement("div"); add.className="sbadd"; add.innerHTML=`<button class="rowbtn" data-sub>＋ sub-tema</button><button class="rowbtn" data-task>＋ tarea</button>`;
