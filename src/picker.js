@@ -31,6 +31,16 @@ function configurado() {
   return !!CLIENT_ID && !!API_KEY;
 }
 
+// Traza del camino completo. Este flujo tiene cuatro tramos que dependen de
+// Google y, cuando uno se cuelga, desde afuera se ven todos iguales: el botón
+// esperando. Dejar dicho en voz alta en qué tramo va convierte media hora de
+// deducción en una línea de consola.
+function traza(...a) {
+  try {
+    console.log("%c[Drive]", "color:#0E7C6B;font-weight:700", ...a);
+  } catch (e) {}
+}
+
 // Los dos scripts de Google se cargan recién cuando alguien aprieta el botón.
 // Así la app no le habla a Google en cada arranque: quien nunca use el
 // selector, nunca lo descarga.
@@ -85,6 +95,7 @@ function pedirToken() {
           });
         }
         clienteToken.callback = (r) => {
+          traza("2b · Google contestó el permiso. concedido:", (r && r.scope) || "(no dijo)", "· token:", r && r.access_token ? "sí" : "NO");
           if (r && r.access_token) {
             // Google puede devolver un token PERFECTAMENTE VÁLIDO pero sin el
             // permiso de Drive adentro, si ese permiso no está declarado en la
@@ -107,6 +118,7 @@ function pedirToken() {
         };
         clienteToken.error_callback = (e) => {
           const tipo = e && e.type;
+          traza("2b · Google avisó un error en el permiso. tipo:", tipo || "(sin tipo)", e);
           falla(
             new Error(
               tipo === "popup_closed"
@@ -118,6 +130,7 @@ function pedirToken() {
           );
         };
         // La primera vez hay que mostrar la pantalla de permiso; después no.
+        traza("2a · abriendo la ventana de permiso de Google…");
         clienteToken.requestAccessToken({ prompt: token ? "" : "consent" });
       })
   );
@@ -161,6 +174,7 @@ function mostrarSelector(accessToken) {
       .addView(compartidos)
       .setCallback((data) => {
         // Cualquier aviso, incluido el de "ya me dibujé", prueba que abrió.
+        traza("3b · la ventana avisó:", (data && data.action) || "(sin acción)");
         abrio = true;
         clearTimeout(reloj);
         const a = data && data.action;
@@ -173,6 +187,7 @@ function mostrarSelector(accessToken) {
         listo(a === g.Action.PICKED ? data.docs || [] : []);
       })
       .build();
+    traza("3a · pidiéndole a Google que dibuje la ventana…");
     sel.setVisible(true);
   });
 }
@@ -197,13 +212,18 @@ export function initPicker() {
   // La app pregunta por este agujero si el selector está disponible. Si no lo
   // instalamos, no muestra el botón y todo sigue como antes.
   window.__mesaDrivePicker = async () => {
+    traza("1/4 · arranca. appId:", APP_ID, "· clave de API:", API_KEY ? "cargada" : "FALTA");
     await conTiempo(cargarPicker(), 20000,
       "No se pudieron cargar los archivos de Google. ¿Hay conexión?");
+    traza("2/4 · scripts de Google cargados. google.picker:", !!(window.google && window.google.picker));
     // Dos minutos: adentro hay una persona real leyendo una pantalla de
     // permisos, no solo una llamada de red.
     const t = await conTiempo(pedirToken(), 120000,
       "Google nunca devolvió el permiso. Suele ser que la ventana emergente quedó abierta, bloqueada, o que el navegador cortó la conexión con ella.");
-    return mostrarSelector(t);
+    traza("3/4 · permiso concedido. token:", t ? t.slice(0, 6) + "…" : "VACÍO");
+    const docs = await mostrarSelector(t);
+    traza("4/4 · la ventana se cerró. elegidos:", docs.length);
+    return docs;
   };
   return true;
 }
