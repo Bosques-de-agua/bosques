@@ -108,7 +108,7 @@
   .tab.on{display:block}
   .tab.nopad{overflow:hidden}
   .wrap{max-width:1080px;margin:0 auto;padding:26px 26px 60px}
-  .h1{font-family:var(--font-display);font-size:23px;font-weight:600;margin:0 0 3px}
+  .h1{font-family:var(--font-display);font-size:23px;font-weight:600;margin:0 0 3px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .lead{color:var(--ink-soft);font-size:13.5px;margin:0 0 22px}
 
   /* MAPA */
@@ -664,7 +664,9 @@
   }}
 
   /* El mapa vive dentro de Estructura, como una vista alternativa del árbol */
-  .estviews{margin:0 0 16px;display:inline-flex}
+  /* Va dentro del h1, al lado del título: se le saca el margen de cuando
+     vivía suelto en la barra de arriba, y se le baja el tamaño al del texto. */
+  .estviews{margin:0;display:inline-flex;font-family:var(--font-ui);font-size:12px;font-weight:500}
   .estwrap-mapa{position:relative;height:calc(100vh - 210px);min-height:380px;border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;box-shadow:var(--shadow)}
   .estwrap-mapa[hidden]{display:none}
   .estwrap-mapa .viewport{position:absolute;inset:0}
@@ -925,8 +927,12 @@
   /* Bien adentro del árbol el punto se vacía: queda solo el anillo. */
   :root .neu.deep .nod{width:8px;height:8px;background:transparent;box-shadow:inset 0 0 0 1.5px var(--acc)}
   :root .neu.sel .nod{box-shadow:0 0 0 1px var(--wood),0 0 20px 3px color-mix(in srgb,var(--wood) 38%,transparent)}
-  :root .neu.dim{opacity:.3}
-  :root .neu.dim:hover{opacity:.72}
+  /* El circulito es el interruptor de la rama, así que tiene que anunciarse
+     como tal: cambia el cursor y crece al pasarle por encima. Y se le da un
+     área de toque más grande que el punto, para el dedo en el teléfono. */
+  :root .neu .nod{cursor:pointer;position:relative}
+  :root .neu .nod::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%}
+  :root .neu .nod:hover{box-shadow:0 0 0 7px color-mix(in srgb,var(--acc) 26%,transparent)}
   :root .neu .link-mark{left:auto;right:8px;bottom:5px}
   :root .neu .nm{font-weight:500}
   :root .neu[data-lvl="1"] .nm{font-weight:600}

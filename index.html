@@ -32,22 +32,20 @@
   <header class="topbar">
     <div class="brand"><img class="mark" src="/bda-isotipo.png" alt="Bosques de Agua" /><span class="btxt"><b>Estudio</b><span class="bsub">Bosques de Agua</span></span></div>
     <div class="topctx" id="topCtx" hidden>
-      <div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div>
       <span class="ctxdiv" id="ctxDiv"></span>
           <button class="btn" id="linkMode"><svg viewBox="0 0 20 20" fill="none"><path d="M8 12l4-4M7 13a3 3 0 0 1 0-4l1-1M13 7a3 3 0 0 1 0 4l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Vincular</button>
           <button class="btn" id="editMode"><svg viewBox="0 0 20 20" fill="none"><path d="M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Editar</button>
           <button class="btn btn-primary" id="addNode"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span id="addLabel">Nuevo tema</span></button>
           <span class="infob" tabindex="0" style="margin-left:2px;align-self:center">i<span class="infopop"><b>El mapa del proyecto</b><ul>
             <li><b>Un clic</b> en un globo abre su ficha.</li>
-            <li><b>Doble clic</b> enciende su rama: queda a la vista todo lo que cuelga de ese tema y todo lo que tiene vinculado. Doble clic otra vez, o en el fondo, para volver a ver todo.</li>
-            <li><b>Arrastrá el fondo</b> para moverte; la rueda hace zoom y ⤢ encuadra todo.</li>
+            <li><b>Doble clic</b> te lleva a ese mismo tema en el árbol, desplegado.</li>
+            <li><b>El circulito</b> de arriba del nombre apaga o enciende ese tema y todo lo que cuelga de él. Nada se apaga solo: siempre está todo a la vista hasta que vos decidas.</li>
+            <li><b>Arrastrar un tema</b> se lleva su rama entera, así el racimo no se desarma. Mover un sub-tema no mueve al de arriba. <b>Ojo</b>: la posición de los globos la ven todos.</li>
+            <li><b>Arrastrá el fondo</b> para moverte; la rueda hace zoom y ⤢ encuadra todo. Eso sí es tuyo: nadie más lo ve.</li>
             <li><b>Vincular</b>: tocá dos temas para conectarlos, aunque estén en ramas distintas.</li>
             <li><b>Editar</b>: cambiá color y tamaño de un tema, o curvá las líneas arrastrándolas.</li>
-            <li><b>Capas</b> esconde lo más hondo del árbol; <b>Persona</b> atenúa los temas donde esa persona no tiene nada.</li>
-            <li><b>Alt + clic</b> apaga una rama a mano, si querés despejar algo puntual.</li></ul></span></span>
+            <li><b>Persona</b> atenúa los temas donde esa persona no tiene nada. Doble clic en el fondo enciende todo de nuevo.</li></ul></span></span>
       <div class="filt" id="filtPersona"><label>Persona</label><select id="fPerson"><option value="">Todas</option></select></div>
-      <!-- Las opciones las arma llenarFiltroCapa() según lo hondo que esté el árbol. -->
-      <div class="filt" id="filtCapa"><label>Capas</label><select id="fCapa"><option value="">Todas</option></select></div>
     </div>
     <div class="spacer"></div>
     <div class="filters">
@@ -106,6 +104,8 @@
 
     <section class="tab" id="tab-estructura"><div class="wrap">
       <div class="tabhead">
+      <!-- El selector de vista vive acá, pegado al título, y no arriba en la
+           barra: es de esta pantalla y de ninguna otra. -->
       <h1 class="h1">Estructura<span class="infob" tabindex="0">i<span class="infopop"><b>El árbol del proyecto</b><ul>
         <li>Cada columna es un <b>macro-tema</b>. Adentro están los sub-temas y las tareas.</li>
         <li>Tocá el botón <b>⤢</b> de la esquina del macro-tema (o hacé doble clic en él) para verlo desplegado a pantalla completa, con su objetivo y su estado actual.</li>
@@ -113,7 +113,7 @@
         <li>El triangulito ▶ de un sub-tema lo abre o lo cierra en el lugar.</li>
         <li>Podés <b>arrastrar una tarea</b> de un tema a otro.</li>
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
-        <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span></h1>
+        <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span><div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div></h1>
       <div class="srchbar"><input class="srch" id="estSearch" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
       </div>
 
