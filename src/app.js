@@ -294,21 +294,36 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function temasDe(p){ return temasConEnc().filter(n=>encsOf(n).includes(p)); }
   // Las cuentas de un tema son las de TODA su rama: quien está a cargo de un
   // macro-tema responde también por lo que cuelga de él.
-  function temaCuentas(n,quien){ const a=agg(n); let mias=0;
-    if(quien)ramaIds(n.id).forEach(id=>{ const x=N(id); if(!x)return;
-      (x.items||[]).forEach(k=>{ if(!k.archived&&!k.done&&ownersOf(k).includes(quien))mias++; }); });
-    return {tot:a.ic,pend:a.ic-a.dc,subs:a.nc,mias}; }
+  function temaCuentas(n){ const a=agg(n); return {tot:a.ic,pend:a.ic-a.dc,subs:a.nc}; }
   function cuentaTema(c){ if(!c.tot)return `<span class="tcnt vacio">sin tareas todavía</span>`;
     return `<span class="tcnt">${c.pend?`<b>${c.pend}</b> sin terminar`:"todo al día"} · ${c.tot} en total</span>`; }
+  // Las tareas de toda la rama que están a nombre de alguien, ordenadas como
+  // las columnas del kanban.
+  function misTareasEn(n,quien){ const out=[]; if(!quien)return out;
+    ramaIds(n.id).forEach(id=>{ const x=N(id); if(!x)return;
+      (x.items||[]).forEach(k=>{ if(!k.archived&&ownersOf(k).includes(quien))out.push({k,node:x}); }); });
+    return out.sort((a,b)=>STORD.indexOf(a.k.status)-STORD.indexOf(b.k.status)||String(a.k.title||"").localeCompare(String(b.k.title||""))); }
+  // De dónde cuelga la tarea, contado DESDE el tema que estás mirando: el
+  // camino completo ya lo dice el renglón del tema, repetirlo es ruido.
+  function subRuta(nodeId,desdeId){ const p=pathOf(nodeId), i=p.findIndex(z=>z.id===desdeId);
+    const resto=p.slice(i+1).map(z=>z.name); return resto.length?resto.join(" › "):""; }
+  // Qué temas están abiertos en Mi foco. No se guarda: es de este rato, no una
+  // preferencia (a diferencia de las ramas abiertas del árbol).
+  const focoOpen=new Set();
   function temaLinea(n,me){ const ruta=rutaDe(n), nombre=ruta[ruta.length-1], trail=ruta.slice(0,-1).join(" › ");
-    const c=temaCuentas(n,me), otros=encsOf(n).filter(p=>p!==me);
-    return `<div class="temaline" data-tema="${n.id}"><span class="orb" style="background:${accentOf(n)}"></span>`
+    const c=temaCuentas(n), otros=encsOf(n).filter(p=>p!==me);
+    const mias=misTareasEn(n,me), abierto=focoOpen.has(n.id);
+    return `<div class="temawrap"><div class="temaline${mias.length?" conmias":""}" data-tema="${n.id}">`
+      +(mias.length?`<span class="car${abierto?" open":""}">▶</span><span class="cnt" title="${mias.length===1?"1 tarea":mias.length+" tareas"} de este tema a tu nombre">${mias.length}</span>`:`<span class="carno"></span>`)
+      +`<span class="orb" style="background:${accentOf(n)}"></span>`
       +`<span class="tlm"><span class="tlt">${esc(nombre)}</span>${trail?`<span class="tlp" title="${esc(ruta.join(" › "))}">${esc(trail)}</span>`:""}</span>`
-      +(c.mias?`<span class="tmias" title="Tareas de este tema a tu nombre">${c.mias} tuya${c.mias===1?"":"s"}</span>`:"")
       +cuentaTema(c)
       +(otros.length?`<span class="tavs" title="También a cargo: ${esc(otros.join(", "))}">${otros.map(p=>avatarMarkup(p,"av2",true)).join("")}</span>`:"")
+      +`<button class="go" data-ficha="${n.id}" title="Abrir la ficha del tema">↗</button></div>`
+      +(abierto&&mias.length?`<div class="temasub">`+mias.map(x=>{ const sr=subRuta(x.node.id,n.id);
+          return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="sdotc" style="background:${cssv(STATUS[x.k.status].v)}" title="${STATUS[x.k.status].l}"></span><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${sr?`<span class="ltema">${esc(sr)}</span>`:""}${cuandoTag(x.k)}${prioTag(x.k)}</div>`; }).join("")+`</div>`:"")
       +`</div>`; }
-  function temaCard(n){ const ruta=rutaDe(n), c=temaCuentas(n,"");
+  function temaCard(n){ const ruta=rutaDe(n), c=temaCuentas(n);
     const el=document.createElement("div"); el.className="kcard tcard"; el.style.borderLeftColor=accentOf(n);
     el.innerHTML=`<div class="kt"><span class="ktt">${esc(ruta[ruta.length-1])}</span></div>`
       +`<div class="kp"><span>${esc(ruta.slice(0,-1).join(" › ")||"raíz")}</span></div>`
@@ -1815,18 +1830,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       : `${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}`;
     const cabecera=`<div class="myfoco"><span class="mfl"><b>Tu foco</b>${seg}<span class="mfc">${resumen}</span></span><span class="mfr">${vf==="tareas"?`<button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}`:""}</span></div>`;
     if(vf==="temas"){ box.innerHTML=cabecera+temasDelFoco(misTemas,me);
-      box.querySelectorAll("[data-tema]").forEach(r=>r.addEventListener("click",()=>openPanel(r.dataset.tema)));
-      wireFocoSeg(); return; }
+      // El renglón abre y cierra tus tareas de ese tema; el ↗ va a la ficha.
+      // Si no tenés ninguna adentro no hay nada que abrir, así que el renglón
+      // entero lleva a la ficha y no queda un clic que no hace nada.
+      box.querySelectorAll("[data-ficha]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); openPanel(b.dataset.ficha); }));
+      box.querySelectorAll(".temaline").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest("[data-ficha]"))return;
+        const id=r.dataset.tema;
+        if(!r.classList.contains("conmias")){ openPanel(id); return; }
+        if(focoOpen.has(id))focoOpen.delete(id); else focoOpen.add(id); renderMyTasks(); }));
+      wireLineasTarea(box,me); wireFocoSeg(); return; }
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
       (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
-    box.querySelectorAll("[data-task]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask(r.dataset.node,r.dataset.task); }));
-    box.querySelectorAll("[data-priv]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask("__priv",r.dataset.priv); }));
-    box.querySelectorAll("[data-donetask]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
-      cb.addEventListener("change",e=>{ const [nid,iid]=cb.dataset.donetask.split("|"); const nd=N(nid); const k=nd&&(nd.items||[]).find(x=>x.id===iid); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); refreshChrome(); }); });
-    box.querySelectorAll("[data-donepriv]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
-      cb.addEventListener("change",e=>{ const k=privL(me).find(x=>x.id===cb.dataset.donepriv); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); }); });
+    wireLineasTarea(box,me);
     document.getElementById("newPrivBtn").addEventListener("click",()=>openNewTask(true));
     const pfd=document.getElementById("panelFilt"), pfm=pfd.querySelector(".fmenu");
     pfd.querySelector("button").addEventListener("click",e=>{ e.stopPropagation(); pfm.classList.toggle("on"); });
@@ -1836,6 +1853,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
     const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); });
     wireFocoSeg(); }
+  // Los renglones de tarea son los mismos en las dos pestañas de Tu foco: en
+  // la lista por estado y adentro de un tema abierto.
+  function wireLineasTarea(box,me){
+    box.querySelectorAll("[data-task]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; e.stopPropagation(); openTask(r.dataset.node,r.dataset.task); }));
+    box.querySelectorAll("[data-priv]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; e.stopPropagation(); openTask("__priv",r.dataset.priv); }));
+    box.querySelectorAll("[data-donetask]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
+      cb.addEventListener("change",e=>{ const [nid,iid]=cb.dataset.donetask.split("|"); const nd=N(nid); const k=nd&&(nd.items||[]).find(x=>x.id===iid); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); refreshChrome(); }); });
+    box.querySelectorAll("[data-donepriv]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
+      cb.addEventListener("change",e=>{ const k=privL(me).find(x=>x.id===cb.dataset.donepriv); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); }); }); }
   const focoVista=()=>state.focoVista==="temas"?"temas":"tareas";
   function wireFocoSeg(){ const s=document.getElementById("focoSeg"); if(!s)return;
     s.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; state.focoVista=b.dataset.fv; save(); renderMyTasks(); }); }

@@ -234,7 +234,7 @@
   .focoseg button.on .segn{color:var(--ink-soft)}
   /* Un tema a cargo. Dos renglones: el nombre manda, la ruta acompaña. */
   .temaline{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line-soft);font-size:13px;cursor:pointer}
-  .temaline:last-child{border-bottom:none}
+  .temawrap:last-child .temaline{border-bottom:none}
   .temaline:hover{background:color-mix(in srgb,var(--wood) 6%,transparent);border-radius:var(--r-ctl)}
   .temaline .orb{width:9px;height:9px;border-radius:50%;flex:none}
   .temaline .tlm{flex:1 1 auto;min-width:0}
@@ -242,14 +242,33 @@
   .temaline .tlp{display:block;font-size:11px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .temaline .tcnt{flex:none;font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
   .temaline .tcnt.vacio{color:var(--ink-faint)}
-  .temaline .tmias{flex:none;font-size:11px;font-weight:700;color:var(--wood-deep);background:color-mix(in srgb,var(--wood) 18%,transparent);border-radius:var(--r-pill);padding:2px 8px;white-space:nowrap}
-  :root[data-theme="dark"] .temaline .tmias,:root:not([data-theme="light"]) .temaline .tmias{color:var(--wood)}
+  .temaline .car{width:14px;height:14px;flex:none;display:grid;place-items:center;font-size:9px;color:var(--ink-faint);transition:transform .15s}
+  .temaline .car.open{transform:rotate(90deg)}
+  .temaline .carno{width:14px;flex:none}
+  .temaline .cnt{flex:none;font-size:10.5px;font-weight:700;color:var(--wood-deep);background:color-mix(in srgb,var(--wood) 18%,transparent);border-radius:var(--r-pill);padding:1px 7px}
+  :root[data-theme="dark"] .temaline .cnt,:root:not([data-theme="light"]) .temaline .cnt{color:var(--wood)}
+  /* El ↗ asoma al pasar por encima: la lista es para leer, y un botón por
+     renglón siempre a la vista la ensucia. En táctil no hay "pasar por
+     encima", así que ahí se ve siempre. */
+  .temaline .go{flex:none;border:none;background:none;cursor:pointer;color:var(--ink-faint);font-size:12px;padding:2px 4px;line-height:1;opacity:0}
+  .temaline:hover .go,.temaline .go:focus{opacity:1}
+  .temaline .go:hover{color:var(--wood)}
+  @media (hover:none){ .temaline .go{opacity:1} }
+  /* Tus tareas de ese tema, colgando del renglón. */
+  .temasub{margin:0 0 8px 22px;padding-left:11px;border-left:2px solid var(--line)}
+  .temasub .listline{padding:6px 2px;font-size:12.5px}
+  .temasub .sdotc{width:7px;height:7px;border-radius:50%;flex:none}
   /* En pantalla angosta la cuenta baja a su propio renglón. Es nowrap y no
      cede, así que compartiendo línea le dejaba veinte píxeles al nombre del
      tema, que es lo único que de verdad hay que poder leer. */
   @media (max-width:620px){
     .temaline{flex-wrap:wrap;row-gap:3px}
-    .temaline .tcnt{flex:1 0 100%;order:3;padding-left:19px}
+    .temaline .tcnt{flex:1 0 100%;order:3;padding-left:24px}
+    /* En el teléfono, a qué tema pertenece la tarea es lo primero que sobra:
+       medido a 390px, el título de la tarea se quedaba con 29 píxeles. La
+       regla de la casa es que el que cede es el tema, y acá cede del todo.
+       La prioridad y el aviso de "nueva" se quedan. */
+    #myTasks .listline .ltema{display:none}
   }
   .temaline .tavs{flex:none;display:flex}
   .temaline .tavs .av2{margin-left:-5px}
