@@ -177,13 +177,32 @@ function mostrarSelector(accessToken) {
   });
 }
 
+// Ningún paso de este camino puede quedarse esperando para siempre. El reloj
+// que había cubría solo la apertura de la ventana; si lo que no volvía era el
+// PERMISO, no había nada que lo cortara y el botón se quedaba en "Abriendo
+// Drive…" sin un solo aviso. Un botón que espera sin fin es la peor forma de
+// fallar: no se puede ni diagnosticar.
+function conTiempo(promesa, ms, mensaje) {
+  return new Promise((listo, falla) => {
+    const reloj = setTimeout(() => falla(new Error(mensaje)), ms);
+    promesa.then(
+      (v) => { clearTimeout(reloj); listo(v); },
+      (e) => { clearTimeout(reloj); falla(e); }
+    );
+  });
+}
+
 export function initPicker() {
   if (!configurado()) return false;
   // La app pregunta por este agujero si el selector está disponible. Si no lo
   // instalamos, no muestra el botón y todo sigue como antes.
   window.__mesaDrivePicker = async () => {
-    await cargarPicker();
-    const t = await pedirToken();
+    await conTiempo(cargarPicker(), 20000,
+      "No se pudieron cargar los archivos de Google. ¿Hay conexión?");
+    // Dos minutos: adentro hay una persona real leyendo una pantalla de
+    // permisos, no solo una llamada de red.
+    const t = await conTiempo(pedirToken(), 120000,
+      "Google nunca devolvió el permiso. Suele ser que la ventana emergente quedó abierta, bloqueada, o que el navegador cortó la conexión con ella.");
     return mostrarSelector(t);
   };
   return true;
