@@ -236,6 +236,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // recién al guardar, así que sirve igual desde la ficha de un tema o desde la
   // lista suelta de la pestaña Drive: no necesita saber dónde estás parado.
   function edBtn(f){ return `<button class="fed" data-editf="${esc(f.id)}" title="Editar nombre o link">${ICO.lapiz}</button>`; }
+  function delBtn(f){ return `<button class="x" data-delf="${esc(f.id)}" title="Desvincular">✕</button>`; }
   function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
     return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?edBtn(f)+`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
   // Archivos que cuelgan de los sub-temas de un tema (y de sus tareas).
@@ -1195,9 +1196,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const ruta=x=>{ const p=pathOf(x.node.id).map(z=>z.name); const bajo=p.slice(1).join(" › ")||p[0]||"Proyecto";
       return bajo+(x.task?" › "+(x.task.title||"Tarea"):""); };
     const filaConRuta=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const r=ruta(x);
-      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button>${verBtn(x.f)}${edBtn(x.f)}</div>`; };
+      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button>${verBtn(x.f)}${edBtn(x.f)}${delBtn(x.f)}</div>`; };
     const fila=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const tarea=x.task?(x.task.title||"Tarea"):"";
-      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}${verBtn(x.f)}${edBtn(x.f)}</div>`; };
+      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}${verBtn(x.f)}${edBtn(x.f)}${delBtn(x.f)}</div>`; };
     const bloque=(titulo,color,ids)=>{ const conArchivos=ids.filter(id=>porNodo.has(id)); if(!conArchivos.length)return "";
       const total=conArchivos.reduce((a,id)=>a+porNodo.get(id).length,0);
       let h=`<div class="drivegroup"><h3><span class="orb" style="background:${color}"></span>${esc(titulo)}<span class="cnt">${total}</span></h3>`;
@@ -1234,7 +1235,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.querySelectorAll("#driveOrdenSeg [data-o]").forEach(b=>b.classList.toggle("on",b.dataset.o===driveOrden));
     box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go)));
     box.querySelectorAll("[data-editf]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
-      openFileModal({kind:"edit",fileId:b.dataset.editf,after:renderDrive}); })); }
+      openFileModal({kind:"edit",fileId:b.dataset.editf,after:renderDrive}); }));
+    // Desvincular desde acá lo saca de donde esté colgado, sea un tema o una
+    // tarea. Se busca por id en el momento de borrar y no se guarda una
+    // referencia: si mientras tanto llegara un cambio del equipo, una
+    // referencia vieja apuntaría a un objeto que ya no cuelga de nada.
+    box.querySelectorAll("[data-delf]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
+      const id=b.dataset.delf; const f=buscarArchivo(id); if(!f)return;
+      confirmar(`Se saca "${f.name||"el archivo"}" de donde está vinculado. El archivo sigue intacto en Drive.`,
+        ()=>{ despegarArchivo(id); save(); renderActive();
+          if(panelOpen&&N(selId))renderPanelBody(N(selId)); if(taskOpen)renderTFiles(); },
+        {title:"Desvincular archivo",yes:"Desvincular"}); })); }
 
   // ---------- CHAT + EVENTOS ----------
   function groupsAll(){ if(!state.chat.groups)state.chat.groups={}; return state.chat.groups; }
