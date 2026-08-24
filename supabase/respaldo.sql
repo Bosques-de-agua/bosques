@@ -1,6 +1,11 @@
 -- RESPALDO AUTOMÁTICO
 -- Correr una sola vez, completo, en el SQL Editor de Supabase.
 --
+-- OJO: la frecuencia ya no es diaria. Ver `supabase/respaldo-cada-hora.sql`,
+-- que reemplaza la tarea de este archivo por una que corre cada hora y solo
+-- guarda si el contenido cambió. Este archivo queda como el punto de partida
+-- (crea la tabla y la función) y para rehacer todo en otro proyecto.
+--
 -- Por qué hace falta: toda la información del equipo es UNA fila
 -- (app_state id=1). El plan gratuito no garantiza copias. Si esa fila se
 -- corrompe o alguien la sobrescribe con algo vacío, no hay a dónde volver.
