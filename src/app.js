@@ -1474,11 +1474,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function marcarLeido(chan,msgs){ const me=state.me; if(!me||!msgs.length)return false;
     const ult=msgs[msgs.length-1].ts||0; const rm=readMap(chan);
     if((rm[me]||0)>=ult)return false; rm[me]=ult; return true; }
-  // Solo las tildes, sin tocar el resto de la pantalla.
+  // Solo el pie —hora y tildes—, sin tocar el resto de la pantalla.
   function refrescarTildes(){ if(active!=="chat")return; const box=document.getElementById("msgs"); if(!box)return;
     const me=state.me; if(!me)return;
     msgsOf(chatChan).forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
-      const pie=row.querySelector(".msgpie"); if(pie)pie.innerHTML=tildes(m,chatChan,me); }); }
+      const pie=row.querySelector(".msgpie");
+      if(pie)pie.innerHTML=`${m.ts?`<span class="hora">${esc(horaDe(m.ts))}</span>`:""}${tildes(m,chatChan,me)}`; }); }
   function renderChat(){ const me=state.me;
     if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
     const list=document.getElementById("chanList");
@@ -1497,14 +1498,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
       <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li>
-      <li>Pasando por encima de un mensaje aparecen <b>responder</b> (↩) y <b>reaccionar</b> (☺). En el teléfono se ven siempre.</li>
+      <li>Pasando por encima de un mensaje aparecen <b>responder</b> (↩) y <b>reaccionar</b> (☺) — también en los eventos. En el teléfono se ven siempre.</li>
+      <li>En el Equipo y en los grupos, cada mensaje lleva un <b>tono del color de quien escribe</b>, para no tener que leer el nombre.</li>
       <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
     if(!me){ box.innerHTML=`<div class="ph"><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
     inp.disabled=false; const msgs=msgsOf(chatChan);
-    box.innerHTML=msgs.length?msgs.map(m=>msgHTML(m,me)).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
+    // La hora sola no dice de qué día es. Cada vez que cambia el día entra un
+    // separador, como en cualquier chat.
+    let diaPrevio="";
+    box.innerHTML=msgs.length?msgs.map(m=>{ const d=diaDe(m.ts); let sep="";
+      if(d!==diaPrevio){ sep=`<div class="daysep"><span>${esc(etiquetaDia(m.ts))}</span></div>`; diaPrevio=d; }
+      return sep+msgHTML(m,me); }).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
@@ -1519,17 +1526,34 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.scrollTop=box.scrollHeight;
     seenMap()[chatChan]=msgs.length; marcarLeido(chatChan,msgs); save(); updateChatBadge(); }
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
-  function msgHTML(m,me){ if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
-      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div><div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div></div>`; }
-    const mm=(m.from===me);
-    const pie=`<div class="msgpie">${tildes(m,chatChan,me)}</div>`;
+  const dosCifras=n=>String(n).padStart(2,"0");
+  function diaDe(ts){ try{ const d=new Date(ts); return d.getFullYear()+"-"+dosCifras(d.getMonth()+1)+"-"+dosCifras(d.getDate()); }catch(e){ return ""; } }
+  function horaDe(ts){ if(!ts)return ""; try{ const d=new Date(ts); return dosCifras(d.getHours())+":"+dosCifras(d.getMinutes()); }catch(e){ return ""; } }
+  function etiquetaDia(ts){ const hoy=diaDe(nowMs()), d=diaDe(ts);
+    if(d===hoy)return "Hoy";
+    if(d===diaDe(nowMs()-86400000))return "Ayer";
+    try{ const x=new Date(ts); return `${DOWLARGO[(x.getDay()+6)%7]} ${x.getDate()} de ${MES[x.getMonth()]}`+(x.getFullYear()!==new Date().getFullYear()?" de "+x.getFullYear():""); }catch(e){ return d; } }
+  // El pie de cada mensaje: la hora para todos, las tildes solo en los propios.
+  function pieMsg(m,me){ const h=horaDe(m.ts); const t=tildes(m,chatChan,me);
+    return (h||t)?`<div class="msgpie">${h?`<span class="hora">${esc(h)}</span>`:""}${t}</div>`:""; }
+  // En un canal de varios, cada burbuja lleva un tono del color de quien
+  // escribe: en una tira de mensajes seguidos se ve de quién es cada uno sin
+  // leer el nombre. En un privado no hace falta: son dos, y el lado alcanza.
+  function tonoDe(m,mm){ const varios=(chatChan==="team"||chatChan.startsWith("grp:"));
+    if(!varios)return "";
+    const c=avColor(m.from);
+    return ` style="background:color-mix(in srgb,${c} ${mm?16:9}%,var(--surface));border-color:color-mix(in srgb,${c} ${mm?42:26}%,var(--line))"`; }
+  function msgHTML(m,me){ const mm=(m.from===me);
+    if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
+      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+    const pie=pieMsg(m,me), tono=tonoDe(m,mm);
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
-      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
+      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
         +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
-    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${esc(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${esc(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
   // Los botones del mensaje, arriba a la derecha. Aparecen al pasar por
   // encima; en pantalla táctil, siempre. Borrar es solo lo propio: hacía
   // falta igual, pero sobre todo porque un adjunto pesado se quedaba adentro
@@ -1663,6 +1687,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- PANEL personal ----------
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   const DOWL=["lun","mar","mié","jue","vie","sáb","dom"];
+  const DOWLARGO=["lunes","martes","miércoles","jueves","viernes","sábado","domingo"];
   function ymdLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   const VISTAS_PANEL={"":"Mi panel",cal:"Calendario",upcoming:"Próximos eventos",foco:"Mi foco",notas:"Mis notas"};
   function panelView(){ return VISTAS_PANEL[state.panelView]!==undefined?state.panelView:""; }

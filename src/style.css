@@ -267,8 +267,14 @@
     /* En el teléfono, a qué tema pertenece la tarea es lo primero que sobra:
        medido a 390px, el título de la tarea se quedaba con 29 píxeles. La
        regla de la casa es que el que cede es el tema, y acá cede del todo.
-       La prioridad y el aviso de "nueva" se quedan. */
+       Aun así quedaban 75px, porque la prioridad y el chip "nueva" tampoco
+       ceden: el chip se va —el renglón resaltado ya dice que es nueva— y la
+       prioridad baja a un renglón propio. Con eso el título se queda con
+       todo el ancho. */
     #myTasks .listline .ltema{display:none}
+    #myTasks .listline{flex-wrap:wrap;row-gap:2px}
+    #myTasks .listline .nuevo{display:none}
+    #myTasks .listline .ptag{flex:1 0 100%;order:9;margin-left:26px}
   }
   .temaline .tavs{flex:none;display:flex}
   .temaline .tavs .av2{margin-left:-5px}
@@ -674,9 +680,14 @@
   .react:hover{border-color:var(--wood)}
   .react.mine{background:color-mix(in srgb,var(--wood) 18%,var(--surface));border-color:var(--wood)}
   .msg .reacts + *{margin-top:0}
-  /* Tildes: una = guardado, dos = lo leyeron todos. */
-  .msgpie{display:flex;justify-content:flex-end;gap:4px;min-height:0;margin-top:2px}
+  /* Hora y tildes: una = guardado, dos = lo leyeron todos. */
+  .msgpie{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:0;margin-top:3px}
   .msgpie:empty{display:none}
+  .msgpie .hora{font:500 10px/1 var(--font-mono);color:var(--ink-faint);letter-spacing:.02em}
+  /* Separador de día: una línea con la fecha en el medio. */
+  .daysep{display:flex;align-items:center;gap:10px;margin:6px 2px 2px;color:var(--ink-faint)}
+  .daysep::before,.daysep::after{content:"";flex:1;height:1px;background:var(--line)}
+  .daysep span{font:600 9.5px/1 var(--font-mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
   .tick{font-size:11px;line-height:1;color:var(--ink-faint);letter-spacing:-2px;cursor:default}
   .tick.full{color:var(--sky);letter-spacing:-3px}
   .tick.pend{letter-spacing:0;font-size:9px;opacity:.7}
@@ -738,6 +749,9 @@
   @media (max-width:560px){
     .chanlist{width:116px;padding:8px 6px}
     .chanlist .chsec{font-size:9px}
+    /* Con la lista de canales al lado, el 70% de siempre dejaba burbujas de
+       129px: ocho renglones para una frase. */
+    .msg{max-width:88%}
     .composer{padding:10px 8px;gap:6px;flex-wrap:wrap}
     .composer input{flex:1 0 100%;order:-1}
     .composer .btn-primary{margin-left:auto;padding:9px 14px}
