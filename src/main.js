@@ -6,6 +6,7 @@ import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush } from "./push.js";
 import { initPicker } from "./picker.js";
+import { initPresencia } from "./presencia.js";
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch((err) => {
@@ -152,6 +153,11 @@ async function launchApp(session) {
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
+
+  // Quién tiene la app abierta ahora, para el punto verde del chat. Va por el
+  // mismo websocket que los cambios en vivo: sin tabla, sin guardar nada.
+  const presencia = initPresencia(email, yo.name, (nombres) => app.setEnLinea(nombres));
+  window.__mesaPresencia = presencia;
 
   // Volver a la pestaña y releer.
   //

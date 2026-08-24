@@ -51,6 +51,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   let state=null, active="mapa", selId=null, cam={tx:0,ty:0,s:1}, linking=false, linkSrc=null, editing=false, taskGroup="estado", cal={y:null,m:null};
   const off=new Set(), treeOpen=new Set();
   let dragTask=null, dragCard=null, dragNode=null, colClickTimer=null, chatChan="team";
+  // Quiénes tienen la app abierta ahora. No se guarda en ningún lado: es una
+  // foto del momento que llega por el mismo websocket de los cambios en vivo.
+  let enLinea=new Set();
 
   const N=id=>state.nodes[id];
   // id único de verdad: un contador compartido genera choques apenas dos personas creen algo a la vez
@@ -1248,7 +1251,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       myGroups().map(g=>`<div class="chanitem ${chatChan==="grp:"+g.id?"on":""}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">${ICO.grupo}</span><span class="chname">${esc(g.name)}</span></div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
-      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}">${avatarMarkup(p,"av")}<span class="chname">${esc(p)}</span></div>`).join("");
+      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span></div>`).join("");
     list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
@@ -1561,6 +1564,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const m=miembroPorEmail(miEmail); if(m)m.name=nuevo;
     state.me=nuevo;
     if(saveMember)saveMember({email:miEmail,name:nuevo}).catch(()=>{});
+    // Volver a anunciarse: si no, el resto te sigue viendo con el nombre viejo
+    // al lado del punto verde.
+    try{ if(window.__mesaPresencia)window.__mesaPresencia.actualizarNombre(nuevo); }catch(e){}
     save(); refreshChrome(); renderActive(); note(`Ahora sos "${nuevo}" para todo el equipo.`,"Nombre actualizado"); }
   function renderMyNotes(forzar){ const box=document.getElementById("myNotes"); if(!box)return; const me=state.me;
     // Si estás escribiendo en una nota, no se vuelve a dibujar la lista: te
@@ -2089,5 +2095,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // primer segundo, no recién cuando alguien intente escribir una nota.
   if(privadoRoto)mostrarEstadoGuardado(estadoGuardado);
 
-  return { applyRemoteState, applyPrivateState, mostrarEstadoGuardado };
+  // Solo se redibuja el chat, y solo si estás mirándolo: la presencia cambia
+  // cada vez que alguien abre o cierra la app, y no es motivo para rehacer la
+  // pantalla entera de nadie.
+  function setEnLinea(lista){ enLinea=new Set(lista||[]);
+    if(active==="chat")renderChat(); }
+
+  return { applyRemoteState, applyPrivateState, mostrarEstadoGuardado, setEnLinea };
 }
