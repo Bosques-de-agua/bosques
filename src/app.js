@@ -274,7 +274,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.values(state.nodes).forEach(n=>{ encsOf(n).forEach(o=>s.add(o)); (n.items||[]).forEach(k=>{ ownersOf(k).forEach(o=>s.add(o)); }); });
     Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>ownersOf(k).forEach(o=>s.add(o))));
     return [...s].filter(Boolean).sort((a,b)=>a.localeCompare(b)); }
-  function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
+  function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",dueTime:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
   function archiveTask(k){ if(k.status!=="listo")setStatus(k,"listo"); if(!k.doneAt)k.doneAt=nowMs(); k.archived=true; k.archivedAt=nowMs(); }
   function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; }
   function setStatus(k,st){ k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
@@ -380,7 +380,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // los "no leídos" son de cada persona, no del equipo
     if(d.chatSeen&&Object.values(d.chatSeen).some(v=>typeof v==="number"))d.chatSeen={};
     Object.keys(d.chatSeen||{}).forEach(p=>{ if(!d.chatSeen[p]||typeof d.chatSeen[p]!=="object")d.chatSeen[p]={}; });
-    const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
+    const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due=""; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
       if(!Array.isArray(k.owners))k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; k.owners=k.owners.map(o=>String(o).trim()).filter(Boolean); delete k.owner;
       if(!Array.isArray(k.files))k.files=[];
       if(k.prio==null||!PRIO[k.prio])k.prio="";
@@ -599,8 +599,19 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     applyTabControls(active);
     const arbol=document.getElementById("estree"); if(arbol)arbol.hidden=esMapa;
     const srch=document.querySelector("#tab-estructura .srchbar"); if(srch)srch.style.display=esMapa?"none":"";
+    ubicarSelectorDeVista(esMapa);
     if(esMapa){ renderMap(); requestAnimationFrame(()=>{ if(!cam._init){ fit(); cam._init=1; } applyCam(); }); }
     else renderEstructura(); }
+  // El selector Árbol/Mapa tiene dos casas, y no por capricho: en modo mapa la
+  // pestaña ES el mapa y el CSS esconde TODO lo que está dentro de .wrap —el
+  // título incluido—, así que si el selector se queda ahí desaparece y no hay
+  // forma de volver al árbol salvo recargando la página. En árbol va al lado
+  // del título, que es donde se lo pidió; en mapa, a la barra de arriba.
+  function ubicarSelectorDeVista(esMapa){
+    const seg=document.getElementById("estViewSeg"); if(!seg)return;
+    const destino=esMapa?document.getElementById("topCtx"):document.querySelector("#tab-estructura .h1");
+    if(!destino||seg.parentElement===destino)return;
+    if(esMapa)destino.prepend(seg); else destino.appendChild(seg); }
   // qué ramas dejaste abiertas: se recuerda entre sesiones
   function saveTreeOpen(){ state.treeOpen=[...treeOpen]; save(); }
   function loadTreeOpen(){ treeOpen.clear(); (state.treeOpen||[]).forEach(id=>{ if(N(id))treeOpen.add(id); }); }
@@ -669,7 +680,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function applyCam(){ world.style.transform=`translate(${cam.tx}px,${cam.ty}px) scale(${cam.s})`; }
   // Encuadra lo que se está viendo: si el filtro de capas escondió lo hondo, no
   // tiene sentido reservarle lugar en pantalla a globos que no están.
-  function fit(){ const ns=Object.values(state.nodes).filter(visible); const vw=viewport.clientWidth||960,vh=viewport.clientHeight||600;
+  function fit(){ const ns=Object.values(state.nodes); const vw=viewport.clientWidth||960,vh=viewport.clientHeight||600;
     if(!ns.length){ cam.tx=vw/2-OX;cam.ty=vh/2-OY;cam.s=1;applyCam();return; }
     let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; ns.forEach(k=>{ const r=baseSize(k)/2+50; mnx=Math.min(mnx,k.x-r);mxx=Math.max(mxx,k.x+r);mny=Math.min(mny,k.y-r);mxy=Math.max(mxy,k.y+r); });
     const cw=Math.max(300,mxx-mnx),ch=Math.max(300,mxy-mny); cam.s=Math.max(.12,Math.min(vw/cw,vh/ch,1.1));
