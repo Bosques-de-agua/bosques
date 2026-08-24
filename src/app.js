@@ -1270,7 +1270,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function llenarFiltroDrive(){
     const sel=document.getElementById("driveTema"); if(!sel)return;
     const abierto=document.activeElement===sel;
-    if(!abierto) sel.innerHTML='<option value="">Todos los temas</option>'+nodeOptionsHTML(driveTema,true);
+    if(!abierto) sel.innerHTML='<option value="">Todos los temas</option>'+nodeOptionsHTML(driveTema,true,true);
     sel.value=driveTema;
     const b=document.getElementById("driveTemaClear"); if(b)b.hidden=!driveTema;
     sel.classList.toggle("act",!!driveTema); }
@@ -1457,9 +1457,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(chan==="team"){ const eq=nombresEquipo(); return (eq.length?eq:allPeople()).filter(p=>p&&p!==me); }
     if(chan.startsWith("grp:")){ const g=groupOf(chan); return ((g&&g.members)||[]).filter(p=>p&&p!==me); }
     const o=chan.slice(3); return (o&&o!==me)?[o]:[]; }
-  function leidoPor(m,chan){ const rm=readMap(chan); return destinatarios(chan).filter(p=>(rm[p]||0)>=m.ts); }
+  // Un mensaje sin hora es de antes de que existiera este campo: cuenta como
+  // más viejo que cualquier lectura, no como recién escrito. Sin el `||0`, la
+  // comparación con undefined da false siempre y se quedaba con el relojito
+  // para siempre.
+  function leidoPor(m,chan){ const rm=readMap(chan); return destinatarios(chan).filter(p=>(rm[p]||0)>=(m.ts||0)); }
   function tildes(m,chan,me){ if(m.from!==me||m.ev)return "";
-    if(!(m.ts<=guardadoHasta))return `<span class="tick pend" title="Todavía no se guardó: si cerrás la pestaña ahora, se pierde.">🕘</span>`;
+    if(!((m.ts||0)<=guardadoHasta))return `<span class="tick pend" title="Todavía no se guardó: si cerrás la pestaña ahora, se pierde.">🕘</span>`;
     const dest=destinatarios(chan), leyeron=leidoPor(m,chan);
     const todos=dest.length>0&&leyeron.length>=dest.length;
     const t=todos?(dest.length===1?`Lo leyó ${leyeron[0]}`:`Lo leyeron todos: ${leyeron.join(", ")}`)
@@ -1664,8 +1668,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function panelView(){ return VISTAS_PANEL[state.panelView]!==undefined?state.panelView:""; }
   function renderPanel(){ if(cal.y==null){ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); }
     const v=panelView(), todo=v==="";
-    // "Próximos eventos" se muestra con el calendario arriba: la lista sola queda
-    // pelada, y con el mes delante se lee como una agenda.
+    // "Próximos eventos" va sola, SIN el calendario arriba: renderUpcoming() se
+    // dibuja como agenda cuando es lo único en pantalla (`solaEnPantalla`),
+    // agrupada por día y con la fecha larga, así que el mes delante sobra.
     const ver=(id,on)=>{ const el=document.getElementById(id); if(el)el.hidden=!on; };
     ver("calMount", todo||v==="cal");
     ver("upcoming", todo||v==="upcoming");
@@ -2189,7 +2194,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   let ntOwnersArr=[];
   function renderNtOwners(){ peoplePick(document.getElementById("ntOwners"),()=>ntOwnersArr,renderNtOwners); }
   // los proyectos raíz no llevan tareas propias: van como encabezado inerte, no como opción elegible
-  function nodeOptionsHTML(sel,noPriv){ const out=[];
+  // Si no hay nada para preseleccionar va un renglón vacío ARRIBA DE TODO. Sin
+  // él, el navegador elige solo la primera opción de la lista: apretabas
+  // "＋ Nueva tarea" en el tablero del equipo, no tocabas el desplegable, y la
+  // tarea salía "Privada — solo la ves vos". No aparecía en el tablero, la
+  // cuenta no se movía, y no la veía nadie más. El aviso de "Elegí a qué tema
+  // pertenece" ya existía; nunca llegaba a dispararse.
+  function nodeOptionsHTML(sel,noPriv,yaTieneVacio){ const out=[];
+    if(!sel&&!yaTieneVacio)out.push(`<option value="" selected>— Elegí un tema —</option>`);
     if(!noPriv&&state.me)out.push(`<option value="__priv"${sel==="__priv"?" selected":""}>Privada — solo la ves vos</option>`);
     const walk=(id,depth)=>{ const n=N(id); if(!n)return;
       if(depth===1) out.push(`<option disabled>── ${esc(n.name)} ──</option>`);

@@ -725,6 +725,23 @@
   .msgfile .fmeta span{font-size:10.5px;color:var(--ink-faint)}
   .msgimg{display:block;max-width:100%;max-height:230px;border-radius:var(--r-ctl);margin-bottom:6px;object-fit:cover}
   @media (max-width:760px){ .filt label{display:none} .brand b{display:none} .chanlist{width:150px} }
+  /* El cajón de escribir en pantalla angosta. Un <input> es un elemento
+     reemplazado: su `min-width:auto` de flex vale su tamaño por defecto —unos
+     180px— así que NO cedía, y empujaba el botón de Enviar fuera de la
+     pantalla. Medido a 390px: el botón terminaba en el píxel 549 de 390, o
+     sea invisible e intocable. Es la misma trampa que dejó el selector
+     Árbol/Mapa fuera de pantalla en su momento, y se arregla igual. */
+  .composer input{min-width:0}
+  /* Y aun cediendo, en 390px le quedaban 64px para escribir. Con la lista de
+     canales al lado no hay ancho para todo en un renglón: el cajón se lleva
+     el primero entero y los botones bajan al segundo. */
+  @media (max-width:560px){
+    .chanlist{width:116px;padding:8px 6px}
+    .chanlist .chsec{font-size:9px}
+    .composer{padding:10px 8px;gap:6px;flex-wrap:wrap}
+    .composer input{flex:1 0 100%;order:-1}
+    .composer .btn-primary{margin-left:auto;padding:9px 14px}
+  }
   /* LOGIN */
   .login-screen{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:100}
   .login-box{width:min(360px,90vw);background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel);box-shadow:var(--shadow-lg);padding:28px}

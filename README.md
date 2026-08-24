@@ -24,11 +24,13 @@ Todo el acceso pasa por la función `is_allowed()`, que compara el email del tok
 
 ### Respaldo automático
 
-Toda la información del equipo es **una fila**, y el plan gratuito **no garantiza copias**. [`supabase/respaldo.sql`](supabase/respaldo.sql) deja una tarea diaria que copia `app_state` y `user_private` a `app_state_backup`, y poda las copias automáticas de más de 60 días. Se corre **una sola vez**, después de habilitar `pg_cron` en Database → Extensions.
+Toda la información del equipo es **una fila**, y el plan gratuito **no garantiza copias**. [`supabase/respaldo.sql`](supabase/respaldo.sql) crea `app_state_backup` y la función que copia `app_state` y `user_private`, y poda las copias automáticas de más de 60 días. Se corre **una sola vez**, después de habilitar `pg_cron` en Database → Extensions.
+
+[`supabase/respaldo-cada-hora.sql`](supabase/respaldo-cada-hora.sql) es el que manda hoy (corrido el 2026-08-24): reemplaza la tarea diaria por una que corre **cada hora** y **solo guarda si el contenido cambió** — compara `md5` contra la última copia de esa misma cosa. Sin eso, 24 copias por día de una fila que nadie tocó serían ~1.400 copias casi idénticas en 60 días. Y la poda **nunca se lleva la copia más reciente** de cada cosa: con la regla de "solo si cambió", lo privado de alguien que no entra hace meses tendría su única copia con más de 60 días.
 
 `app_state_backup` tiene RLS activo y **ninguna política**: no se llega desde la app ni con sesión iniciada, solo desde el panel. Un respaldo que la app puede borrar no es un respaldo.
 
-De regalo resuelve el pausado: un proyecto gratuito se duerme tras ~1 semana sin actividad, y la tarea diaria lo mantiene despierto.
+De regalo resuelve el pausado: un proyecto gratuito se duerme tras ~1 semana sin actividad, y la tarea horaria lo mantiene despierto.
 
 ### Pruebas
 
