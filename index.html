@@ -203,7 +203,8 @@
     <div class="sec"><div class="sh"><h3>Sub-temas</h3><button class="mini-add" id="addSub">＋ sub-tema</button></div><div id="subList"></div></div>
     <div class="sec" id="pBelongSec"><div class="sh"><h3>Pertenece a</h3></div><div id="pBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="pAddFile">＋ archivo de Drive</button></div><div id="pFiles"></div></div>
-    <div class="sec" id="pLinksSec"><div class="sh"><h3>Vínculos con otros temas</h3><button class="mini-add" id="addLink">＋ vincular</button></div><div style="position:relative"><div class="picker" id="picker"><input class="txt" id="pickSearch" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
+    <div class="sec" id="pLinksSec"><div class="sh"><h3>Vínculos con otros temas</h3><button class="mini-add" id="addLink">＋ vincular</button></div><div style="position:relative"><!-- Clase propia y específica a propósito: "picker" a secas la usa también el
+     selector de Google, y nuestra regla le apagaba la ventana. --><div class="linkpick" id="picker"><input class="txt" id="pickSearch" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
   </div>
   <div class="pfoot"><button class="btn danger" id="delNode">Eliminar tema</button></div>
 </aside>
