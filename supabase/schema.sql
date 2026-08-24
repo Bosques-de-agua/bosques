@@ -160,7 +160,7 @@ create policy "team invites" on allowed_emails
 -- 9) Sembrar la ficha de los cuatro que ya estaban, con sus nombres actuales.
 insert into team_members (email, name) values
   ('nicomoner@gmail.com',    'Nico'),
-  ('juanpmoretto@gmail.com', 'Juanpi'),
+  ('juanpmoretto@gmail.com', 'Juampi'),
   ('lucasriachi@gmail.com',  'Lucas'),
   ('juanhumus@gmail.com',    'Juanso')
 on conflict (email) do nothing;

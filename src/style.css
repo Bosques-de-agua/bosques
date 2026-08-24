@@ -1099,6 +1099,11 @@
 
   /* El titulo y el buscador en la misma linea, el buscador contra la derecha. */
   .tabhead{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 18px}
+  /* Sin esto el título no puede achicarse por debajo de su contenido, así que
+     en el teléfono el selector Árbol/Mapa se salía de la pantalla y no había
+     forma de pasar al mapa. Con min-width:0 el h1 cede y el selector baja al
+     renglón de abajo, que para eso ya tenía flex-wrap. */
+  .tabhead .h1{min-width:0}
   .tabhead .h1{margin:0;flex:0 0 auto}
   .tabhead .srchbar{margin:0;flex:1 1 240px;justify-content:flex-end}
   .tabhead .srch{flex:0 1 320px}

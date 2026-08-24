@@ -357,7 +357,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // había que salir a borrar a mano de la base.
     const events=[];
     const chat={team:[],dm:{},groups:{}};
-    return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juanpi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",privTasks:{},_seedfix:true,_layout3:true};
+    return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juampi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",privTasks:{},_seedfix:true,_layout3:true};
   }
 
   function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";

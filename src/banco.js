@@ -21,7 +21,7 @@ document.getElementById("app").classList.add("on");
 
 const team = [
   { email: "nico@ejemplo.org", name: "Nico" },
-  { email: "juanpi@ejemplo.org", name: "Juanpi" },
+  { email: "juampi@ejemplo.org", name: "Juampi" },
   { email: "lucas@ejemplo.org", name: "Lucas" },
   { email: "juanso@ejemplo.org", name: "Juanso" },
 ];
