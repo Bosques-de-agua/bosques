@@ -1,7 +1,7 @@
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen","focoVista","tareasVista","verSinEnc"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen","focoVista","tareasVista","verSinEnc","emojiUsados"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -417,6 +417,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   }
 
   function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";
+    // Hasta qué mensaje leyó cada uno, por canal. Es COMPARTIDO: de acá salen
+    // las tildes. Un número por persona y por canal, nada por mensaje.
+    if(!d.chatRead||typeof d.chatRead!=="object")d.chatRead={};
     if(!d.taskFilters||typeof d.taskFilters!=="object")d.taskFilters={people:[],status:[],temas:[],prio:[]};
     ["people","status","temas","prio"].forEach(kk=>{ if(!Array.isArray(d.taskFilters[kk]))d.taskFilters[kk]=[]; });
     if("taskTemaFilter" in d)delete d.taskTemaFilter;
@@ -610,7 +613,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   let estadoGuardado="guardado", ultimoGuardado=null;
   function mostrarEstadoGuardado(estado,err){
     estadoGuardado=estado;
-    if(estado==="guardado")ultimoGuardado=new Date();
+    // Todo lo escrito hasta este instante ya está en la base: de acá sale la
+    // primera tilde. Se refresca sin redibujar el chat entero, que volvería a
+    // guardar y a pedir el foco.
+    if(estado==="guardado"){ ultimoGuardado=new Date(); guardadoHasta=nowMs(); refrescarTildes(); }
     // Un fallo suelta el guard anti-eco: si no, el mismo contenido nunca se
     // vuelve a intentar y el cambio queda solo en la pantalla de quien lo hizo.
     if(estado==="error")lastPushed="";
@@ -1352,6 +1358,123 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const other=chan.slice(3), me=state.me||""; if(!me||!other||other===me)return [];
     const k=dmKey(me,other); return state.chat.dm[k]||(state.chat.dm[k]=[]); }
   function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return ICO.grupo+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
+
+  // ---------- EMOJIS, RESPUESTAS Y TILDES ----------
+  // Emojis a mano. No es un teclado completo a propósito: una grilla corta se
+  // recorre de un vistazo, y el teclado del sistema sigue estando para el
+  // resto (en Windows, Win + punto).
+  const EMOJIS=["👍","🙏","🎉","🔥","😂","❤️","😮","😢","👏","✅","❌","🤔","💪","🙌","👀","🤝","😅","😊","😉","🥲","😎","🫠","🤯","😴",
+    "🌱","🌳","💧","☀️","🌧️","🍃","🐝","🐛","🦌","🔭","🗺️","📍","📌","📷","📊","📎","📝","💡","⏰","🚜","🧭","⛰️","🚧","🧪"];
+  const RAPIDAS=["👍","🙏","🎉","🔥","😂","❤️","👀","✅"];
+  function emojisUsados(){ if(!Array.isArray(state.emojiUsados))state.emojiUsados=[]; return state.emojiUsados; }
+  function anotarEmoji(e){ const u=emojisUsados(); const i=u.indexOf(e); if(i>=0)u.splice(i,1); u.unshift(e); if(u.length>10)u.length=10; saveLocalPrefs(state); }
+  let panelEmoji=null;
+  function cerrarEmojis(){ if(panelEmoji){ panelEmoji.remove(); panelEmoji=null; } }
+  // El panel se cuelga del body y se ubica a mano: adentro de la burbuja o del
+  // pie quedaba recortado por el scroll de los mensajes.
+  function abrirEmojis(ancla,elegir){ cerrarEmojis();
+    const p=document.createElement("div"); p.className="emojipop";
+    const recientes=emojisUsados();
+    p.innerHTML=(recientes.length?`<div class="eplab">Últimos</div><div class="epgrid">`+recientes.map(e=>`<button type="button" data-e="${e}">${e}</button>`).join("")+`</div>`:"")
+      +`<div class="eplab">Emojis</div><div class="epgrid">`+EMOJIS.map(e=>`<button type="button" data-e="${e}">${e}</button>`).join("")+`</div>`;
+    document.body.appendChild(p);
+    const r=ancla.getBoundingClientRect(), w=p.offsetWidth, h=p.offsetHeight;
+    let left=Math.min(Math.max(8,r.left-w/2+r.width/2),window.innerWidth-w-8);
+    let top=r.top-h-8; if(top<8)top=Math.min(r.bottom+8,window.innerHeight-h-8);
+    p.style.left=left+"px"; p.style.top=top+"px";
+    p.addEventListener("click",e=>{ const b=e.target.closest("[data-e]"); if(!b)return; e.stopPropagation();
+      anotarEmoji(b.dataset.e); cerrarEmojis(); elegir(b.dataset.e); });
+    setTimeout(()=>document.addEventListener("click",cerrarEmojis,{once:true}),0);
+    panelEmoji=p; }
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape")cerrarEmojis(); });
+  window.addEventListener("resize",cerrarEmojis);
+
+  // Reacciones: emoji → quiénes. Va adentro del mensaje, que es lo que ya
+  // viaja; no hay estructura nueva que sincronizar.
+  function reaccionesDe(m){ if(!m.r||typeof m.r!=="object")m.r={}; return m.r; }
+  function toggleReaccion(mid,emoji){ const m=msgsOf(chatChan).find(x=>x.id===mid); if(!m)return; const me=state.me; if(!me)return;
+    const r=reaccionesDe(m); const arr=Array.isArray(r[emoji])?r[emoji]:(r[emoji]=[]);
+    const i=arr.indexOf(me); if(i>=0)arr.splice(i,1); else arr.push(me);
+    if(!arr.length)delete r[emoji];
+    if(!Object.keys(r).length)delete m.r;
+    save(); renderChat(); }
+  function reaccionesHTML(m,me){ const r=(m.r&&typeof m.r==="object")?m.r:null; if(!r)return "";
+    const chips=Object.keys(r).filter(e=>Array.isArray(r[e])&&r[e].length);
+    if(!chips.length)return "";
+    return `<div class="reacts">`+chips.map(e=>`<button class="react${r[e].includes(me)?" mine":""}" data-react="${esc(e)}" title="${esc(r[e].join(", "))}">${e}<span>${r[e].length}</span></button>`).join("")+`</div>`; }
+
+  // Al reaccionar primero se ofrecen ocho de un toque; el ＋ abre la grilla
+  // entera. Dos pasos solo para quien quiere algo raro.
+  function abrirReacciones(ancla,mid){ cerrarEmojis();
+    const p=document.createElement("div"); p.className="emojipop rapidas";
+    p.innerHTML=`<div class="epgrid">`+RAPIDAS.map(e=>`<button type="button" data-e="${e}">${e}</button>`).join("")
+      +`<button type="button" class="epmas" data-mas>＋</button></div>`;
+    document.body.appendChild(p);
+    const r=ancla.getBoundingClientRect(), w=p.offsetWidth, h=p.offsetHeight;
+    p.style.left=Math.min(Math.max(8,r.left-w+r.width),window.innerWidth-w-8)+"px";
+    p.style.top=(r.top-h-6<8?r.bottom+6:r.top-h-6)+"px";
+    p.addEventListener("click",e=>{ e.stopPropagation();
+      if(e.target.closest("[data-mas]")){ const a=ancla; cerrarEmojis(); abrirEmojis(a,em=>toggleReaccion(mid,em)); return; }
+      const b=e.target.closest("[data-e]"); if(!b)return; anotarEmoji(b.dataset.e); cerrarEmojis(); toggleReaccion(mid,b.dataset.e); });
+    setTimeout(()=>document.addEventListener("click",cerrarEmojis,{once:true}),0);
+    panelEmoji=p; }
+
+  // Responder: el mensaje guarda el id del que contesta. Si el original se
+  // borró, la cita lo dice en vez de desaparecer.
+  let respondiendoA=null;
+  function msgPorId(id){ return msgsOf(chatChan).find(x=>x.id===id)||null; }
+  function resumenMsg(m){ if(!m)return ""; if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); return "Evento: "+((ev&&ev.title)||"sin título"); }
+    if(m.file&&!m.text)return (/^image\//.test(m.file.type||"")?"Imagen: ":"Archivo: ")+(m.file.name||"");
+    const t=String(m.text||"").replace(/\s+/g," ").trim(); return t.length>90?t.slice(0,90)+"…":t||"(sin texto)"; }
+  function citaHTML(m){ if(!m.re)return ""; const o=msgPorId(m.re);
+    if(!o)return `<div class="msgquote ida"><b>Mensaje borrado</b></div>`;
+    return `<div class="msgquote" data-ira="${o.id}" title="Ir al mensaje"><b>${esc(o.from)}</b><span>${esc(resumenMsg(o))}</span></div>`; }
+  function responderA(mid){ respondiendoA=mid; pintarRespuesta(); const inp=document.getElementById("msgInput"); if(inp)inp.focus(); }
+  function cancelarRespuesta(){ respondiendoA=null; pintarRespuesta(); }
+  function pintarRespuesta(){ const bar=document.getElementById("replyBar"); if(!bar)return;
+    const o=respondiendoA?msgPorId(respondiendoA):null;
+    if(!o){ bar.hidden=true; bar.innerHTML=""; respondiendoA=null; return; }
+    bar.hidden=false;
+    bar.innerHTML=`<span class="rbmark"></span><span class="rbtxt"><b>Respondiendo a ${esc(o.from)}</b><span>${esc(resumenMsg(o))}</span></span><button class="rbx" id="cancelReply" title="Cancelar">✕</button>`;
+    bar.querySelector("#cancelReply").addEventListener("click",cancelarRespuesta); }
+  function irAlMensaje(id){ const box=document.getElementById("msgs"); const el=box&&box.querySelector(`[data-msg="${id}"]`); if(!el)return;
+    el.scrollIntoView({block:"center",behavior:"smooth"});
+    el.classList.remove("destacado"); void el.offsetWidth; el.classList.add("destacado");
+    setTimeout(()=>el.classList.remove("destacado"),1600); }
+
+  // Tildes. UNA por mensaje guardado, DOS cuando lo leyeron todos los del
+  // canal. Lo que se guarda no es "quién vio cada mensaje" sino hasta qué
+  // momento leyó cada uno cada canal: un número por persona, y las tildes se
+  // calculan. Por mensaje serían miles de marcas en la misma fila compartida.
+  let guardadoHasta=0;
+  function canalKey(chan){ if(chan==="team")return "team"; if(chan.startsWith("grp:"))return chan;
+    // El canal privado tiene que llamarse igual para los dos lados, o cada uno
+    // escribiría su lectura en un lugar distinto y nunca habría dos tildes.
+    return "dm:"+dmKey(state.me||"",chan.slice(3)); }
+  function readMap(chan){ const r=state.chatRead||(state.chatRead={}); const k=canalKey(chan);
+    if(!r[k]||typeof r[k]!=="object")r[k]={}; return r[k]; }
+  function destinatarios(chan){ const me=state.me||"";
+    if(chan==="team"){ const eq=nombresEquipo(); return (eq.length?eq:allPeople()).filter(p=>p&&p!==me); }
+    if(chan.startsWith("grp:")){ const g=groupOf(chan); return ((g&&g.members)||[]).filter(p=>p&&p!==me); }
+    const o=chan.slice(3); return (o&&o!==me)?[o]:[]; }
+  function leidoPor(m,chan){ const rm=readMap(chan); return destinatarios(chan).filter(p=>(rm[p]||0)>=m.ts); }
+  function tildes(m,chan,me){ if(m.from!==me||m.ev)return "";
+    if(!(m.ts<=guardadoHasta))return `<span class="tick pend" title="Todavía no se guardó: si cerrás la pestaña ahora, se pierde.">🕘</span>`;
+    const dest=destinatarios(chan), leyeron=leidoPor(m,chan);
+    const todos=dest.length>0&&leyeron.length>=dest.length;
+    const t=todos?(dest.length===1?`Lo leyó ${leyeron[0]}`:`Lo leyeron todos: ${leyeron.join(", ")}`)
+      :(leyeron.length?`Lo leyó ${leyeron.join(", ")}. Falta ${dest.filter(p=>!leyeron.includes(p)).join(", ")}.`:"Guardado. Todavía no lo abrió nadie.");
+    return `<span class="tick${todos?" full":""}" title="${esc(t)}">${todos?"✓✓":"✓"}</span>`; }
+  // Al abrir un canal queda leído hasta su último mensaje. Solo se escribe si
+  // el número cambió: si no, cada dibujado sería una escritura.
+  function marcarLeido(chan,msgs){ const me=state.me; if(!me||!msgs.length)return false;
+    const ult=msgs[msgs.length-1].ts||0; const rm=readMap(chan);
+    if((rm[me]||0)>=ult)return false; rm[me]=ult; return true; }
+  // Solo las tildes, sin tocar el resto de la pantalla.
+  function refrescarTildes(){ if(active!=="chat")return; const box=document.getElementById("msgs"); if(!box)return;
+    const me=state.me; if(!me)return;
+    msgsOf(chatChan).forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
+      const pie=row.querySelector(".msgpie"); if(pie)pie.innerHTML=tildes(m,chatChan,me); }); }
   function renderChat(){ const me=state.me;
     if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
     const list=document.getElementById("chanList");
@@ -1369,7 +1492,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
-      <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
+      <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li>
+      <li>Pasando por encima de un mensaje aparecen <b>responder</b> (↩) y <b>reaccionar</b> (☺). En el teléfono se ven siempre.</li>
+      <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
@@ -1379,27 +1504,51 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
-      const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id)); });
-    seenMap()[chatChan]=msgs.length; save(); updateChatBadge(); box.scrollTop=box.scrollHeight; }
+      const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id));
+      const rp=row.querySelector("[data-responder]"); if(rp)rp.addEventListener("click",()=>responderA(m.id));
+      const rc=row.querySelector("[data-reacc]"); if(rc)rc.addEventListener("click",e=>{ e.stopPropagation(); abrirReacciones(rc,m.id); });
+      const q=row.querySelector("[data-ira]"); if(q)q.addEventListener("click",()=>irAlMensaje(q.dataset.ira));
+      row.querySelectorAll("[data-react]").forEach(b=>b.addEventListener("click",()=>toggleReaccion(m.id,b.dataset.react))); });
+    pintarRespuesta();
+    // El scroll va ANTES de guardar: marcar leído dispara un guardado y, si
+    // falla, el aviso empuja la pantalla; que la lista quede abajo igual.
+    box.scrollTop=box.scrollHeight;
+    seenMap()[chatChan]=msgs.length; marcarLeido(chatChan,msgs); save(); updateChatBadge(); }
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   function msgHTML(m,me){ if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div><div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div></div>`; }
     const mm=(m.from===me);
+    const pie=`<div class="msgpie">${tildes(m,chatChan,me)}</div>`;
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
-      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}`
+      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
-        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+borrarBtn(m,me)+`</div>`; }
-    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}<div>${esc(m.text)}</div>${borrarBtn(m,me)}</div>`; }
-  // Se puede borrar lo propio. Hacía falta igual, pero sobre todo porque un
-  // adjunto pesado se quedaba adentro de la fila compartida para siempre.
-  function borrarBtn(m,me){ return m.from===me?`<button class="msgx" data-borrarm="${m.id}" title="Borrar mensaje">✕</button>`:""; }
+        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
+    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}">${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${esc(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+  // Los botones del mensaje, arriba a la derecha. Aparecen al pasar por
+  // encima; en pantalla táctil, siempre. Borrar es solo lo propio: hacía
+  // falta igual, pero sobre todo porque un adjunto pesado se quedaba adentro
+  // de la fila compartida para siempre.
+  function accionesMsg(m,me){ return `<div class="msgacts">`
+    +`<button class="msgb" data-responder="${m.id}" title="Responder">↩</button>`
+    +`<button class="msgb" data-reacc="${m.id}" title="Reaccionar">☺</button>`
+    +(m.from===me?`<button class="msgb msgx" data-borrarm="${m.id}" title="Borrar mensaje">✕</button>`:"")
+    +`</div>`; }
   function borrarMsg(mid){ const arr=msgsOf(chatChan); const m=arr.find(x=>x.id===mid); if(!m)return;
     if(m.from!==(state.me||""))return;
     const q=m.file?"Se borra el mensaje y el archivo que trae, para todos.":"Se borra el mensaje para todos.";
     confirmar(q,()=>{ const i=arr.findIndex(x=>x.id===mid); if(i>=0)arr.splice(i,1); save(); renderChat(); },{title:"Borrar mensaje",yes:"Borrar"}); }
-  function sendMsg(){ const inp=document.getElementById("msgInput"); const me=state.me; if(!me)return; const t=inp.value.trim(); if(!t)return; msgsOf(chatChan).push({id:"m"+uid(),from:me,text:t,ts:nowMs()}); inp.value=""; save(); renderChat(); }
+  function sendMsg(){ const inp=document.getElementById("msgInput"); const me=state.me; if(!me)return; const t=inp.value.trim(); if(!t)return;
+    const m={id:"m"+uid(),from:me,text:t,ts:nowMs()};
+    // Solo cuenta si el mensaje al que respondés sigue en este canal.
+    if(respondiendoA&&msgPorId(respondiendoA))m.re=respondiendoA;
+    respondiendoA=null;
+    msgsOf(chatChan).push(m); inp.value=""; save(); renderChat(); }
+  function ponerEmoji(e){ const inp=document.getElementById("msgInput"); if(!inp)return;
+    const a=inp.selectionStart==null?inp.value.length:inp.selectionStart, b=inp.selectionEnd==null?a:inp.selectionEnd;
+    inp.value=inp.value.slice(0,a)+e+inp.value.slice(b);
+    inp.focus(); const p=a+e.length; try{ inp.setSelectionRange(p,p); }catch(err){} }
   // Lo que se adjunta al chat NO se guarda aparte: viaja dentro de la misma
   // fila que comparte todo el equipo. O sea que el peso de un adjunto se lo
   // banca cada guardado de cada persona, para siempre. Con el limite viejo de
@@ -2119,7 +2268,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
   document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
   document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
-  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg(); });
+  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg();
+    if(e.key==="Escape"&&respondiendoA){ e.stopPropagation(); cancelarRespuesta(); } });
+  document.getElementById("emojiBtn").addEventListener("click",e=>{ e.stopPropagation(); abrirEmojis(e.currentTarget,ponerEmoji); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });
   // cambiar de identidad afecta panel, chat, privadas y archivo: hay que refrescar todo y soltar lo que estaba abierto
   // ---------- avisos (campanita) ----------
@@ -2218,6 +2369,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   applyTheme(state.theme); applyPalette(state.palette||"carbon");
   sweepArchive(); loadTreeOpen(); syncPeopleList();
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
+  // Lo que vino de la base ya está guardado, por definición: sin esto, los
+  // mensajes viejos no mostrarían ninguna tilde hasta el primer guardado.
+  guardadoHasta=nowMs();
   if(!seed) save();                                // base vacía: sembrar
   // Si la pestaña guardada ya no existe (el mapa pasó a vivir dentro de
   // Estructura), se cae a una válida en vez de quedar en pantalla vacía.

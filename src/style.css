@@ -644,6 +644,64 @@
   .msg:hover .msgx,.msg .msgx:focus-visible{opacity:1}
   .msg .msgx:hover{color:#8E2F1D;border-color:#8E2F1D}
   @media (hover:none){ .msg .msgx{opacity:.55} }
+  /* Los botones del mensaje: responder, reaccionar y borrar. */
+  .msgacts{position:absolute;top:-11px;right:-6px;display:flex;gap:3px;opacity:0;transition:opacity .12s}
+  .msg:hover .msgacts,.msgacts:focus-within{opacity:1}
+  @media (hover:none){ .msgacts{opacity:.55} }
+  .msgacts .msgb{width:22px;height:22px;line-height:1;border-radius:999px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-faint);font-size:12px;cursor:pointer;padding:0;
+    display:grid;place-items:center;box-shadow:var(--shadow)}
+  .msgacts .msgb:hover{color:var(--wood);border-color:var(--wood)}
+  .msgacts .msgx{position:static;opacity:1;width:22px;height:22px}
+  /* La cita del mensaje al que se responde. */
+  .msgquote{display:block;text-align:left;width:100%;font:inherit;border:none;border-left:3px solid var(--wood);
+    background:color-mix(in srgb,var(--ink) 5%,transparent);border-radius:var(--r-sm);
+    padding:5px 8px;margin:0 0 6px;cursor:pointer;font-size:12px;line-height:1.35}
+  .msgquote b{display:block;color:var(--wood-deep);font-size:11px}
+  :root[data-theme="dark"] .msgquote b,:root:not([data-theme="light"]) .msgquote b{color:var(--wood)}
+  .msgquote span{display:block;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .msgquote.ida{border-left-color:var(--ink-faint);cursor:default}
+  .msgquote.ida b{color:var(--ink-faint);font-style:italic}
+  .msg.destacado{animation:destacar 1.6s ease}
+  @keyframes destacar{ 0%,60%{background:color-mix(in srgb,var(--wood) 34%,var(--surface))} 100%{} }
+  /* Reacciones, colgando del borde de abajo de la burbuja. */
+  .reacts{display:flex;flex-wrap:wrap;gap:4px;margin:6px -2px -14px 0;position:relative;z-index:1}
+  .msg.mine .reacts{justify-content:flex-end}
+  .react{font:inherit;font-size:12px;line-height:1;display:inline-flex;align-items:center;gap:3px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-pill);
+    padding:3px 7px;cursor:pointer;box-shadow:var(--shadow)}
+  .react span{font-size:10.5px;color:var(--ink-soft);font-weight:700}
+  .react:hover{border-color:var(--wood)}
+  .react.mine{background:color-mix(in srgb,var(--wood) 18%,var(--surface));border-color:var(--wood)}
+  .msg .reacts + *{margin-top:0}
+  /* Tildes: una = guardado, dos = lo leyeron todos. */
+  .msgpie{display:flex;justify-content:flex-end;gap:4px;min-height:0;margin-top:2px}
+  .msgpie:empty{display:none}
+  .tick{font-size:11px;line-height:1;color:var(--ink-faint);letter-spacing:-2px;cursor:default}
+  .tick.full{color:var(--sky);letter-spacing:-3px}
+  .tick.pend{letter-spacing:0;font-size:9px;opacity:.7}
+  /* La barra de "respondiendo a", arriba del cajón de escribir. */
+  .replybar{display:flex;align-items:center;gap:9px;padding:8px 14px;background:var(--surface-2);
+    border-top:1px solid var(--line);font-size:12px}
+  .replybar[hidden]{display:none}
+  .replybar .rbmark{width:3px;align-self:stretch;background:var(--wood);border-radius:2px;flex:none}
+  .replybar .rbtxt{flex:1;min-width:0}
+  .replybar .rbtxt b{display:block;font-size:11px;color:var(--wood-deep)}
+  :root[data-theme="dark"] .replybar .rbtxt b,:root:not([data-theme="light"]) .replybar .rbtxt b{color:var(--wood)}
+  .replybar .rbtxt span{display:block;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .replybar .rbx{border:none;background:none;color:var(--ink-faint);font-size:13px;cursor:pointer;padding:2px 4px;flex:none}
+  .replybar .rbx:hover{color:var(--ink)}
+  /* La grilla de emojis. Cuelga del body para que no la recorte el scroll. */
+  .emojipop{position:fixed;z-index:120;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--r-md);box-shadow:var(--shadow-lg);padding:8px;width:296px;max-height:264px;overflow-y:auto}
+  .emojipop.rapidas{width:auto;max-height:none;overflow:visible}
+  .emojipop .eplab{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin:2px 2px 5px;font-weight:700}
+  .emojipop .eplab + .epgrid{margin-bottom:8px}
+  .emojipop .epgrid{display:flex;flex-wrap:wrap;gap:2px}
+  .emojipop button{font:inherit;font-size:19px;line-height:1;width:34px;height:32px;border:none;background:none;
+    border-radius:var(--r-sm);cursor:pointer;display:grid;place-items:center}
+  .emojipop button:hover{background:var(--surface-3)}
+  .emojipop .epmas{font-size:15px;color:var(--ink-faint)}
   .msg .who{font-size:10.5px;color:var(--ink-faint);margin-bottom:2px;font-weight:600}
   .msg.event{max-width:86%;align-self:stretch;border-left:3px solid var(--sky)}
   .msg .evtitle{font-weight:700;font-size:14px;margin-top:2px}
