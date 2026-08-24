@@ -232,10 +232,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // puede (carpetas, links de afuera) queda como estaba: se abre en Drive.
   function verBtn(f){ const p=previewUrl(f.url); if(!p)return "";
     return `<button class="fver" data-ver="${esc(p)}" data-vernm="${esc(f.name||f.url)}" data-verk="${esc(f.kind||"link")}" data-verurl="${esc(f.url)}" title="Ver acá">${ICO.ojo}</button>`; }
+  // El lápiz. El modal de edición busca el archivo por id y resuelve el destino
+  // recién al guardar, así que sirve igual desde la ficha de un tema o desde la
+  // lista suelta de la pestaña Drive: no necesita saber dónde estás parado.
+  function edBtn(f){ return `<button class="fed" data-editf="${esc(f.id)}" title="Editar nombre o link">${ICO.lapiz}</button>`; }
   function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
-    // El lápiz va donde ya se administra el archivo, junto al desvincular. En
-    // la pestaña Drive las filas son de lectura y quedan limpias.
-    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?`<button class="fed" data-editf="${f.id}" title="Editar nombre o link">${ICO.lapiz}</button><button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
+    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?edBtn(f)+`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
   // Archivos que cuelgan de los sub-temas de un tema (y de sus tareas).
   function filesHeredados(node){ const out=[];
     const bajar=id=>{ const n=N(id); if(!n)return;
@@ -1193,9 +1195,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const ruta=x=>{ const p=pathOf(x.node.id).map(z=>z.name); const bajo=p.slice(1).join(" › ")||p[0]||"Proyecto";
       return bajo+(x.task?" › "+(x.task.title||"Tarea"):""); };
     const filaConRuta=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const r=ruta(x);
-      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button>${verBtn(x.f)}</div>`; };
+      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a><button class="fpath fpathgo" data-go="${x.node.id}" title="Ir al tema: ${esc(r)}">${esc(r)}</button>${verBtn(x.f)}${edBtn(x.f)}</div>`; };
     const fila=x=>{ const k=FKIND[x.f.kind]||FKIND.link; const tarea=x.task?(x.task.title||"Tarea"):"";
-      return `<div class="filerow"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}${verBtn(x.f)}</div>`; };
+      return `<div class="filerow enlista"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(x.f.url)}">${esc(x.f.name||x.f.url)}</a>${tarea?`<span class="fpath" title="Tarea: ${esc(tarea)}">${esc(tarea)}</span>`:""}${verBtn(x.f)}${edBtn(x.f)}</div>`; };
     const bloque=(titulo,color,ids)=>{ const conArchivos=ids.filter(id=>porNodo.has(id)); if(!conArchivos.length)return "";
       const total=conArchivos.reduce((a,id)=>a+porNodo.get(id).length,0);
       let h=`<div class="drivegroup"><h3><span class="orb" style="background:${color}"></span>${esc(titulo)}<span class="cnt">${total}</span></h3>`;
@@ -1230,7 +1232,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const cuenta=document.getElementById("driveCuenta");
     if(cuenta)cuenta.textContent=all.length+(all.length===1?" archivo":" archivos");
     document.querySelectorAll("#driveOrdenSeg [data-o]").forEach(b=>b.classList.toggle("on",b.dataset.o===driveOrden));
-    box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go))); }
+    box.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>openPanel(b.dataset.go)));
+    box.querySelectorAll("[data-editf]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation();
+      openFileModal({kind:"edit",fileId:b.dataset.editf,after:renderDrive}); })); }
 
   // ---------- CHAT + EVENTOS ----------
   function groupsAll(){ if(!state.chat.groups)state.chat.groups={}; return state.chat.groups; }

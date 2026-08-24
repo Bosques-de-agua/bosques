@@ -377,6 +377,12 @@
   .filerow .fver,.filerow .fed{color:var(--ink-faint);border:none;background:none;cursor:pointer;padding:3px;flex:none;display:inline-flex;align-items:center}
   .filerow .fver:hover,.filerow .fed:hover{color:var(--wood-deep)}
   .filerow .fver .ico,.filerow .fed .ico{width:16px;height:16px;vertical-align:0}
+  /* En la pestaña Drive la lista es larga y sirve sobre todo para mirar, así
+     que el lápiz asoma recién al pasar por encima del renglón. En la ficha de
+     un tema, donde ya está el desvincular, se queda siempre a la vista. */
+  .filerow.enlista .fed{opacity:0;transition:opacity .12s}
+  .filerow.enlista:hover .fed,.filerow.enlista .fed:focus-visible{opacity:1}
+  @media (hover:none){ .filerow.enlista .fed{opacity:.55} }
   .drivegroup{margin-bottom:20px}
   .drivegroup h3{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 9px;display:flex;align-items:center;gap:8px}
   .drivegroup h3 .orb{width:11px;height:11px;border-radius:50%;flex:none}
