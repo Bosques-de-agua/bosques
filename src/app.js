@@ -653,8 +653,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     [...worldInner.querySelectorAll(".neu")].forEach(n=>n.remove());
     Object.values(state.nodes).forEach(node=>{
       const a=agg(node),depth=depthOf(node),hasKids=(node.children||[]).length>0,size=baseSize(node),acc=accentOf(node);
-      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(a.ic?" conprog":"");
-      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.setProperty("--pct",a.ic?Math.round(a.dc/a.ic*100):0); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id;
+      const el=document.createElement("div"); el.className="neu"+(node.id===selId?" sel":"")+(isBright(node)?"":" off")+(node.id===linkSrc?" linksrc":"")+(depth>=4?" deep":"")+(a.ic?" conprog":"")+(node.forma==="redonda"?" redonda":"");
+      // `--nesc` es la misma escala que el ancho, pero aplicada a la letra y a
+      // los márgenes: por eso el globo crece en diagonal y no solo a lo ancho.
+      el.dataset.lvl=Math.min(depth,4); el.style.width=size+"px"; el.style.setProperty("--nesc",node.scale||1); el.style.borderTopColor=acc; el.style.setProperty("--acc",acc); el.style.setProperty("--pct",a.ic?Math.round(a.dc/a.ic*100):0); el.style.left=(OX+node.x)+"px"; el.style.top=(OY+node.y)+"px"; el.dataset.id=node.id;
       el.title="Clic: abre la ficha · Doble clic: lo ve en el árbol · El circulito apaga o enciende su rama";
       const owners=[...a.owners].slice(0,4); const avs=owners.map(o=>avatarMarkup(o,"av",true)).join("");
       const outLinks=(node.links||[]).length;
@@ -735,12 +737,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function placePop(el,wx,wy){ const sx=wx*cam.s+cam.tx,sy=wy*cam.s+cam.ty,w=el.offsetWidth||234,h=el.offsetHeight||220; el.style.left=Math.max(8,Math.min(viewport.clientWidth-w-8,sx+18))+"px"; el.style.top=Math.max(8,Math.min(viewport.clientHeight-h-8,sy-10))+"px"; }
   const NEU_HUES=[210,168,150,90,45,28,8,340,300,265,190,120];
   const LINE_COLORS=["#8a6aa8","#2f9e8a","#4a86c4","#d19a34","#c15b46","#6f9a6a"];
-  function openAspect(node){ closePops(); selId=node.id; renderMap(); const el=document.createElement("div"); el.className="pop"; const cur=node.hue!=null?node.hue:200;
-    el.innerHTML=`<div class="pop-h">Aspecto · ${esc(node.name)}</div><div class="pop-l">Color</div><div class="swatches">${NEU_HUES.map(hh=>`<span class="sw${node.hue===hh?' on':''}" data-h="${hh}" style="background:hsl(${hh} 45% 50%)"></span>`).join("")}</div><input type="range" class="hue" min="0" max="360" value="${cur}"><button class="tiny inherit">↺ Color por capa (auto)</button><div class="pop-l">Tamaño</div><input type="range" class="size" min="0.6" max="2" step="0.05" value="${node.scale||1}"><div class="pop-actions"><button class="btn done">Listo</button></div>`;
+  function openAspect(node){ closePops(); selId=node.id; renderMap(); const el=document.createElement("div"); el.className="pop";
+    // Se fue la barra de tono: con doce colores a un clic, arrastrar una línea
+    // para buscar el matiz era un paso de más para llegar al mismo lado.
+    el.innerHTML=`<div class="pop-h">Aspecto · ${esc(node.name)}</div><div class="pop-l">Color</div><div class="swatches">${NEU_HUES.map(hh=>`<span class="sw${node.hue===hh?' on':''}" data-h="${hh}" style="background:hsl(${hh} 45% 50%)"></span>`).join("")}</div><button class="tiny inherit">↺ Color por capa (auto)</button><div class="pop-l">Forma</div><div class="seg2 formaseg">${[["","Cuadrada"],["redonda","Redonda"]].map(([v,l])=>`<button data-forma="${v}" class="${(node.forma||"")===v?"on":""}">${l}</button>`).join("")}</div><div class="pop-l">Tamaño</div><input type="range" class="size" min="0.6" max="2" step="0.05" value="${node.scale||1}"><div class="pop-actions"><button class="btn done">Listo</button></div>`;
     viewport.appendChild(el); placePop(el,OX+node.x,OY+node.y);
-    const liveS=()=>{ const e=document.querySelector(`.neu[data-id="${node.id}"]`); if(e)e.style.width=baseSize(node)+"px"; };
-    el.querySelectorAll("[data-h]").forEach(s=>s.addEventListener("click",()=>{ node.hue=+s.dataset.h; save(); renderMap(); el.querySelectorAll(".sw").forEach(x=>x.classList.toggle("on",+x.dataset.h===node.hue)); el.querySelector(".hue").value=node.hue; }));
-    el.querySelector(".hue").addEventListener("change",e=>{ node.hue=+e.target.value; save(); renderMap(); });
+    // Mientras se arrastra el tamaño se toca el globo en vivo, sin volver a
+    // dibujar el mapa entero en cada píxel. Van los dos: el ancho y la escala
+    // que agranda letra y márgenes, que es lo que lo hace crecer en diagonal
+    // en vez de solo ensancharse.
+    const liveS=()=>{ const e=document.querySelector(`.neu[data-id="${node.id}"]`); if(!e)return;
+      e.style.width=baseSize(node)+"px"; e.style.setProperty("--nesc",node.scale||1); };
+    el.querySelectorAll("[data-h]").forEach(s=>s.addEventListener("click",()=>{ node.hue=+s.dataset.h; save(); renderMap(); el.querySelectorAll(".sw").forEach(x=>x.classList.toggle("on",+x.dataset.h===node.hue)); }));
+    el.querySelectorAll("[data-forma]").forEach(b=>b.addEventListener("click",()=>{ node.forma=b.dataset.forma||""; save(); renderMap();
+      el.querySelectorAll("[data-forma]").forEach(x=>x.classList.toggle("on",x===b)); }));
     el.querySelector(".inherit").addEventListener("click",()=>{ node.hue=null; save(); renderMap(); closePops(); });
     el.querySelector(".size").addEventListener("input",e=>{ node.scale=+e.target.value; liveS(); });
     el.querySelector(".size").addEventListener("change",()=>{ save(); renderMap(); });
