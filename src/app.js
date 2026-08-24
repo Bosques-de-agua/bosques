@@ -136,7 +136,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     grupo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 8h12M4 12.4h12M8.6 4L7.1 16M13.4 4L11.9 16\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     persona:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"7.4\" r=\"2.8\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4.8 16.2c0-2.7 2.3-4.4 5.2-4.4s5.2 1.7 5.2 4.4\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
     si:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M7 10.2l2.1 2.1L13 8.4\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
-    ojo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M2.6 10S5.5 5.4 10 5.4 17.4 10 17.4 10 14.5 14.6 10 14.6 2.6 10 2.6 10Z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><circle cx=\"10\" cy=\"10\" r=\"2.2\" stroke=\"currentColor\" stroke-width=\"1.4\"/></svg>"
+    ojo:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M2.6 10S5.5 5.4 10 5.4 17.4 10 17.4 10 14.5 14.6 10 14.6 2.6 10 2.6 10Z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><circle cx=\"10\" cy=\"10\" r=\"2.2\" stroke=\"currentColor\" stroke-width=\"1.4\"/></svg>",
+    lapiz:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 16l1-4 8.5-8.5 3 3L11 15l-4 1Z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/></svg>"
   };
   const FKIND={doc:{i:ICO.doc,l:"Documento"},sheet:{i:ICO.sheet,l:"Hoja de cálculo"},slides:{i:ICO.slides,l:"Presentación"},form:{i:ICO.form,l:"Formulario"},folder:{i:ICO.folder,l:"Carpeta"},pdf:{i:ICO.pdf,l:"PDF"},word:{i:ICO.doc,l:"Word"},excel:{i:ICO.sheet,l:"Excel"},ppt:{i:ICO.slides,l:"PowerPoint"},image:{i:ICO.imagen,l:"Imagen"},file:{i:ICO.clip,l:"Archivo"},link:{i:ICO.link,l:"Link"}};
   // Un PDF o un Word subidos a Drive tienen URL "drive.google.com/file/d/…/view":
@@ -222,7 +223,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function verBtn(f){ const p=previewUrl(f.url); if(!p)return "";
     return `<button class="fver" data-ver="${esc(p)}" data-vernm="${esc(f.name||f.url)}" data-verk="${esc(f.kind||"link")}" data-verurl="${esc(f.url)}" title="Ver acá">${ICO.ojo}</button>`; }
   function fileRow(f,onDel){ const k=FKIND[f.kind]||FKIND.link;
-    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?`<button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
+    // El lápiz va donde ya se administra el archivo, junto al desvincular. En
+    // la pestaña Drive las filas son de lectura y quedan limpias.
+    return `<div class="filerow" data-f="${f.id}"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(f.url)}" target="_blank" rel="noopener noreferrer" title="${esc(f.url)}">${esc(f.name||f.url)}</a>${verBtn(f)}${onDel?`<button class="fed" data-editf="${f.id}" title="Editar nombre o link">${ICO.lapiz}</button><button class="x" data-delf="${f.id}" title="Desvincular">✕</button>`:""}</div>`; }
   // Archivos que cuelgan de los sub-temas de un tema (y de sus tareas).
   function filesHeredados(node){ const out=[];
     const bajar=id=>{ const n=N(id); if(!n)return;
@@ -230,7 +233,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       (n.items||[]).forEach(k=>filesOf(k).forEach(f=>out.push({f,node:n,task:k})));
       (n.children||[]).forEach(bajar); };
     (node.children||[]).forEach(bajar); return out; }
-  function renderFileList(el,owner,after){ const fs=filesOf(owner);
+  function renderFileList(el,owner,after,donde){ const fs=filesOf(owner);
     let html=fs.map(f=>fileRow(f,true)).join("");
     // Entrás a un tema y ves todo lo que cuelga de ahí para abajo, no solo lo
     // vinculado al tema exacto. Lo heredado va marcado con su ruta y no se
@@ -242,7 +245,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return `<div class="filerow hered"><span class="fic" title="${k.l}">${k.i}</span><a class="fnm" href="${esc(x.f.url)}" target="_blank" rel="noopener noreferrer">${esc(x.f.name||x.f.url)}</a><span class="fpath" title="${esc(ruta)}">${esc(ruta)}</span>${verBtn(x.f)}</div>`; }).join("");
     el.innerHTML=html||`<div class="empty">Sin archivos. Pegá el link de Drive con "＋ archivo de Drive".</div>`;
     el.querySelectorAll("[data-delf]").forEach(b=>b.addEventListener("click",()=>{ const id=b.dataset.delf;
-      confirmar("Se saca el link de acá. El archivo sigue intacto en Drive.",()=>{ owner.files=filesOf(owner).filter(f=>f.id!==id); save(); if(after)after(); },{title:"Desvincular archivo",yes:"Desvincular"}); })); }
+      confirmar("Se saca el link de acá. El archivo sigue intacto en Drive.",()=>{ owner.files=filesOf(owner).filter(f=>f.id!==id); save(); if(after)after(); },{title:"Desvincular archivo",yes:"Desvincular"}); }));
+    // Se guarda DÓNDE vive el archivo, no el objeto: si mientras editás llega
+    // un cambio del equipo, el estado se reemplaza entero y una referencia
+    // vieja escribiría en un objeto que ya no está colgado de ningún lado.
+    el.querySelectorAll("[data-editf]").forEach(b=>b.addEventListener("click",()=>{
+      openFileModal({kind:"edit",donde:donde||"node",fileId:b.dataset.editf,after}); })); }
   function allFiles(){ const out=[];
     // incluye las tareas archivadas: el archivo sigue siendo del tema aunque la tarea ya esté hecha
     Object.values(state.nodes).forEach(n=>{ filesOf(n).forEach(f=>out.push({f,node:n,task:null}));
@@ -937,23 +945,48 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- DRIVE ----------
   // El filtro del Drive es una vista personal: vive acá, no en el estado, así
   // que filtrar no le cambia la pantalla a nadie más.
-  let driveQuery="", driveTema="", driveOrden="tema", fmTarget=null;
-  function openFileModal(target){ fmTarget=target; // target: {kind:"node"|"task"|"pick", node, task}
-    document.getElementById("fmUrl").value=""; const fmn=document.getElementById("fmName"); fmn.value=""; fmn.dataset.touched="";
+  let driveQuery="", driveTema="", driveOrden="tema", fmTarget=null, tipoDelSelector=null;
+  // Todos los destinos posibles, para el desplegable "Vincularlo a".
+  function opcionesDestino(){ const opts=[]; const walk=(id,depth)=>{ const n=N(id); if(!n)return; const pad=depth>1?"　".repeat(depth-1)+"› ":"";
+      opts.push(`<option value="n:${n.id}">${esc(pad+n.name)}</option>`);
+      (n.items||[]).forEach(k=>{ if(!k.archived)opts.push(`<option value="t:${n.id}:${k.id}">${esc("　".repeat(depth)+"· "+(k.title||"Tarea"))}</option>`); });
+      (n.children||[]).forEach(c=>walk(c,depth+1)); };
+    state.roots.forEach(r=>walk(r,1)); return opts.join(""); }
+  // Dónde vive hoy un archivo, en el formato del desplegable.
+  function destinoDe(fileId){ let res=null;
+    Object.values(state.nodes).forEach(n=>{
+      if(filesOf(n).some(f=>f.id===fileId))res=res||"n:"+n.id;
+      (n.items||[]).forEach(k=>{ if(filesOf(k).some(f=>f.id===fileId))res=res||"t:"+n.id+":"+k.id; }); });
+    return res; }
+  function openFileModal(target){ fmTarget=target; // {kind:"node"|"task"|"pick"|"edit", …}
+    const url=document.getElementById("fmUrl"), fmn=document.getElementById("fmName");
     const wrap=document.getElementById("fmWhereWrap"), sel=document.getElementById("fmWhere");
-    if(target.kind==="pick"){ wrap.style.display="";
-      const opts=[]; const walk=(id,depth)=>{ const n=N(id); if(!n)return; const pad=depth>1?"　".repeat(depth-1)+"› ":"";
-        opts.push(`<option value="n:${n.id}">${esc(pad+n.name)}</option>`);
-        (n.items||[]).forEach(k=>{ if(!k.archived)opts.push(`<option value="t:${n.id}:${k.id}">${esc("　".repeat(depth)+"· "+(k.title||"Tarea"))}</option>`); });
-        (n.children||[]).forEach(c=>walk(c,depth+1)); };
-      state.roots.forEach(r=>walk(r,1)); sel.innerHTML=opts.join("");
+    const titulo=document.getElementById("fmTitulo"), guardar=document.getElementById("fmSave");
+    const editando=target.kind==="edit";
+    // En edición se busca el archivo por id, no por referencia: si mientras
+    // tanto llega un cambio del equipo, el estado se reemplaza entero.
+    const f=editando?buscarArchivo(target.fileId):null;
+    if(editando&&!f){ note("Ese archivo ya no está."); return; }
+    tipoDelSelector=null;
+    url.value=editando?f.url:""; fmn.value=editando?(f.name||""):""; fmn.dataset.touched="";
+    titulo.textContent=editando?"Editar el archivo":"Vincular un archivo de Drive";
+    guardar.textContent=editando?"Guardar":"Vincular";
+    // El desplegable aparece cuando hay que elegir destino y también al editar,
+    // que es la forma de mover un archivo de un tema a otro.
+    if(target.kind==="pick"||editando){ wrap.style.display=""; sel.innerHTML=opcionesDestino();
+      if(editando){ const d=destinoDe(target.fileId); if(d)sel.value=d; }
     } else wrap.style.display="none";
     // El selector de Google aparece solo si initPicker() lo dejó instalado.
-    // Sin él, el modal es el de siempre: se pega el link a mano.
-    const hayPicker=!!window.__mesaDrivePicker;
+    // En edición no: cambiar de archivo es desvincular y vincular otro.
+    const hayPicker=!!window.__mesaDrivePicker&&!editando;
     document.getElementById("fmPickWrap").hidden=!hayPicker;
-    document.getElementById("fmSep").hidden=!hayPicker;
-    document.getElementById("fileModal").classList.add("on"); setTimeout(()=>document.getElementById("fmUrl").focus(),40); }
+    document.getElementById("fileModal").classList.add("on");
+    setTimeout(()=>(editando?fmn:url).focus(),40); }
+  function buscarArchivo(fileId){ let res=null;
+    Object.values(state.nodes).forEach(n=>{
+      filesOf(n).forEach(f=>{ if(f.id===fileId)res=res||f; });
+      (n.items||[]).forEach(k=>filesOf(k).forEach(f=>{ if(f.id===fileId)res=res||f; })); });
+    return res; }
   function closeFM(){ document.getElementById("fileModal").classList.remove("on"); fmTarget=null; }
   // La ventana de lectura. El marco se carga recién al abrirla y se vacía al
   // cerrarla: si se dejara la dirección puesta, Drive seguiría trabajando
@@ -970,20 +1003,39 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // modal se abrió desde la pestaña Drive, o el tema/tarea desde cuya ficha se
   // lo abrió. Lo usan los dos caminos, el link pegado y el selector de Google.
   function ownerDeFM(){ const t=fmTarget; if(!t)return null;
-    if(t.kind==="pick"){ const p=String(document.getElementById("fmWhere").value||"").split(":");
+    if(t.kind==="pick"||t.kind==="edit"){ const p=String(document.getElementById("fmWhere").value||"").split(":");
       if(p[0]==="n")return N(p[1]);
       const n=N(p[1]); return n&&(n.items||[]).find(x=>x.id===p[2])||null; }
     return (t.kind==="task"?t.task:t.node)||null; }
+  // Saca el archivo de donde esté colgado hoy. Se usa al mover de tema: si no,
+  // quedaría duplicado en los dos lados.
+  function despegarArchivo(fileId){
+    Object.values(state.nodes).forEach(n=>{
+      if(Array.isArray(n.files))n.files=n.files.filter(f=>f.id!==fileId);
+      (n.items||[]).forEach(k=>{ if(Array.isArray(k.files))k.files=k.files.filter(f=>f.id!==fileId); }); }); }
   function trasVincular(){ save(); closeFM(); renderActive();
     if(panelOpen&&N(selId))renderPanelBody(N(selId));
     if(taskOpen)renderTFiles(); }
-  function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta."); return; }
+  function saveFM(){ const url=document.getElementById("fmUrl").value.trim(); if(!url){ note("Pegá el link del archivo o la carpeta, o elegilo de tu Drive."); return; }
     if(!/^https?:\/\//i.test(url)){ note("El link tiene que empezar con http:// o https://"); return; }
-    const nombre=document.getElementById("fmName").value.trim(); const kind=kindOf(url,nombre); const name=nombre||(FKIND[kind]||FKIND.link).l;
-    const f={id:"f"+uid(),url,name,kind,addedBy:state.me||"",addedAt:nowMs()};
+    const nombre=document.getElementById("fmName").value.trim();
     const owner=ownerDeFM();
     if(!owner){ note("No encontré dónde vincularlo."); return; }
-    filesOf(owner).push(f); trasVincular(); }
+    if(fmTarget&&fmTarget.kind==="edit"){
+      const viejo=buscarArchivo(fmTarget.fileId);
+      if(!viejo){ note("Ese archivo ya no está."); closeFM(); return; }
+      // El tipo se recalcula solo si cambió el link; si no, se respeta el que
+      // ya tenía, que puede venir exacto del selector de Google.
+      const kind=viejo.url===url?viejo.kind:kindOf(url,nombre);
+      const actualizado=Object.assign({},viejo,{url,kind,name:nombre||viejo.name||(FKIND[kind]||FKIND.link).l});
+      despegarArchivo(fmTarget.fileId);
+      filesOf(owner).push(actualizado);
+      const after=fmTarget.after; trasVincular(); if(after)after();
+      return; }
+    const kind=(tipoDelSelector&&tipoDelSelector.url===url&&tipoDelSelector.kind)||kindOf(url,nombre);
+    const name=nombre||(FKIND[kind]||FKIND.link).l;
+    filesOf(owner).push({id:"f"+uid(),url,name,kind,addedBy:state.me||"",addedAt:nowMs()});
+    trasVincular(); }
   // ---------- elegir de Drive en vez de pegar el link ----------
   // El selector lo instala initPicker() al entrar a la app real, y solo si
   // están cargadas las variables de Google. Si no está, este botón ni aparece.
@@ -994,6 +1046,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     btn.disabled=true; btn.textContent="Abriendo Drive…";
     abrir().then(docs=>{
       if(!docs||!docs.length)return;                       // cerró la ventana sin elegir
+      // Si elegiste UNO, no se vincula todavía: se llena el formulario y volvés
+      // a tener la última palabra sobre el nombre y el destino. Vincular a
+      // ciegas era justamente lo que no dejaba cambiarlos.
+      if(docs.length===1){ const d=docs[0]; const u=urlDeDoc(d); if(!u)return;
+        // El tipo exacto solo lo sabe Drive (por la URL, un PDF y un Word son
+        // iguales). Se guarda aparte para que no se pierda al pasar por el
+        // formulario, y se usa solo si el link sigue siendo ese.
+        tipoDelSelector={url:u,kind:kindOfMime(d.mimeType)||null};
+        document.getElementById("fmUrl").value=u;
+        const fmn=document.getElementById("fmName");
+        if(!fmn.value.trim())fmn.value=d.name||"";
+        fmn.focus(); fmn.select();
+        note("Traído de Drive. Revisá el nombre y el destino, y apretá Vincular.","Listo para vincular");
+        return; }
+      // Con varios no hay formulario que alcance, así que se vinculan todos con
+      // el nombre que traen de Drive.
       const yaEstan=new Set(filesOf(owner).map(f=>driveIdDe(f.url)||f.url));
       let nuevos=0, repetidos=0;
       docs.forEach(d=>{ const url=urlDeDoc(d); if(!url)return;
@@ -1543,7 +1611,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     menu.querySelector("[data-newp]").addEventListener("click",()=>{ menu.classList.remove("on"); pedirTexto("Sumar a alguien","Nombre de la persona",nv=>{ const a=getArr(); if(!a.includes(nv))a.push(nv); onChange(); }); }); }
   document.addEventListener("click",()=>{ document.querySelectorAll(".ppmenu.on").forEach(m=>m.classList.remove("on")); });
   function renderTOwners(){ const k=curTask(); if(!k)return; peoplePick(document.getElementById("tOwners"),()=>ownersOf(k),()=>{ save(); renderTOwners(); refreshChrome(); renderActive(); }); }
-  function renderTFiles(){ const k=curTask(); if(!k)return; renderFileList(document.getElementById("tFiles"),k,()=>{ renderTFiles(); renderActive(); }); }
+  function renderTFiles(){ const k=curTask(); if(!k)return; renderFileList(document.getElementById("tFiles"),k,()=>{ renderTFiles(); renderActive(); },"task"); }
   function renderTBelong(){ const k=curTask(); if(!k)return; const box=document.getElementById("tBelong");
     document.getElementById("tKind").textContent=isPriv()?"Tarea privada":"Tarea";
     if(isPriv()){
@@ -1607,7 +1675,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!isRoot){ const par=N(n.parent); const p=pathOf(par.id).map(z=>z.name); const label=p.pop();
       bb.innerHTML=`<div class="subrow" id="pGoUp"><span class="orb" style="background:${accentOf(par)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(p.join(" › ")||"proyecto")}</span></span><span class="go">↗</span></div>`;
       document.getElementById("pGoUp").addEventListener("click",()=>openPanel(par.id)); }
-    renderFileList(document.getElementById("pFiles"),n,()=>{ renderPanelBody(n); renderActive(); });
+    renderFileList(document.getElementById("pFiles"),n,()=>{ renderPanelBody(n); renderActive(); },"node");
     const ls=(n.links||[]).map(N).filter(Boolean);
     linkList.innerHTML=ls.length?ls.map(t=>{ const p=pathOf(t.id).map(x=>x.name); const label=p.pop(); return `<div class="linkrow"><span style="width:9px;height:9px;border-radius:50%;background:${accentOf(t)}"></span><span class="path" data-go="${t.id}"><b>${esc(label)}</b><span>${esc(p.join(" › ")||"raíz")}</span></span><button class="x" data-unlink="${t.id}">✕</button></div>`; }).join(""):`<div class="empty">Sin vínculos.</div>`;
     linkList.querySelectorAll("[data-go]").forEach(g=>g.addEventListener("click",()=>openPanel(g.dataset.go)));
