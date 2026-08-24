@@ -15,14 +15,18 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <title>Estudio · Bosques de Agua</title>
 </head>
-<body>
+<!-- El corrector va prendido de arriba hacia abajo: `spellcheck` se hereda, así
+     que alcanza con ponerlo acá y apagarlo en los pocos campos donde subrayar
+     sería ruido (links, buscadores, correos). Los campos que crea el JavaScript
+     —las notas, por ejemplo— quedan cubiertos solos. -->
+<body spellcheck="true">
   <div id="login-screen" class="login-screen">
     <div class="login-box">
       <span class="brandmark" role="img" aria-label="Bosques de Agua"></span>
       <h1>Estudio</h1>
       <p>Bosques de Agua · Boscora. Ingresá con tu email de equipo — te mandamos un enlace de acceso, sin contraseña.</p>
       <form id="login-form">
-        <input type="email" id="login-email" placeholder="tu@email.com" autocomplete="email" required />
+        <input type="email" id="login-email" spellcheck="false" placeholder="tu@email.com" autocomplete="email" required />
         <button type="submit" class="btn btn-primary enter-btn">Enviar enlace de acceso</button>
       </form>
       <div class="status" id="login-status"></div>
@@ -114,7 +118,7 @@
         <li>Podés <b>arrastrar una tarea</b> de un tema a otro.</li>
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
         <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span><div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div></h1>
-      <div class="srchbar"><input class="srch" id="estSearch" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
+      <div class="srchbar"><input class="srch" id="estSearch" spellcheck="false" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
       </div>
 
       <div class="estwrap-mapa" id="estMapaWrap" hidden>
@@ -137,7 +141,7 @@
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li></ul></span></span></h1>
       <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
-      <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" placeholder="Buscar tarea…"></div>
+      <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
     </div></section>
 
@@ -167,7 +171,7 @@
         <li>Para sumar algo: copiá el link desde Drive y pegalo con <b>＋ vincular archivo</b>.</li>
         <li>El archivo <b>no se copia</b>: queda apuntando a Drive, así siempre ves la última versión.</li>
         <li>El link funciona para quien tenga acceso en Drive: compartí la carpeta con todo el equipo.</li></ul></span></span></h1>
-      <div class="srchbar"><input class="srch" id="driveSearch" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
+      <div class="srchbar"><input class="srch" id="driveSearch" spellcheck="false" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
       <div class="tbar"><span class="barlab">Ordenar por</span>
         <div class="seg2" id="driveOrdenSeg"><button data-o="tema" class="on">Tema</button><button data-o="nombre">Nombre</button><button data-o="tipo">Tipo</button></div>
         <span style="color:var(--ink-faint);font-size:12.5px" id="driveCuenta"></span></div>
@@ -204,7 +208,7 @@
     <div class="sec" id="pBelongSec"><div class="sh"><h3>Pertenece a</h3></div><div id="pBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="pAddFile">＋ archivo de Drive</button></div><div id="pFiles"></div></div>
     <div class="sec" id="pLinksSec"><div class="sh"><h3>Vínculos con otros temas</h3><button class="mini-add" id="addLink">＋ vincular</button></div><div style="position:relative"><!-- Clase propia y específica a propósito: "picker" a secas la usa también el
-     selector de Google, y nuestra regla le apagaba la ventana. --><div class="linkpick" id="picker"><input class="txt" id="pickSearch" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
+     selector de Google, y nuestra regla le apagaba la ventana. --><div class="linkpick" id="picker"><input class="txt" id="pickSearch" spellcheck="false" placeholder="Buscar tema…"><div class="list" id="pickList"></div></div></div><div id="linkList"></div></div>
   </div>
   <div class="pfoot"><button class="btn danger" id="delNode">Eliminar tema</button></div>
 </aside>
@@ -259,7 +263,7 @@
     <button type="button" class="btn btn-primary" id="fmPick">Elegir de mi Drive</button>
     <span class="fmpickhint">Trae el link y el tipo solos. Si elegís varios, se vinculan todos.</span>
   </div>
-  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Link de Drive</label><input class="txt" id="fmUrl" placeholder="https://docs.google.com/…"><span class="fmhint">O abrilo en Drive, copiá el link de la barra del navegador y pegalo acá. El archivo queda en Drive: la app solo guarda el link.</span></div></div>
+  <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Link de Drive</label><input class="txt" id="fmUrl" spellcheck="false" placeholder="https://docs.google.com/…"><span class="fmhint">O abrilo en Drive, copiá el link de la barra del navegador y pegalo acá. El archivo queda en Drive: la app solo guarda el link.</span></div></div>
   <div class="row"><div style="flex:1"></div><button class="btn" id="fmCancel">Cancelar</button><button class="btn btn-primary" id="fmSave">Vincular</button></div>
 </div></div>
 
@@ -292,6 +296,7 @@
   <div class="pctl">
     <div class="c" style="flex:1 1 100%"><label>Responsables</label><div class="ppick" id="ntOwners"></div></div>
     <div class="c"><label>Fecha</label><input type="date" class="txt" id="ntDue"></div>
+    <div class="c"><label>Hora <small>opcional</small></label><input type="time" class="txt" id="ntDueTime"></div>
   </div>
   <div class="pctl">
     <div class="c"><label>Estado</label><select class="pick" id="ntStatus"></select></div>

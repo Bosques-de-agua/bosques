@@ -974,7 +974,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -1439,7 +1439,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <div class="cfgsec"><div class="lab">Equipo</div>
         <div id="cfgTeam"></div>
         <div class="cfgrow"><span class="lbl">Sumar a alguien<small>Recibe acceso con su propio correo</small></span>
-          <input class="txt" id="cfgInvitar" placeholder="correo@ejemplo.com" type="email"><button class="btn" id="cfgInvitarOk">Habilitar</button></div>
+          <input class="txt" spellcheck="false" id="cfgInvitar" placeholder="correo@ejemplo.com" type="email"><button class="btn" id="cfgInvitarOk">Habilitar</button></div>
       </div>
       <div class="cfgsec"><div class="lab">Respaldo</div>
         <div class="cfgrow"><span class="lbl">Descargar una copia<small>Todo el contenido del equipo en un archivo</small></span>
@@ -1635,9 +1635,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(cel){ cel.classList.add("resaltada"); cel.scrollIntoView({behavior:"smooth",block:"center"}); } })); }
   function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",label:k.title||"Tarea",color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
-    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",label:(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
-    (state.events||[]).forEach(ev=>push(ev.date,{type:"event",label:ev.title,id:ev.id}));
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
+    (state.events||[]).forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
+    // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
+    // tiene: si hay una reunión a las 9, quiero verla arriba de todo.
+    Object.keys(byDay).forEach(ds=>byDay[ds].sort((a,b)=>{
+      if(!!a.hora!==!!b.hora)return a.hora?-1:1;
+      return a.hora<b.hora?-1:a.hora>b.hora?1:0; }));
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
       const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':''}" ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}">${esc(c.label)}</span>`).join("");
@@ -1649,6 +1654,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
     mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; openEvNew(ds); }));
     mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else openEvView(c.id); })); }
+  // A qué tema pertenece, al lado del nombre y antes de la prioridad. Va en
+  // cursiva y apagado a propósito: tiene que poder ignorarse de un vistazo,
+  // pero estar cuando el título de la tarea, solo, queda en el aire.
+  function lineaTema(node){ if(!node)return "";
+    const p=pathOf(node.id).map(z=>z.name);
+    const corto=p.slice(1).join(" › ")||p[0]||"";
+    return corto?`<span class="ltema" title="${esc(p.join(" › "))}">${esc(corto)}</span>`:""; }
+  // La hora, cuando la tiene. Sin hora no se muestra nada: la fecha sola ya
+  // vive en el calendario y en la tarjeta.
+  function cuandoTag(k){ return k&&k.dueTime?`<span class="lhora" title="${esc(k.due||"")}">${esc(k.dueTime)}</span>`:""; }
   function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
     if(!me){ box.innerHTML=`<div class="ph"><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; return; }
@@ -1667,8 +1682,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +(pf.length?`<button class="fclear">Ver todas</button>`:"")+`</div></div>`;
     box.innerHTML=`<div class="myfoco"><span class="mfl"><b>Tu foco</b> · ${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}</span><span class="mfr"><button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}</span></div>`+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
-        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${prioTag(k)}</div>`).join("")+`</div>`:"")+
-      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
+        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
+      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
     box.querySelectorAll("[data-task]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask(r.dataset.node,r.dataset.task); }));
     box.querySelectorAll("[data-priv]").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".lchk"))return; openTask("__priv",r.dataset.priv); }));
     box.querySelectorAll("[data-donetask]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
@@ -1688,7 +1703,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const drawer=document.getElementById("drawer"),scrim=document.getElementById("scrim");
   const pTitle=document.getElementById("pTitle"),pObj=document.getElementById("pObj"),pCtx=document.getElementById("pCtx"),pKind=document.getElementById("pKind"),pDot=document.getElementById("pDot"),subList=document.getElementById("subList"),itemList=document.getElementById("itemList"),linkList=document.getElementById("linkList");
   let panelOpen=false;
-  const taskDrawer=document.getElementById("taskDrawer"),tTitle=document.getElementById("tTitle"),tStatus=document.getElementById("tStatus"),tPrio=document.getElementById("tPrio"),tDue=document.getElementById("tDue"),tObj=document.getElementById("tObj"),tNotas=document.getElementById("tNotas"),tDot=document.getElementById("tDot");
+  const taskDrawer=document.getElementById("taskDrawer"),tTitle=document.getElementById("tTitle"),tStatus=document.getElementById("tStatus"),tPrio=document.getElementById("tPrio"),tDue=document.getElementById("tDue"),tDueTime=document.getElementById("tDueTime"),tObj=document.getElementById("tObj"),tNotas=document.getElementById("tNotas"),tDot=document.getElementById("tDot");
   let selTaskNode=null,selTaskId=null,taskOpen=false;
   const isPriv=()=>selTaskNode==="__priv";
   function curTask(){ if(isPriv())return privL().find(x=>x.id===selTaskId); const nd=N(selTaskNode); return nd&&(nd.items||[]).find(x=>x.id===selTaskId); }
@@ -1734,7 +1749,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(state.me&&ownersOf(k).includes(state.me)){ state.tasksSeen=state.tasksSeen||{};
       const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); updateAvisos(); } }
     drawer.classList.remove("on"); panelOpen=false;
-    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
+    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
     renderTOwners(); renderTBelong(); renderTFiles();
     taskDrawer.classList.add("on"); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
@@ -1817,7 +1832,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("tDoneChk").addEventListener("change",e=>{ const k=curTask(); if(!k)return; setDone(k,e.target.checked); tStatus.value=k.status; syncTaskDone(k); save(); renderActive(); });
   document.getElementById("tArch").addEventListener("click",()=>{ const k=curTask(); if(!k)return; archiveTask(k); save(); closeTask(); renderActive(); refreshChrome(); });
   tPrio.addEventListener("change",()=>{ const k=curTask(); if(k){k.prio=tPrio.value;syncTaskDots(k);save();renderActive();} });
-  tDue.addEventListener("change",()=>{ const k=curTask(); if(k){k.due=tDue.value;save();renderActive();} });
+  tDue.addEventListener("change",()=>{ const k=curTask(); if(k){k.due=tDue.value;
+    // Una hora sin día no dice nada y no se puede mostrar en el calendario:
+    // si se borra la fecha, se va con ella.
+    if(!k.due){ k.dueTime=""; tDueTime.value=""; }
+    save();renderActive();} });
+  tDueTime.addEventListener("change",()=>{ const k=curTask(); if(!k)return;
+    if(tDueTime.value&&!k.due){ tDueTime.value=""; note("Poné primero la fecha: una hora sola no se puede ubicar en el calendario."); return; }
+    k.dueTime=tDueTime.value; save(); renderActive(); });
   tObj.addEventListener("input",()=>{ const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
   tNotas.addEventListener("input",()=>{ const k=curTask(); if(k){k.notas=tNotas.value;save();} });
   document.getElementById("tDel").addEventListener("click",()=>{ const k=curTask(); if(!k)return;
@@ -1859,7 +1881,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.getElementById("ntNode").innerHTML=nodeOptionsHTML(preT);
     const preP=(f.people.length===1&&f.people[0]!=="__none")?f.people[0]:(state.me||"");
     ntOwnersArr=preP?[preP]:[]; renderNtOwners();
-    document.getElementById("ntDue").value="";
+    document.getElementById("ntDue").value=""; document.getElementById("ntDueTime").value="";
     document.getElementById("ntStatus").innerHTML=STORD.filter(s=>s!=="listo").map(s=>`<option value="${s}"${s==="sin"?" selected":""}>${STATUS[s].l}</option>`).join("");
     document.getElementById("ntPrio").innerHTML=`<option value="" selected>— sin prioridad —</option>`+PRORD.map(v=>`<option value="${v}">${PRIO[v].l}</option>`).join("");
     ntModal.classList.add("on"); setTimeout(()=>document.getElementById("ntTitle").focus(),40); }
@@ -1867,7 +1889,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function createNT(){ const dest=document.getElementById("ntNode").value; const priv=dest==="__priv"; const n=priv?null:N(dest);
     if(!priv&&!n){ note("Elegí a qué tema pertenece."); return; }
     const title=document.getElementById("ntTitle").value.trim(); if(!title){ note("Poné un título para la tarea."); return; }
-    const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
+    const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.dueTime=document.getElementById("ntDueTime").value; k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
     if(priv){ const arr=privList(); if(!arr){ note("No pudimos identificarte para crear una tarea privada."); return; }
       k.priv=true; if(!k.owners.length&&state.me)k.owners=[state.me]; arr.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask("__priv",k.id); return; }
     n.items=n.items||[]; n.items.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask(n.id,k.id); }
