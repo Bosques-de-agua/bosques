@@ -27,8 +27,28 @@ export function setSaveErrorHandler(fn) {
 export function setSaveStateHandler(fn) {
   onEstado = fn;
 }
+// Lo último que se intentó guardar y NO entró. Se queda acá hasta que entre.
+//
+// Sin esto había un agujero feo: cuando un guardado fallaba definitivamente,
+// `pendiente` ya se había consumido y `escribiendo` volvía a false, así que la
+// app creía que no quedaba nada sin guardar. Trabajabas sin conexión, volvía la
+// conexión, la app releía del servidor y te reemplazaba todo lo escrito por la
+// versión vieja. Trabajo perdido, en silencio, justo en el momento en que
+// parecía que se recuperaba.
+let ultimoFallido = null;
+
 export function hayCambiosSinGuardar() {
-  return !!pendiente || escribiendo;
+  return !!pendiente || escribiendo || !!ultimoFallido;
+}
+// Volver a intentar lo que quedó afuera. Se llama al recuperar la conexión y
+// desde el botón "Reintentar" del cartel de error.
+export function reintentarPendiente() {
+  if (!ultimoFallido) return false;
+  const payload = ultimoFallido;
+  ultimoFallido = null;
+  generacion++;
+  escribir(payload);
+  return true;
 }
 
 // Cada contenido que entra a la cola se lleva un número. Un intento sigue vivo
@@ -70,11 +90,15 @@ async function escribir(state, intento = 0, mia = generacion) {
       return false;
     }
     escribiendo = false;
+    // Se guarda lo que no entró: mientras esté acá, la app sabe que hay trabajo
+    // sin salvar y NO va a releer del servidor encima.
+    ultimoFallido = state;
     if (onEstado) onEstado("error", error);
     if (onError) onError(error);
     return false;
   }
   escribiendo = false;
+  ultimoFallido = null;
   if (onEstado) onEstado("guardado");
   return true;
 }

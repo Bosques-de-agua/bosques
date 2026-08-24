@@ -11,7 +11,7 @@
 // Cada prueba de acá corresponde a una falla REAL que existió en el código.
 // Están para que no vuelva.
 import { supabase } from "./supabaseClient.js";
-import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar } from "./sync.js";
+import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
 import { pushPrivateState, setPrivateSaveStateHandler } from "./private.js";
 
 const salida = document.getElementById("salida");
@@ -122,8 +122,34 @@ await esperar(4000);
 
 afirmar(estados.includes("error"), "avisó del fallo tras agotar los reintentos",
   "estados: " + estados.join(" → "));
-afirmar(hayCambiosSinGuardar() === false || hayCambiosSinGuardar() === true,
-  "hayCambiosSinGuardar() responde sin romperse");
+
+// -----------------------------------------------------------------------
+// 5. Lo que NO entró sigue contando como trabajo sin guardar, y vuelve a
+//    salir cuando hay red.
+//
+//    La falla real: al agotarse los reintentos, `pendiente` ya se había
+//    consumido y `escribiendo` volvía a false, así que la app creía que no
+//    quedaba nada sin guardar. Trabajabas sin conexión, volvía la conexión,
+//    la app releía del servidor y te reemplazaba lo escrito por la versión
+//    vieja. Es la unica proteccion que tiene el trabajo hecho sin red.
+// -----------------------------------------------------------------------
+linea("\n5. Lo que no entró no se da por perdido");
+afirmar(hayCambiosSinGuardar() === true,
+  "tras fallar del todo, sigue diciendo que hay trabajo sin guardar",
+  "si diera false, al volver la conexión se relee del servidor y se pisa");
+
+reiniciar();
+estados = [];
+setSaveStateHandler((e) => estados.push(e));
+responder = () => null;                    // vuelve la red
+const salio = reintentarPendiente();
+await esperar(600);
+
+afirmar(salio === true, "al volver la red, reintenta lo que había quedado afuera");
+const rec = soloOk()[soloOk().length - 1];
+afirmar(rec && rec.data.v === "PERDIDO", "y lo que entra es EXACTAMENTE lo que se había perdido",
+  "entró: " + JSON.stringify(rec && rec.data));
+afirmar(hayCambiosSinGuardar() === false, "una vez guardado, deja de contar como pendiente");
 
 // =======================================================================
 setSaveStateHandler(null);

@@ -1,6 +1,6 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
-import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar } from "./sync.js";
+import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
 import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
@@ -186,7 +186,13 @@ async function launchApp(session) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") releer();
   });
-  window.addEventListener("online", () => releer());
+  // Al recuperar la conexión, lo PRIMERO es mandar lo que no había entrado.
+  // Releer antes que eso reemplazaría con la versión del servidor justo el
+  // trabajo que estuvo esperando para salir.
+  window.addEventListener("online", () => {
+    if (reintentarPendiente()) return;
+    releer();
+  });
 }
 
 function showLoadError(err) {
