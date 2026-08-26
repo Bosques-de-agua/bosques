@@ -1483,11 +1483,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderChat(){ const me=state.me;
     if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
     const list=document.getElementById("chanList");
-    list.innerHTML=`<div class="chsec">Canales</div><div class="chanitem ${chatChan==="team"?"on":""}" data-ch="team"><span class="av" style="background:var(--wood)">${ICO.equipo}</span>Equipo</div>`+
-      myGroups().map(g=>`<div class="chanitem ${chatChan==="grp:"+g.id?"on":""}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">${ICO.grupo}</span><span class="chname">${esc(g.name)}</span></div>`).join("")+
+    // El canal que estás mirando no lleva aviso: al dibujarlo ya queda leído.
+    const aviso=chan=>{ const n=chan===chatChan?0:sinLeerDe(chan);
+      return n?`<span class="channuevo" title="${n===1?"1 mensaje sin leer":n+" mensajes sin leer"}">${n>9?"9+":n}</span>`:""; };
+    const cls=chan=>`chanitem ${chan===chatChan?"on":""}${(chan!==chatChan&&sinLeerDe(chan))?" nuevo":""}`;
+    list.innerHTML=`<div class="chsec">Canales</div><div class="${cls("team")}" data-ch="team"><span class="av" style="background:var(--wood)">${ICO.equipo}</span><span class="chname">Equipo</span>${aviso("team")}</div>`+
+      myGroups().map(g=>`<div class="${cls("grp:"+g.id)}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">${ICO.grupo}</span><span class="chname">${esc(g.name)}</span>${aviso("grp:"+g.id)}</div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
-      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="chanitem ${chatChan==="dm:"+p?"on":""}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span></div>`).join("");
+      allPeople().filter(p=>p&&p!==me).map(p=>`<div class="${cls("dm:"+p)}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span>${aviso("dm:"+p)}</div>`).join("");
     list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
@@ -1652,10 +1656,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.querySelector("#evOk").addEventListener("click",closeEv);
     box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar("El evento se borra para todo el equipo.",()=>{ state.events=state.events.filter(e=>e.id!==id); if(state.chat)state.chat.team=(state.chat.team||[]).filter(m=>m.ev!==id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
   function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
-  function chatUnread(){ const c=state.chat||{team:[],dm:{}}; const seen=seenMap(); const me=state.me;
-    let u=Math.max(0,(c.team||[]).length-(seen.team||0));
-    if(me)allPeople().filter(p=>p&&p!==me).forEach(p=>{ const arr=(c.dm||{})[dmKey(me,p)]||[]; u+=Math.max(0,arr.length-(seen["dm:"+p]||0)); });
-    myGroups().forEach(g=>{ u+=Math.max(0,(g.msgs||[]).length-(seen["grp:"+g.id]||0)); });
+  // Cuántos mensajes sin leer tiene UN canal. La campanita de arriba decía que
+  // había algo nuevo pero no dónde: había que entrar canal por canal a buscarlo.
+  function sinLeerDe(chan){ const c=state.chat||{team:[],dm:{}}; const seen=seenMap(); const me=state.me;
+    if(chan==="team")return Math.max(0,(c.team||[]).length-(seen.team||0));
+    if(chan.startsWith("grp:")){ const g=groupOf(chan); return g?Math.max(0,(g.msgs||[]).length-(seen[chan]||0)):0; }
+    const p=chan.slice(3); if(!me||!p||p===me)return 0;
+    const arr=(c.dm||{})[dmKey(me,p)]||[]; return Math.max(0,arr.length-(seen[chan]||0)); }
+  function chatUnread(){ const me=state.me;
+    let u=sinLeerDe("team");
+    if(me)allPeople().filter(p=>p&&p!==me).forEach(p=>{ u+=sinLeerDe("dm:"+p); });
+    myGroups().forEach(g=>{ u+=sinLeerDe("grp:"+g.id); });
     return u; }
   // ---------- grupos de chat ----------
   let grpEditId=null, grpMembers=[];
