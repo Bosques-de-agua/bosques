@@ -9,6 +9,22 @@ self.addEventListener("activate", (event) => {
 // Passthrough — no offline caching, solo existe para habilitar instalación y push.
 self.addEventListener("fetch", () => {});
 
+// El navegador rota la suscripción cada tanto y avisa por acá. Se rehace en el
+// momento, con la misma clave del servidor que traía la vieja; el endpoint
+// nuevo se guarda en la base la próxima vez que se abra la app, que es lo que
+// hace `reengancharPush()`. Sin esto, la suscripción moría en silencio y los
+// avisos dejaban de llegar sin que nada lo dijera.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  const vieja = event.oldSubscription;
+  const clave = vieja && vieja.options && vieja.options.applicationServerKey;
+  if (event.newSubscription || !clave) return;
+  event.waitUntil(
+    self.registration.pushManager
+      .subscribe({ userVisibleOnly: true, applicationServerKey: clave })
+      .catch(() => {})
+  );
+});
+
 self.addEventListener("push", (event) => {
   let payload = { title: "Estudio · Bosques de Agua", body: "Tenés novedades." };
   try {

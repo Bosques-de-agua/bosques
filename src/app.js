@@ -1,7 +1,10 @@
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","tasksSeen","focoVista","tareasVista","verSinEnc","emojiUsados"];
+// `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
+// aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
+// resto de una época: se lee al arrancar para migrar y no se escribe más.
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -1528,8 +1531,18 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // El scroll va ANTES de guardar: marcar leído dispara un guardado y, si
     // falla, el aviso empuja la pantalla; que la lista quede abajo igual.
     box.scrollTop=box.scrollHeight;
-    seenMap()[chatChan]=msgs.length; marcarLeido(chatChan,msgs); save(); updateChatBadge(); }
+    marcarLeido(chatChan,msgs); save(); updateChatBadge(); }
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
+  // `chatSeen` (cuántos mensajes viste, guardado en ESTE navegador) fue lo que
+  // se usó hasta ahora. Se lee una sola vez, al arrancar, para pasar esa marca
+  // a `chatRead`, que es la compartida: si no, la primera vez con el código
+  // nuevo se encenderían como nuevos todos los mensajes viejos.
+  function migrarLeidos(){ const me=state.me; if(!me)return; const seen=seenMap();
+    const canales=["team"].concat(myGroups().map(g=>"grp:"+g.id)).concat(allPeople().filter(p=>p&&p!==me).map(p=>"dm:"+p));
+    canales.forEach(chan=>{ const n=seen[chan]; if(!n)return;
+      const arr=msgsOf(chan); if(!arr.length)return;
+      const ult=arr[Math.min(n,arr.length)-1]; if(!ult||!ult.ts)return;
+      const rm=readMap(chan); if((rm[me]||0)<ult.ts)rm[me]=ult.ts; }); }
   const dosCifras=n=>String(n).padStart(2,"0");
   function diaDe(ts){ try{ const d=new Date(ts); return d.getFullYear()+"-"+dosCifras(d.getMonth()+1)+"-"+dosCifras(d.getDate()); }catch(e){ return ""; } }
   function horaDe(ts){ if(!ts)return ""; try{ const d=new Date(ts); return dosCifras(d.getHours())+":"+dosCifras(d.getMinutes()); }catch(e){ return ""; } }
@@ -1658,11 +1671,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
   // Cuántos mensajes sin leer tiene UN canal. La campanita de arriba decía que
   // había algo nuevo pero no dónde: había que entrar canal por canal a buscarlo.
-  function sinLeerDe(chan){ const c=state.chat||{team:[],dm:{}}; const seen=seenMap(); const me=state.me;
-    if(chan==="team")return Math.max(0,(c.team||[]).length-(seen.team||0));
-    if(chan.startsWith("grp:")){ const g=groupOf(chan); return g?Math.max(0,(g.msgs||[]).length-(seen[chan]||0)):0; }
-    const p=chan.slice(3); if(!me||!p||p===me)return 0;
-    const arr=(c.dm||{})[dmKey(me,p)]||[]; return Math.max(0,arr.length-(seen[chan]||0)); }
+  // La cuenta sale de `chatRead` —hasta qué momento leíste cada canal—, que es
+  // COMPARTIDO. Antes salía de `chatSeen`, que vive en cada navegador: leías
+  // en el teléfono y la computadora seguía marcando todo como nuevo. Y es la
+  // misma marca que enciende la segunda tilde del que escribió, así que las
+  // dos cosas no pueden discrepar.
+  function sinLeerDe(chan){ const me=state.me; if(!me)return 0;
+    if(chan.startsWith("dm:")){ const p=chan.slice(3); if(!p||p===me)return 0; }
+    const arr=msgsOf(chan); if(!arr.length)return 0;
+    const desde=readMap(chan)[me]||0;
+    return arr.filter(m=>m.from!==me&&(m.ts||0)>desde).length; }
   function chatUnread(){ const me=state.me;
     let u=sinLeerDe("team");
     if(me)allPeople().filter(p=>p&&p!==me).forEach(p=>{ u+=sinLeerDe("dm:"+p); });
@@ -2405,11 +2423,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(yo&&yo.name)state.me=yo.name;
   mountPrivate(priv);
   migrarMisPrivados(priv);
-  // Primer arranque en este dispositivo (o después de un renombre hecho en
-  // otro): se da por visto lo que ya existe, para no mostrar treinta avisos.
+  // Primer arranque (o después de un renombre): se da por visto lo que ya
+  // existe, para no mostrar treinta avisos.
   if(state.me){ state.tasksSeen=state.tasksSeen||{};
     if(!Array.isArray(state.tasksSeen[state.me]))
       state.tasksSeen[state.me]=activeItems().filter(x=>ownersOf(x.k).includes(state.me)).map(x=>x.k.id); }
+  // Lo que leíste en el teléfono vale en la computadora: la marca de lectura
+  // del chat pasa de ser de cada navegador a ser tuya.
+  migrarLeidos();
   // El tema ya no tiene opción "Automático": es claro u oscuro y se recuerda.
   // A quien nunca eligió se le fija el que YA estaba viendo (el del sistema),
   // así la app no le cambia de cara sola; de ahí en más manda su elección.

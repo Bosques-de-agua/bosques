@@ -4,7 +4,7 @@ import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail
 import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
-import { initPush } from "./push.js";
+import { initPush, reengancharPush } from "./push.js";
 import { initPicker } from "./picker.js";
 import { initPresencia } from "./presencia.js";
 
@@ -130,6 +130,12 @@ async function launchApp(session) {
   showApp();
   addSignOutPill(email);
   initPush();
+  // Cada arranque revalida la suscripción a los avisos. Los navegadores la
+  // rotan solos —Android lo hace cada tanto—, y cuando eso pasa la que está
+  // guardada en el servidor queda muerta: el envío da 410, se borra, y nunca
+  // vuelve. El botón seguía diciendo "Activadas" y la prueba local seguía
+  // funcionando, así que no había forma de darse cuenta.
+  reengancharPush();
   // Si no están cargadas las variables de Google, no instala nada y la app
   // sigue pidiendo el link pegado a mano.
   initPicker();
