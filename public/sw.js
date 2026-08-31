@@ -34,7 +34,10 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: "/icon-192.png",
+      // La foto de quien escribe cuando la tiene, y si no el logo. El color de
+      // la persona viaja como un punto delante del nombre: el aviso del
+      // sistema no se puede pintar desde la web.
+      icon: payload.icon || "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: payload.url || "/" },
     })

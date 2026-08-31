@@ -14,12 +14,44 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 webpush.setVapidDetails("mailto:nicomoner@gmail.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 // El nombre visible sale de team_members, no de una lista escrita a mano:
-// así renombrarse o sumar gente no rompe los avisos en silencio.
-async function nameToEmail(supabase: any): Promise<Record<string, string>> {
-  const { data } = await supabase.from("team_members").select("email,name");
-  const map: Record<string, string> = {};
-  for (const m of data || []) if (m.name) map[String(m.name).trim()] = m.email;
+// así renombrarse o sumar gente no rompe los avisos en silencio. De la misma
+// ficha sale el color de cada uno, que es lo que lo identifica en toda la app.
+type Ficha = { email: string; color: string };
+async function fichas(supabase: any): Promise<Record<string, Ficha>> {
+  const { data } = await supabase.from("team_members").select("email,name,color");
+  const map: Record<string, Ficha> = {};
+  for (const m of data || [])
+    if (m.name) map[String(m.name).trim()] = { email: m.email, color: m.color || "" };
   return map;
+}
+
+// El aviso del sistema no se puede pintar: la web elige el texto y el ícono, y
+// nada más. Así que el color va como un punto delante del nombre — lo único
+// que se ve igual en Android, en iPhone y en la computadora. Se busca el punto
+// más parecido al color de la persona.
+function puntoDe(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return "";
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255,
+    g = ((n >> 8) & 255) / 255,
+    b = (n & 255) / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    d = max - min,
+    l = (max + min) / 2;
+  if (d < 0.06) return l > 0.6 ? "⚪" : "⚫";
+  let h = 0;
+  if (max === r) h = 60 * (((g - b) / d) % 6);
+  else if (max === g) h = 60 * ((b - r) / d + 2);
+  else h = 60 * ((r - g) / d + 4);
+  if (h < 0) h += 360;
+  if (h < 12 || h >= 330) return "🔴";
+  if (h < 45) return l < 0.42 ? "🟤" : "🟠";
+  if (h < 75) return "🟡";
+  if (h < 165) return "🟢";
+  if (h < 240) return "🔵";
+  return "🟣";
 }
 
 type Tarea = { owners: string[]; title: string; nodeName: string; taskId: string };
@@ -87,7 +119,8 @@ async function sendTo(
   emails: string[] | null,
   title: string,
   body: string,
-  url = "/"
+  url = "/",
+  icon = ""
 ) {
   const destinos = emails ? emails.filter(Boolean) : null;
   if (destinos && !destinos.length) return;
@@ -107,7 +140,7 @@ async function sendTo(
         // defecto, Android pospone el aviso mientras la app está en segundo plano
         // y con el ahorro de batería encendido no llega nunca; con TTL corto
         // encima se descarta. Esto es lo que hace que lleguen igual.
-        .sendNotification(s.subscription, JSON.stringify({ title, body, url }), {
+        .sendNotification(s.subscription, JSON.stringify({ title, body, url, icon }), {
           TTL: 86400,
           urgency: "high",
         })
@@ -137,9 +170,29 @@ Deno.serve(async (req) => {
   if (esRenombre(oldData, newData)) return new Response("ok (renombre)");
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-  const emailDe = await nameToEmail(supabase);
-  // Quién hizo el cambio: nunca se le notifica lo que acaba de hacer.
+  const gente = await fichas(supabase);
+  const emailDe: Record<string, string> = {};
+  for (const [n, f] of Object.entries(gente)) emailDe[n] = f.email;
+
+  // Quién es quién en el aviso: el punto del color de la persona, delante del
+  // nombre. Manda el color de su ficha; si todavía no eligió uno, el que tenga
+  // en el estado compartido.
+  const colorDe = (nombre: string) =>
+    gente[nombre]?.color || newData.userColors?.[nombre] || "";
+  const punto = (nombre: string) => {
+    const p = puntoDe(colorDe(nombre));
+    return p ? p + " " : "";
+  };
+  // La foto de perfil NO se puede mandar como ícono: vive como data URL de
+  // unos 6 KB y el mensaje de push entero no puede pasar de ~4 KB. Mandarla
+  // haría fallar el aviso completo, así que el color va solo en el texto.
+  const quien = (nombre: string) => `${punto(nombre)}${nombre}`;
+
+  // Quién hizo el cambio: nunca se le notifica lo que acaba de hacer, y en las
+  // tareas es además quien la asignó.
   const autorEmail: string = payload.record?.updated_by_email || "";
+  const nombreDelAutor =
+    Object.entries(gente).find(([, f]) => f.email === autorEmail)?.[0] || "";
   const paraOtros = (correos: (string | undefined)[]) =>
     correos.filter((e): e is string => !!e && e !== autorEmail);
   const todosMenos = (nombre: string) =>
@@ -158,7 +211,12 @@ Deno.serve(async (req) => {
 
   // 1) Canal del equipo: le llega a todos menos a quien escribió.
   for (const m of nuevosDe(oldData.chat?.team, newData.chat?.team)) {
-    await sendTo(supabase, todosMenos(m.from), "👥 Equipo", `${m.from}: ${cuerpoDe(m)}`);
+    await sendTo(
+      supabase,
+      todosMenos(m.from),
+      "👥 Equipo",
+      `${quien(m.from)}: ${cuerpoDe(m)}`
+    );
   }
 
   // 2) Grupos: solo a sus integrantes, menos quien escribió.
@@ -167,7 +225,12 @@ Deno.serve(async (req) => {
       const destinos = paraOtros(
         (g.members || []).filter((p: string) => p !== m.from).map((p: string) => emailDe[p])
       );
-      await sendTo(supabase, destinos, `👪 ${g.name || "Grupo"}`, `${m.from}: ${cuerpoDe(m)}`);
+      await sendTo(
+        supabase,
+        destinos,
+        `👪 ${g.name || "Grupo"}`,
+        `${quien(m.from)}: ${cuerpoDe(m)}`
+      );
     }
   }
 
@@ -178,19 +241,20 @@ Deno.serve(async (req) => {
         .split(" ~ ")
         .find((n) => n !== m.from);
       const dest = paraOtros([destino ? emailDe[destino] : undefined]);
-      if (dest.length) await sendTo(supabase, dest, `💬 ${m.from}`, cuerpoDe(m));
+      if (dest.length) await sendTo(supabase, dest, quien(m.from), cuerpoDe(m));
     }
   }
 
   // 4) Tareas recién asignadas: una notificación por responsable nuevo.
-  //    El enlace deja la app abierta en esa tarea.
+  //    Quien la asignó es quien guardó el cambio, que ya sabemos; sin eso, el
+  //    aviso decía "Te asignaron una tarea" sin decir quién.
   for (const a of findNewAssignments(oldData, newData)) {
     const dest = paraOtros([emailDe[String(a.owner).trim()]]);
     if (!dest.length) continue; // sin ficha, o sos vos mismo asignándote
     await sendTo(
       supabase,
       dest,
-      "Te asignaron una tarea",
+      nombreDelAutor ? `${quien(nombreDelAutor)} te asignó una tarea` : "Te asignaron una tarea",
       `${a.title}${a.nodeName ? ` (${a.nodeName})` : ""}`,
       `/?tarea=${encodeURIComponent(a.taskId)}`
     );
