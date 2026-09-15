@@ -1,3 +1,5 @@
+import { DOCS, docPorId, pintarDoc, cerrarDoc } from "./documentos.js";
+
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
 // aparecería al resto (y además haría escribir la base sin necesidad).
@@ -654,7 +656,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(estadoGuardado==="error"||(hayPendiente&&hayPendiente())){ e.preventDefault(); e.returnValue=""; } });
 
   function renderActive(){ refreshChrome();
-    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); }
+    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); else if(docPorId(active))renderDoc(active); }
+  // Un documento se baja una sola vez por visita: si ya está pintado, no se
+  // vuelve a pedir cada vez que volvés a la pestaña.
+  const docsPintados=new Set();
+  function renderDoc(id){ const doc=docPorId(id); const host=document.getElementById("dochost-"+id);
+    if(!doc||!host||docsPintados.has(id))return;
+    docsPintados.add(id);
+    pintarDoc(host,doc).catch(()=>docsPintados.delete(id)); }
   // Estructura tiene dos vistas del mismo árbol: en columnas o como mapa.
   let vistaEst="arbol";
   function estView(){ return vistaEst==="mapa"?"mapa":"arbol"; }

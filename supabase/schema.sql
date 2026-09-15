@@ -164,3 +164,24 @@ insert into team_members (email, name) values
   ('lucasriachi@gmail.com',  'Lucas'),
   ('juanhumus@gmail.com',    'Juanso')
 on conflict (email) do nothing;
+
+-- 10) Documentos del equipo: archivos grandes que se miran adentro de la app
+--     (el mapa interactivo; más adelante la hoja de ruta, el plan operativo y
+--     la estrategia de adquisición de campos).
+--
+--     Van acá y NO en public/ del repo. El repo es PÚBLICO, y todo lo que está
+--     en public/ se sirve sin login: el mapa lleva precios por hectárea, el
+--     estado de cada negociación y 567 parcelas catastrales. Detrás de este
+--     bucket privado lo ve el mismo grupo que ve el resto de la app.
+
+insert into storage.buckets (id, name, public)
+values ('documentos', 'documentos', false)
+on conflict (id) do nothing;
+
+drop policy if exists "team reads documentos" on storage.objects;
+create policy "team reads documentos" on storage.objects
+  for select using (bucket_id = 'documentos' and public.is_allowed());
+
+-- A propósito NO hay políticas de escritura: desde la app nadie puede subir ni
+-- pisar un documento. Se sube desde el panel de Supabase, a mano, igual que dar
+-- de baja a alguien de allowed_emails.

@@ -1369,3 +1369,36 @@
   .sbsalir:hover{color:var(--ink);background:var(--surface-2)}
   .sidebar.rail .sbmail{display:none}
   @media (max-width:900px){ .sidebar .sbmail{display:none} }
+
+  /* ---------- DOCUMENTOS ----------
+     Archivos grandes (hoy el mapa) que se miran adentro de la app. Ocupan la
+     página entera: no llevan .wrap porque adentro hay un mapa que necesita
+     todo el alto. */
+  .tabdoc{overflow:hidden}
+  .tabdoc.on{display:flex;flex-direction:column}
+  .dochost{display:flex;flex-direction:column;flex:1;min-height:0}
+  .docbar{display:flex;align-items:center;gap:14px;padding:10px 18px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+  .docnom{display:flex;align-items:baseline;gap:10px;min-width:0}
+  .docnom strong{font-family:var(--font-display);font-size:15px;color:var(--ink)}
+  .docver{font-size:12px;color:var(--ink-faint);white-space:nowrap}
+  .docacc{margin-left:auto;display:flex;gap:8px;flex:none}
+  /* .btn trae display:inline-flex, que le gana al display:none que el navegador
+     le pone a [hidden]. Sin esta linea el boton se ve aunque este oculto. */
+  .docacc .btn[hidden]{display:none}
+  .doccuerpo{flex:1;min-height:0;position:relative;background:var(--bg-2)}
+  /* El marco va en blanco a propósito: el documento trae su propio diseño y no
+     tiene por qué seguir el tema de la app. */
+  .docmarco{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#fff}
+  /* En pantalla completa el que se agranda es el cuerpo, así que tiene que
+     llevar fondo propio: si no, se ve la ventana negra del navegador detrás. */
+  .doccuerpo:fullscreen{background:#fff}
+  .doccargando,.docerror{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:8px;text-align:center;padding:24px;color:var(--ink-soft)}
+  .docerror strong{font-family:var(--font-display);font-size:16px;color:var(--ink)}
+  .docerror p{margin:0;max-width:46ch;font-size:13px;line-height:1.5}
+  @media(max-width:620px){
+    .docbar{padding:8px 12px;gap:8px}
+    .docnom{flex-direction:column;gap:0}
+    .docver{font-size:11px}
+  }
