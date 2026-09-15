@@ -1983,7 +1983,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(cel){ cel.classList.add("resaltada"); cel.scrollIntoView({behavior:"smooth",block:"center"}); } })); }
   function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; if(me&&!ownersOf(k).includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
+    // Una tarea sin responsable es del equipo, así que va al calendario de
+    // todos. El filtro de antes la escondía de todas partes: desde que la
+    // identidad sale del email de la sesión, `me` nunca está vacío, y una
+    // fecha sin dueño no aparecía en el calendario de nadie.
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
     if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
     (state.events||[]).forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
     // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
