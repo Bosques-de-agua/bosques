@@ -133,7 +133,10 @@ export async function pintarDoc(host, doc) {
     const version = await versionDe(doc.archivo);
     const { blob, deCache } = await bajarConCache(doc.archivo, version);
 
-    urlActual = URL.createObjectURL(blob);
+    // El tipo se fuerza a HTML a propósito: si el bucket devolviera el archivo
+    // como octet-stream o texto plano, el marco lo mostraría como código o se
+    // lo bajaría en vez de dibujar el mapa.
+    urlActual = URL.createObjectURL(new Blob([blob], { type: "text/html" }));
     const marco = document.createElement("iframe");
     marco.className = "docmarco";
     marco.setAttribute("allowfullscreen", "");
