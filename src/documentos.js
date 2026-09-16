@@ -17,18 +17,61 @@ import { supabase } from "./supabaseClient.js";
 const BUCKET = "documentos";
 const CACHE = "documentos-v1";
 
-// Sumar uno es agregar un renglón acá y subir el archivo al bucket.
+// Sumar uno es agregar una entrada acá y subir el archivo al bucket: el botón
+// del menú y la sección los arma montarDocs(). El orden de la lista es el del
+// menú. `id` no puede repetir el nombre de otra pestaña (panel, tareas, chat…).
+const ICONO = {
+  mapa: `<svg viewBox="0 0 20 20" fill="none"><path d="M7.5 4.5L3 6.2v9.3l4.5-1.7 5 1.7 4.5-1.7V4.5l-4.5 1.7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 4.5v9.3M12.5 6.2v9.3" stroke="currentColor" stroke-width="1.4"/></svg>`,
+  // parcelas: un terreno dividido en lotes
+  campos: `<svg viewBox="0 0 20 20" fill="none"><path d="M3.5 5.5l6-2 7 2.5v9l-7 2-6-2.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.5 3.5l.5 13.5M3.5 10.5l13-1" stroke="currentColor" stroke-width="1.4"/></svg>`,
+};
+
 export const DOCS = [
   {
     id: "mapa",
     nombre: "Mapa interactivo",
     archivo: "mapa-interactivo.html",
+    icono: ICONO.mapa,
     resumen:
       "Mapa satelital del parque: perímetro, lotes, mosaico de conservación, catastro y sitios de interés.",
+  },
+  {
+    id: "campos",
+    nombre: "Adquisición de campos",
+    archivo: "estrategia-adquisicion.html",
+    icono: ICONO.campos,
+    resumen: "Estrategia de adquisición de tierras: los campos, su prioridad y el estado de cada negociación.",
   },
 ];
 
 export const docPorId = (id) => DOCS.find((d) => d.id === id);
+
+// Arma, al final del menú y separados por una rayita, un botón por documento, y
+// su sección vacía en <main>. Tiene que correr ANTES de que la app enlace los
+// .navtab, o los botones nuevos no responden al clic.
+export function montarDocs() {
+  const nav = document.querySelector("#sidebar nav.sbgroup");
+  const main = document.getElementById("main");
+  if (!nav || !main || nav.querySelector("[data-doc]")) return;
+  const sep = document.createElement("span");
+  sep.className = "sbsep";
+  sep.dataset.doc = "";
+  nav.appendChild(sep);
+  DOCS.forEach((d) => {
+    const b = document.createElement("button");
+    b.className = "navtab sbitem";
+    b.dataset.tab = d.id;
+    b.dataset.doc = d.id;
+    b.title = d.nombre;
+    b.innerHTML = `${d.icono || ""}<span class="sblbl">${escapar(d.nombre)}</span>`;
+    nav.appendChild(b);
+    const s = document.createElement("section");
+    s.className = "tab tabdoc";
+    s.id = "tab-" + d.id;
+    s.innerHTML = `<div class="dochost" id="dochost-${d.id}"></div>`;
+    main.appendChild(s);
+  });
+}
 
 // La versión del archivo según el bucket. Sirve para dos cosas: saber si lo que
 // está cacheado sigue sirviendo, y mostrar de cuándo es lo que estás mirando.

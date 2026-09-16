@@ -1,4 +1,4 @@
-import { DOCS, docPorId, pintarDoc, cerrarDoc } from "./documentos.js";
+import { docPorId, pintarDoc, montarDocs } from "./documentos.js";
 
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
@@ -32,6 +32,9 @@ function stripShared(state){ const o=stripLocal(state); const me=state.me;
   return o; }
 
 export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto }){
+  // Los documentos arman su botón y su sección antes que nada: más abajo se
+  // enlazan todos los .navtab de una, y uno que llegue tarde no respondería.
+  montarDocs();
   // El equipo viene de la base (tabla team_members), no del estado compartido.
   // Cada persona ES su email; el nombre es solo la etiqueta que se muestra.
   let equipo = Array.isArray(team) ? team.slice() : [];
