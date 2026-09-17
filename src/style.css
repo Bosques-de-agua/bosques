@@ -1425,3 +1425,5 @@
   .msgaudio .abar span{display:block;height:100%;width:0;background:var(--fill-primary)}
   .msgaudio .adur{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
   @media(max-width:620px){ .msgaudio{min-width:0;max-width:100%} .composer.grabando .recmax{display:none} }
+  .msgaudio.vencido{min-width:0;padding:7px 12px;border-style:dashed;background:transparent}
+  .msgaudio.vencido .adur{font-family:var(--font-ui);font-style:italic;color:var(--ink-faint)}

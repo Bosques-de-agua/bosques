@@ -218,3 +218,33 @@ create policy "team deletes own chat audios" on storage.objects
     bucket_id = 'chat-audios' and public.is_allowed()
     and (storage.foldername(name))[1] = (auth.jwt() ->> 'email')
   );
+
+-- 12) Limpieza de audios viejos. Una vez por semana, la función de Edge
+--     `limpiar-audios` borra los audios del chat de más de seis meses.
+--
+--     El borrado NO se hace por SQL: borrar una fila de storage.objects deja el
+--     archivo huérfano en el bucket, ocupando espacio (lo dice la documentación
+--     de Supabase). Esta función solo LISTA los vencidos; el borrado lo hace la
+--     función de Edge con la API de Storage. Y solo la puede llamar el rol de
+--     servicio: nadie desde la app.
+--
+--     El mensaje de chat NO se borra: en la app pasa a decir "Audio vencido".
+--     Borrarlo desde el servidor tampoco serviría, porque la fila compartida la
+--     pisa el último que guarda y una pestaña abierta lo haría volver.
+
+create or replace function public.audios_vencidos(dias integer default 183, tope integer default 500)
+returns table (ruta text)
+language sql
+security definer
+set search_path = storage, public
+stable
+as $$
+  select name from storage.objects
+  where bucket_id = 'chat-audios'
+    and created_at < now() - make_interval(days => dias)
+  order by created_at
+  limit tope;
+$$;
+
+revoke all on function public.audios_vencidos(integer, integer) from public, anon, authenticated;
+grant execute on function public.audios_vencidos(integer, integer) to service_role;

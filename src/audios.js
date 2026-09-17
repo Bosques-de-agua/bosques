@@ -11,6 +11,9 @@ import { supabase } from "./supabaseClient.js";
 
 const BUCKET = "chat-audios";
 export const MAX_SEG = 5 * 60;
+// A los seis meses el archivo se borra solo (función limpiar-audios, una vez por
+// semana). Tiene que coincidir con DIAS en supabase/functions/limpiar-audios.
+export const VENCE_DIAS = 183;
 
 export const grabadorDisponible = () =>
   typeof window !== "undefined" &&

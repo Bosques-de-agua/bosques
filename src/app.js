@@ -1,5 +1,5 @@
 import { docPorId, pintarDoc, montarDocs } from "./documentos.js";
-import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAudio, mmss, MAX_SEG } from "./audios.js";
+import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAudio, mmss, MAX_SEG, VENCE_DIAS } from "./audios.js";
 
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
@@ -1582,6 +1582,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
     const pie=pieMsg(m,me), tono=tonoDe(m,mm);
     if(m.audio){ const a=m.audio;
+      // Pasados seis meses el archivo ya no está: en vez de un play que falla, se avisa.
+      if(nowMs()-(m.ts||0)>VENCE_DIAS*DAY)return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div class="msgaudio vencido"><span class="adur">Audio vencido · ${mmss(a.dur)} · se borró a los 6 meses</span></div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
         +`<div class="msgaudio" data-audio="${m.id}" data-dur="${Number(a.dur)||0}"><button class="aplay" title="Escuchar"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg></button><div class="abar" title="Adelantar o volver"><span></span></div><span class="adur">${mmss(a.dur)}</span></div>`
         +pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
