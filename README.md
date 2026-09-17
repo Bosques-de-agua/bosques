@@ -129,3 +129,14 @@ Toda mutación pasa por una única función `save()`, que:
 - El estado compartido se guarda entero en una fila: si dos personas editan el mismo campo al mismo tiempo, gana la última. Con un equipo chico es aceptable; el retardo de guardado reduce mucho la ventana.
 - Los mensajes del chat (incluidos grupos y privados) viven dentro de esa misma fila. La app los filtra en pantalla, pero técnicamente están al alcance de quien tenga acceso a la base. Las tareas privadas y las notas personales **no**: esas sí están en una tabla aparte con permisos.
 - Los archivos que se adjuntan al chat se guardan dentro del estado (hasta 3 MB). Para documentos del proyecto conviene la pestaña Drive, que solo guarda el enlace.
+
+## Audios del chat y su limpieza
+
+Los audios van al bucket privado `chat-audios` (schema.sql, punto 11) y **no** adentro de la fila compartida: los adjuntos del chat viven ahí con un tope de 400 KB, y engordar esa fila hace más probable que dos guardados se pisen. Cada uno sube solo a la carpeta de su email y solo puede borrar lo suyo.
+
+**Limpieza automática.** Los lunes a las 03:00 (06:00 GMT), el cron `limpiar-audios-semanal` (Integrations → Cron) llama a la Edge Function `limpiar-audios`, que borra los audios de más de 183 días.
+- Borra **por la API de Storage**, no por SQL: borrar la fila de `storage.objects` deja el archivo huérfano en el bucket (lo advierte la documentación de Supabase).
+- La lista de vencidos sale de `audios_vencidos()` (schema.sql, punto 12), que solo puede ejecutar el rol de servicio.
+- **Los mensajes no se tocan:** la app muestra "Audio vencido". Borrarlos desde el servidor no serviría, porque cualquier pestaña abierta los volvería a guardar.
+- `VENCE_DIAS` en `src/audios.js` y `DIAS` en la función tienen que coincidir.
+- Deploy: Edge Functions → Deploy a new function → Via Editor, nombre `limpiar-audios`. El panel tiene un botón **Test** que la corre y muestra cuántos borró; llamarla de más no hace daño.
