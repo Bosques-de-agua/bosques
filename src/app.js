@@ -437,7 +437,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
     d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
     if(!Array.isArray(d.panelFilter))d.panelFilter=[]; d.panelFilter=d.panelFilter.filter(p=>p==="__none"||PRIO[p]);
-    if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc=""; });
+    if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc="";
+      // para: nombres de los invitados. Sin lista (o vacía) = todo el equipo.
+      if(Array.isArray(ev.para)){ ev.para=[...new Set(ev.para.map(String).filter(Boolean))]; if(!ev.para.length)delete ev.para; } else if(ev.para!=null)delete ev.para; });
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
     // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
     if(!d._dmpair){ const viejo=d.chat.dm||{}, nuevo={};
@@ -567,6 +569,33 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
     renderActive(); save(); }
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+
+  // ---------- NOTAS AL PASAR EL MOUSE ----------
+  // Parado sobre una tarea (en Tareas o en Estructura), a los ~0,4 s aparece un
+  // recuadro con sus notas: una vista rápida de en qué está, sin abrir la ficha.
+  // Sin notas no aparece nada. Solo con mouse: en pantallas táctiles no hay
+  // "pasar por encima", y un toque abre la ficha como siempre.
+  const conMouse=!!(window.matchMedia&&matchMedia("(hover: hover) and (pointer: fine)").matches);
+  const tipNotas=document.createElement("div"); tipNotas.className="tipnotas"; tipNotas.setAttribute("role","tooltip"); document.body.appendChild(tipNotas);
+  let tipTimer=null, tipSobre=null;
+  function tareaPorId(id){ const x=allItems().find(y=>y.k.id===id); if(x)return x.k;
+    const p=state.me&&state.privTasks&&state.privTasks[state.me]; return Array.isArray(p)?(p.find(k=>k.id===id)||null):null; }
+  function ocultarNotas(){ clearTimeout(tipTimer); tipTimer=null; tipSobre=null; tipNotas.classList.remove("on"); }
+  function mostrarNotas(el){ const k=tareaPorId(el.dataset.item); const notas=k?String(k.notas||"").trim():"";
+    if(!notas){ ocultarNotas(); return; }
+    tipNotas.innerHTML=`<div class="tiplab">Notas</div><div class="tiptxt">${esc(notas)}</div>`;
+    tipNotas.style.left="0px"; tipNotas.style.top="0px"; tipNotas.classList.add("on");
+    const r=el.getBoundingClientRect(), tw=tipNotas.offsetWidth, th=tipNotas.offsetHeight;
+    let top=r.bottom+6; if(top+th>innerHeight-8)top=Math.max(8,r.top-th-6);
+    const left=Math.min(Math.max(8,r.left),innerWidth-tw-8);
+    tipNotas.style.left=left+"px"; tipNotas.style.top=top+"px"; }
+  if(conMouse){
+    document.addEventListener("mouseover",e=>{ const el=e.target.closest(".kcard[data-item], .taskrow[data-item]");
+      if(el===tipSobre)return; ocultarNotas(); if(!el)return;
+      tipSobre=el; tipTimer=setTimeout(()=>{ if(tipSobre===el&&el.isConnected)mostrarNotas(el); },400); });
+    ["pointerdown","dragstart","scroll","wheel"].forEach(ev=>document.addEventListener(ev,ocultarNotas,true));
+    window.addEventListener("blur",ocultarNotas);
+  }
 
   // ---------- MENÚ LATERAL ----------
   // Se puede plegar a una banda de iconos. En Chat se pliega solo: ese costado
@@ -1117,7 +1146,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       else { const from=x.fromPerson; if(from&&from!==p){ const i=os.indexOf(from); if(i>=0)os.splice(i,1); }
         if(!os.includes(p))os.push(p); } }
     save(); renderTareas(); refreshChrome(); }
-  function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.style.borderLeftColor=cssv(STATUS[k.status].v);
+  function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.dataset.item=k.id; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
     c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
@@ -1521,8 +1550,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li>
       <li>Pasando por encima de un mensaje aparecen <b>responder</b> (↩) y <b>reaccionar</b> (☺) — también en los eventos. En el teléfono se ven siempre.</li>
       <li>En el Equipo y en los grupos, cada mensaje lleva un <b>tono del color de quien escribe</b>, para no tener que leer el nombre.</li>
-      <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span>${chatChan==="team"?'<button class="btn" id="newEv">＋ Evento</button>':""}`;
-    const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",openEvNew);
+      <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span><button class="btn" id="newEv" title="${chatChan==="team"?"Evento para todo el equipo":"Evento solo para los de este chat"}">＋ Evento</button>`;
+    const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",()=>openEvNew(null,chatChan));
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
     if(!me){ box.innerHTML=`<div class="ph"><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
@@ -1578,8 +1607,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const c=avColor(m.from);
     return ` style="background:color-mix(in srgb,${c} ${mm?16:9}%,var(--surface));border-color:color-mix(in srgb,${c} ${mm?42:26}%,var(--line))"`; }
   function msgHTML(m,me){ const mm=(m.from===me);
-    if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
-      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+    if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev||!veoEvento(ev))return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
+      return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div>${esParaTodos(ev)?"":`<div class="evpara">${ICO.candado}<span>${esc(invitadosDe(ev).join(", "))}</span></div>`}<div class="rsvp">${puedeResponder(ev)?`<button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button>`:""}<span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
     const pie=pieMsg(m,me), tono=tonoDe(m,mm);
     if(m.audio){ const a=m.audio;
       // Pasados seis meses el archivo ya no está: en vez de un play que falla, se avisa.
@@ -1716,17 +1745,90 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     try{ const a=document.createElement("a"); a.href=f.data; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); }
     catch(e){ note("No se pudo descargar el archivo."); } }
   function closeEv(){ document.getElementById("evModal").classList.remove("on"); }
-  function openEvNew(presetDate){ evForm(null,presetDate); }
-  function openEvEdit(id){ const ev=(state.events||[]).find(e=>e.id===id); if(ev)evForm(ev); }
-  function evForm(ev,presetDate){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date());
+  // ---------- EVENTOS: para quién es cada uno ----------
+  // Un evento es de todo el equipo, o solo de algunas personas (la lista "para", con
+  // sus nombres). Si es de algunas, solo lo ven ellas —en el calendario, en
+  // Próximos eventos y en el chat— y el aviso les llega solo a ellas:
+  //  · todo el equipo                      → canal Equipo
+  //  · exactamente los de un grupo del chat → ese grupo
+  //  · si no                               → un privado a cada invitado
+  // OJO: es la misma privacidad que los mensajes privados. Los datos viajan en
+  // la fila compartida; la app los oculta, no los cifra.
+  const esParaTodos=ev=>!(ev&&Array.isArray(ev.para)&&ev.para.length);
+  function veoEvento(ev){ if(!ev)return false; if(esParaTodos(ev))return true; const me=state.me||""; return !!me&&(ev.para.includes(me)||ev.by===me); }
+  function puedeResponder(ev){ const me=state.me||""; return !!me&&(esParaTodos(ev)||ev.para.includes(me)); }
+  function invitadosDe(ev){ return esParaTodos(ev)?allPeople():ev.para.slice(); }
+  function eventosVisibles(){ return (state.events||[]).filter(veoEvento); }
+  const mismaGente=(a,b)=>{ const x=[...new Set(a||[])], y=[...new Set(b||[])]; return x.length===y.length&&x.every(p=>y.includes(p)); };
+  function destinoAviso(para,desde){ const me=state.me||"";
+    if(!para||!para.length)return {tipo:"team"};
+    const otros=para.filter(p=>p!==me);
+    if(!otros.length)return {tipo:"nadie"};
+    const gDesde=(desde&&desde.startsWith("grp:"))?groupOf(desde):null;
+    const g=(gDesde&&mismaGente(gDesde.members,para))?gDesde:myGroups().find(x=>mismaGente(x.members,para));
+    if(g)return {tipo:"grupo",g};
+    return {tipo:"privados",a:otros}; }
+  function textoDestino(d){
+    if(d.tipo==="team")return "Lo ve todo el equipo. Se avisa en el canal Equipo.";
+    if(d.tipo==="nadie")return "Solo lo ves vos: no se le avisa a nadie.";
+    if(d.tipo==="grupo")return "Lo ven solo los del grupo «"+d.g.name+"». Se avisa en ese grupo.";
+    return d.a.length===1?"Lo ven solo vos y "+d.a[0]+". Se le avisa por privado.":"Lo ven solo los invitados. Se avisa por privado a cada uno: "+d.a.join(", ")+"."; }
+  // Deja la tarjeta del evento donde corresponde. Devuelve el canal, si es uno solo.
+  function avisarEvento(ev,d){ const nueva=()=>({id:"m"+uid(),from:state.me||"Equipo",ev:ev.id,ts:nowMs()});
+    if(d.tipo==="team"){ msgsOf("team").push(nueva()); return "team"; }
+    if(d.tipo==="grupo"){ msgsOf("grp:"+d.g.id).push(nueva()); return "grp:"+d.g.id; }
+    if(d.tipo==="privados"){ d.a.forEach(p=>msgsOf("dm:"+p).push(nueva())); return d.a.length===1?"dm:"+d.a[0]:null; }
+    return null; }
+  function quitarTarjetasEvento(id){ const f=arr=>(arr||[]).filter(m=>m.ev!==id);
+    state.chat.team=f(state.chat.team);
+    Object.values(groupsAll()).forEach(g=>{ g.msgs=f(g.msgs); });
+    Object.keys(state.chat.dm||{}).forEach(k=>{ state.chat.dm[k]=f(state.chat.dm[k]); }); }
+
+  function openEvNew(presetDate,desde){ evForm(null,(typeof presetDate==="string")?presetDate:null,(typeof desde==="string")?desde:null); }
+  function openEvEdit(id){ const ev=(state.events||[]).find(e=>e.id===id); if(ev&&veoEvento(ev))evForm(ev); }
+  function evForm(ev,presetDate,desde){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date()); const me=state.me||"";
     const da0=ev?ev.date:((presetDate&&/^\d{4}-\d{2}-\d{2}$/.test(presetDate))?presetDate:today);
-    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" autocapitalize="sentences" autocorrect="on" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar al equipo"}</button></div>`;
+    // Invitados de arranque: los del evento; si es nuevo, la gente del chat desde donde se crea.
+    let para;
+    if(ev)para=esParaTodos(ev)?[]:ev.para.slice();
+    else if(desde&&desde.startsWith("grp:")){ const g=groupOf(desde); para=g?(g.members||[]).slice():[]; }
+    else if(desde&&desde.startsWith("dm:"))para=[me,desde.slice(3)];
+    else para=[];
+    if(para.length&&me&&!para.includes(me))para.unshift(me);
+    let modo=para.length?"algunos":"todos";
+    const antes=ev?(esParaTodos(ev)?null:ev.para.slice()):undefined;   // null = era de todo el equipo
+    const gente=allPeople().filter(Boolean);
+    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" autocapitalize="sentences" autocorrect="on" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿A quién invitás?</label><div class="seg2 evmodo"><button type="button" data-modo="todos">Todo el equipo</button><button type="button" data-modo="algunos">Elegir personas</button></div><div class="gmlist evgente" id="evGente">${gente.map(p=>`<label class="fopt"><input type="checkbox" data-p="${esc(p)}" ${p===me?"checked disabled":""}><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}${p===me?" (vos)":""}</span></label>`).join("")}</div><div class="evdestino" id="evDestino"></div></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar"}</button></div>`;
+    const invitadosAhora=()=>modo==="todos"?[]:[...new Set(para)];
+    const pintar=()=>{ box.querySelectorAll("[data-modo]").forEach(b=>b.classList.toggle("on",b.dataset.modo===modo));
+      box.querySelector("#evGente").style.display=modo==="algunos"?"":"none";
+      box.querySelectorAll("#evGente [data-p]").forEach(cb=>{ if(cb.dataset.p!==me)cb.checked=para.includes(cb.dataset.p); });
+      const p=invitadosAhora(); let t;
+      if(!ev)t=textoDestino(destinoAviso(p,desde));
+      else if(antes===null&&!p.length)t="Es de todo el equipo. No se vuelve a avisar.";
+      else if(antes===null)t="Pasa a verse solo para los invitados. No se vuelve a avisar: ya lo vieron en Equipo.";
+      else if(!p.length)t="Pasa a ser de todo el equipo. Se avisa en el canal Equipo.";
+      else { const nuevos=p.filter(x=>x!==me&&!antes.includes(x)); t=nuevos.length?"A los que sumás les llega un aviso por privado: "+nuevos.join(", ")+".":"No se le avisa a nadie de nuevo."; }
+      box.querySelector("#evDestino").textContent=t; };
+    box.querySelectorAll("[data-modo]").forEach(b=>b.addEventListener("click",()=>{ modo=b.dataset.modo; if(modo==="algunos"&&!para.length&&me)para=[me]; pintar(); }));
+    box.querySelectorAll("#evGente [data-p]").forEach(cb=>cb.addEventListener("change",()=>{ const p=cb.dataset.p; if(cb.checked){ if(!para.includes(p))para.push(p); } else para=para.filter(x=>x!==p); pintar(); }));
+    pintar();
     document.getElementById("evModal").classList.add("on");
     box.querySelector("#evCancel").addEventListener("click",()=>{ if(ev)openEvView(ev.id); else closeEv(); });
     box.querySelector("#evTitle").focus();
     box.querySelector("#evCreate").addEventListener("click",()=>{ const ti=box.querySelector("#evTitle").value.trim()||"Evento"; const da=box.querySelector("#evDate").value||da0; const ho=box.querySelector("#evTime").value||""; const de=box.querySelector("#evDesc").value.trim();
-      if(ev){ ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de; save(); renderActive(); openEvView(ev.id); return; }
-      const id="ev"+uid(); const rsvp={}; if(state.me)rsvp[state.me]="yes"; state.events.push({id,date:da,title:ti,time:ho,desc:de,rsvp}); state.chat.team.push({id:"m"+uid(),from:state.me||"Equipo",ev:id,ts:nowMs()}); chatChan="team"; save(); closeEv(); renderActive(); }); }
+      const p=invitadosAhora();
+      if(ev){ ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de;
+        if(p.length){ ev.para=p; if(!ev.by)ev.by=me; } else delete ev.para;
+        if(antes!==null&&antes!==undefined){
+          if(!p.length)avisarEvento(ev,{tipo:"team"});
+          else { const nuevos=p.filter(x=>x!==me&&!antes.includes(x)); if(nuevos.length)avisarEvento(ev,{tipo:"privados",a:nuevos}); } }
+        save(); renderActive(); openEvView(ev.id); return; }
+      const id="ev"+uid(); const rsvp={}; if(me)rsvp[me]="yes";
+      const nuevo={id,date:da,title:ti,time:ho,desc:de,rsvp,by:me}; if(p.length)nuevo.para=p;
+      state.events.push(nuevo);
+      avisarEvento(nuevo,destinoAviso(p,desde));
+      save(); closeEv(); renderActive(); }); }
   // link a Google Calendar con el evento precargado (el recordatorio lo manda Google)
   function gcalUrl(ev){ const pad=n=>String(n).padStart(2,"0");
     const [y,m,d]=(ev.date||"").split("-").map(Number); if(!y)return "";
@@ -1741,15 +1843,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const p=new URLSearchParams({action:"TEMPLATE",text:ev.title||"Reunión",dates});
     if(ev.desc)p.set("details",ev.desc);
     return "https://calendar.google.com/calendar/render?"+p.toString(); }
-  function openEvView(id){ const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; const box=document.getElementById("evBox"); const me=state.me;
-    const rows=allPeople().map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"Voy":v==="no"?"No voy":"— sin responder"}</span></div>`; }).join("");
-    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>${ICO.calendario} ${esc(ev.date)}${ev.time?" · "+ICO.reloj+" "+esc(ev.time):""}</p>${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${me?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">Elegí quién sos (arriba) para responder.</p>'}<div class="pop-l" style="margin-top:14px">Asistencia del equipo</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">${ICO.calendario} Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
+  function openEvView(id){ const ev=(state.events||[]).find(e=>e.id===id); if(!ev||!veoEvento(ev))return; const box=document.getElementById("evBox"); const me=state.me;
+    const inv=invitadosDe(ev);
+    const rows=inv.map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"Voy":v==="no"?"No voy":"— sin responder"}</span></div>`; }).join("");
+    const quienes=esParaTodos(ev)?`<p class="evquienes">${ICO.equipo}<span>Todo el equipo</span></p>`:`<p class="evquienes">${ICO.candado}<span>Solo invitados: ${esc(inv.join(", "))}</span></p>`;
+    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>${ICO.calendario} ${esc(ev.date)}${ev.time?" · "+ICO.reloj+" "+esc(ev.time):""}</p>${quienes}${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${puedeResponder(ev)?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">No estás entre los invitados.</p>'}<div class="pop-l" style="margin-top:14px">${esParaTodos(ev)?"Asistencia del equipo":"Asistencia de los invitados"}</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">${ICO.calendario} Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelectorAll("[data-rv]").forEach(b=>b.addEventListener("click",()=>{ setRsvp(id,b.dataset.rv); openEvView(id); }));
     box.querySelector("#evEdit").addEventListener("click",()=>openEvEdit(id));
     box.querySelector("#evOk").addEventListener("click",closeEv);
-    box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar("El evento se borra para todo el equipo.",()=>{ state.events=state.events.filter(e=>e.id!==id); if(state.chat)state.chat.team=(state.chat.team||[]).filter(m=>m.ev!==id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
-  function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev)return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
+    box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar(esParaTodos(ev)?"El evento se borra para todo el equipo.":"El evento se borra para todos los invitados.",()=>{ state.events=state.events.filter(e=>e.id!==id); quitarTarjetasEvento(id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
+  function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev||!puedeResponder(ev))return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
   // Cuántos mensajes sin leer tiene UN canal. La campanita de arriba decía que
   // había algo nuevo pero no dónde: había que entrar canal por canal a buscarlo.
   // La cuenta sale de `chatRead` —hasta qué momento leíste cada canal—, que es
@@ -1943,7 +2047,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // revive en los filtros y en las columnas por persona.
     Object.values(state.privTasks||{}).forEach(arr=>(arr||[]).forEach(k=>{ k.owners=cambia(ownersOf(k)); }));
     [state.privTasks,state.myNotes,state.avatars,state.userColors,state.tasksSeen,state.chatSeen].forEach(mueveClave);
-    (state.events||[]).forEach(ev=>mueveClave(ev.rsvp));
+    (state.events||[]).forEach(ev=>{ mueveClave(ev.rsvp); if(Array.isArray(ev.para))ev.para=cambia(ev.para); if(ev.by===viejo)ev.by=nuevo; });
     // conversaciones privadas: la clave son los dos nombres ordenados
     const dm=state.chat.dm||{}; const nuevoDm={};
     Object.keys(dm).forEach(k=>{ const partes=k.split(" ~ ").map(p=>p===viejo?nuevo:p);
@@ -2019,7 +2123,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const today=ymdLocal(new Date()); const me=state.me; const solaEnPantalla=panelView()==="upcoming";
     // En el Panel completo es un resumen corto; siendo la unica cosa en
     // pantalla no tiene sentido recortar a seis.
-    let evs=(state.events||[]).filter(e=>e.date>=today).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
+    let evs=eventosVisibles().filter(e=>e.date>=today).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
     if(!solaEnPantalla)evs=evs.slice(0,6);
     if(!evs.length){ box.innerHTML=solaEnPantalla
       ? `<div class="ph"><b>No hay nada agendado</b><div style="margin-top:6px;font-size:13px">Los eventos se crean tocando un día en el calendario.</div></div>`
@@ -2038,7 +2142,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         const rs=ev.rsvp||{}; const mine=rs[me];
         const van=Object.keys(rs).filter(p=>rs[p]==="yes");
         const noVan=Object.keys(rs).filter(p=>rs[p]==="no");
-        const sinResponder=allPeople().filter(p=>!rs[p]);
+        const sinResponder=invitadosDe(ev).filter(p=>!rs[p]);
         const tuya=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':'<span class="evtag">sin responder</span>';
         html+=`<div class="agev" data-ev="${esc(ev.id)}">
           <div class="aghora">${ev.time?esc(ev.time):"—"}</div>
@@ -2070,7 +2174,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // fecha sin dueño no aparecía en el calendario de nadie.
     activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
     if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
-    (state.events||[]).forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
+    eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
     // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
     // tiene: si hay una reunión a las 9, quiero verla arriba de todo.
     Object.keys(byDay).forEach(ds=>byDay[ds].sort((a,b)=>{

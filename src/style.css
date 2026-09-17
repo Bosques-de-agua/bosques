@@ -1427,3 +1427,25 @@
   @media(max-width:620px){ .msgaudio{min-width:0;max-width:100%} .composer.grabando .recmax{display:none} }
   .msgaudio.vencido{min-width:0;padding:7px 12px;border-style:dashed;background:transparent}
   .msgaudio.vencido .adur{font-family:var(--font-ui);font-style:italic;color:var(--ink-faint)}
+
+  /* ---------- EVENTOS CON INVITADOS ---------- */
+  .evmodo{display:inline-flex;margin:2px 0 8px}
+  /* Las personas en fila y no una debajo de otra: con la lista vertical el
+     formulario pasaba los 700 px de alto. */
+  .evgente{margin-bottom:8px;display:flex;flex-wrap:wrap;gap:2px 4px;max-height:none}
+  .evgente .fopt{flex:0 0 auto}
+  .evdestino{font-size:12px;line-height:1.45;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:7px 10px}
+  .evpara,.evquienes{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+  .evpara{margin-top:3px}
+  .evquienes{margin:-6px 0 10px}
+  .evpara svg,.evquienes svg{width:13px;height:13px;flex:none}
+
+  /* ---------- NOTAS AL PASAR EL MOUSE ---------- */
+  .tipnotas{position:fixed;z-index:70;display:none;max-width:min(340px,calc(100vw - 16px));background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:0 8px 24px rgba(0,0,0,.28);padding:8px 11px 9px;pointer-events:none}
+  .tipnotas.on{display:block}
+  .tipnotas .tiplab{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:3px}
+  .tipnotas .tiptxt{font-size:12.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;max-height:16em;overflow:hidden}
+
+  /* Ninguna ventana emergente puede ser más alta que la pantalla: sin esto, en
+     una notebook chica el botón de abajo quedaba afuera y no había cómo llegar. */
+  .modal .box{max-height:calc(100dvh - 24px);overflow:auto}

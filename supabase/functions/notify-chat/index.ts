@@ -107,9 +107,17 @@ function esRenombre(oldData: any, newData: any): boolean {
   return distintos === 1;
 }
 
-function cuerpoDe(m: any): string {
+function cuerpoDe(m: any, data?: any): string {
   if (!m) return "";
-  if (m.ev) return "Propuso un evento";
+  if (m.ev) {
+    // El aviso dice qué evento es y cuándo: con eventos privados, "propuso un
+    // evento" solo no alcanza para saber si te importa.
+    const ev = (data?.events || []).find((e: any) => e.id === m.ev);
+    if (!ev) return "Propuso un evento";
+    const [, mes, dia] = String(ev.date || "").split("-");
+    const cuando = dia && mes ? ` · ${dia}/${mes}${ev.time ? " " + ev.time : ""}` : "";
+    return `Te invita: ${ev.title || "evento"}${cuando}`;
+  }
   if (m.audio) {
     const s = Math.max(0, Math.round(Number(m.audio.dur) || 0));
     return `Mandó un audio (${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")})`;
@@ -219,7 +227,7 @@ Deno.serve(async (req) => {
       supabase,
       todosMenos(m.from),
       "👥 Equipo",
-      `${quien(m.from)}: ${cuerpoDe(m)}`
+      `${quien(m.from)}: ${cuerpoDe(m, newData)}`
     );
   }
 
@@ -233,7 +241,7 @@ Deno.serve(async (req) => {
         supabase,
         destinos,
         `👪 ${g.name || "Grupo"}`,
-        `${quien(m.from)}: ${cuerpoDe(m)}`
+        `${quien(m.from)}: ${cuerpoDe(m, newData)}`
       );
     }
   }
@@ -245,7 +253,7 @@ Deno.serve(async (req) => {
         .split(" ~ ")
         .find((n) => n !== m.from);
       const dest = paraOtros([destino ? emailDe[destino] : undefined]);
-      if (dest.length) await sendTo(supabase, dest, quien(m.from), cuerpoDe(m));
+      if (dest.length) await sendTo(supabase, dest, quien(m.from), cuerpoDe(m, newData));
     }
   }
 
