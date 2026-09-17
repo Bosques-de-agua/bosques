@@ -139,4 +139,4 @@ Los audios van al bucket privado `chat-audios` (schema.sql, punto 11) y **no** a
 - La lista de vencidos sale de `audios_vencidos()` (schema.sql, punto 12), que solo puede ejecutar el rol de servicio.
 - **Los mensajes no se tocan:** la app muestra "Audio vencido". Borrarlos desde el servidor no serviría, porque cualquier pestaña abierta los volvería a guardar.
 - `VENCE_DIAS` en `src/audios.js` y `DIAS` en la función tienen que coincidir.
-- Deploy: Edge Functions → Deploy a new function → Via Editor, nombre `limpiar-audios`. El panel tiene un botón **Test** que la corre y muestra cuántos borró; llamarla de más no hace daño.
+- Deploy: Edge Functions → Deploy a new function → Via Editor, nombre `limpiar-audios`. **`limpiar-audios` tiene "Verify JWT" APAGADO a propósito**, para que el cron la pueda llamar sin llevar una clave guardada en la base. No baja la seguridad: la anon key ya viaja en el bundle de la app, y lo único que la función puede hacer es borrar audios que ya estaban vencidos. Verificado llamándola sin cabecera: responde 200. El panel tiene un botón **Test** que la corre y muestra cuántos borró; llamarla de más no hace daño.
