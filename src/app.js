@@ -1,4 +1,5 @@
 import { docPorId, pintarDoc, montarDocs } from "./documentos.js";
+import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAudio, mmss, MAX_SEG } from "./audios.js";
 
 // Preferencias de cada persona: quedan en SU navegador y no viajan al equipo.
 // Cualquier clave nueva que sea personal tiene que sumarse acá, o se le
@@ -1439,6 +1440,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   let respondiendoA=null;
   function msgPorId(id){ return msgsOf(chatChan).find(x=>x.id===id)||null; }
   function resumenMsg(m){ if(!m)return ""; if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); return "Evento: "+((ev&&ev.title)||"sin título"); }
+    if(m.audio&&!m.text)return "Audio ("+mmss(m.audio.dur)+")";
     if(m.file&&!m.text)return (/^image\//.test(m.file.type||"")?"Imagen: ":"Archivo: ")+(m.file.name||"");
     const t=String(m.text||"").replace(/\s+/g," ").trim(); return t.length>90?t.slice(0,90)+"…":t||"(sin texto)"; }
   function citaHTML(m){ if(!m.re)return ""; const o=msgPorId(m.re);
@@ -1534,10 +1536,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
+      const ap=row.querySelector("[data-audio] .aplay"); if(ap)ap.addEventListener("click",()=>tocarAudio(m));
+      const ab=row.querySelector("[data-audio] .abar"); if(ab)ab.addEventListener("click",e=>adelantarAudio(m,ab,e));
       const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id));
       const rp=row.querySelector("[data-responder]"); if(rp)rp.addEventListener("click",()=>responderA(m.id));
       const rc=row.querySelector("[data-reacc]"); if(rc)rc.addEventListener("click",e=>{ e.stopPropagation(); abrirReacciones(rc,m.id); });
       const q=row.querySelector("[data-ira]"); if(q)q.addEventListener("click",()=>irAlMensaje(q.dataset.ira));
+      if(m.audio&&sonando===m.id)requestAnimationFrame(pintarReproductor);
       row.querySelectorAll("[data-react]").forEach(b=>b.addEventListener("click",()=>toggleReaccion(m.id,b.dataset.react))); });
     pintarRespuesta();
     // El scroll va ANTES de guardar: marcar leído dispara un guardado y, si
@@ -1576,6 +1581,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev)return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div><div class="rsvp"><button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button><span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
     const pie=pieMsg(m,me), tono=tonoDe(m,mm);
+    if(m.audio){ const a=m.audio;
+      return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
+        +`<div class="msgaudio" data-audio="${m.id}" data-dur="${Number(a.dur)||0}"><button class="aplay" title="Escuchar"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg></button><div class="abar" title="Adelantar o volver"><span></span></div><span class="adur">${mmss(a.dur)}</span></div>`
+        +pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
@@ -1594,14 +1603,72 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     +`</div>`; }
   function borrarMsg(mid){ const arr=msgsOf(chatChan); const m=arr.find(x=>x.id===mid); if(!m)return;
     if(m.from!==(state.me||""))return;
-    const q=m.file?"Se borra el mensaje y el archivo que trae, para todos.":"Se borra el mensaje para todos.";
-    confirmar(q,()=>{ const i=arr.findIndex(x=>x.id===mid); if(i>=0)arr.splice(i,1); save(); renderChat(); },{title:"Borrar mensaje",yes:"Borrar"}); }
+    const q=m.audio?"Se borra el mensaje y el audio, para todos.":m.file?"Se borra el mensaje y el archivo que trae, para todos.":"Se borra el mensaje para todos.";
+    confirmar(q,()=>{ const i=arr.findIndex(x=>x.id===mid); if(i>=0)arr.splice(i,1);
+      // El archivo va aparte, en el bucket. Si no se puede borrar (sin red), el
+      // mensaje se va igual: un audio huérfano no le molesta a nadie.
+      if(m.audio){ if(sonando===mid){ player.pause(); sonando=null; } borrarAudio(m.audio.path).catch(()=>{}); }
+      save(); renderChat(); },{title:"Borrar mensaje",yes:"Borrar"}); }
   function sendMsg(){ const inp=document.getElementById("msgInput"); const me=state.me; if(!me)return; const t=inp.value.trim(); if(!t)return;
     const m={id:"m"+uid(),from:me,text:t,ts:nowMs()};
     // Solo cuenta si el mensaje al que respondés sigue en este canal.
     if(respondiendoA&&msgPorId(respondiendoA))m.re=respondiendoA;
     respondiendoA=null;
     msgsOf(chatChan).push(m); inp.value=""; save(); renderChat(); }
+  // ---------- AUDIOS ----------
+  // Se graba con el micrófono de la compu, se sube al bucket privado y en el
+  // mensaje queda solo la ruta (ver src/audios.js por qué no va adentro).
+  let grab=null, grabTimer=null, grabCanal="", grabRe=null, enviandoAudio=false, audioPend=null;
+  function pintarGrab(){ const inp=document.getElementById("msgInput"); const c=inp&&inp.closest(".composer"); if(!c)return;
+    c.classList.toggle("grabando",!!(grab||enviandoAudio||audioPend));
+    c.classList.toggle("recfallo",!!audioPend&&!enviandoAudio);
+    const t=document.getElementById("recTime"), mx=document.getElementById("recMax"), s=document.getElementById("recSend"), x=document.getElementById("recCancel");
+    if(t)t.textContent=audioPend&&!enviandoAudio?"No se pudo enviar":grab?mmss(grab.segundos()):audioPend?mmss(audioPend.a.dur):"0:00";
+    if(mx)mx.textContent=audioPend&&!enviandoAudio?"audio de "+mmss(audioPend.a.dur)+" guardado":"máx. "+mmss(MAX_SEG);
+    if(s){ s.disabled=enviandoAudio; s.textContent=enviandoAudio?"Enviando…":audioPend?"Reintentar":"Enviar audio"; }
+    if(x)x.disabled=enviandoAudio; }
+  function cortarGrabTimer(){ if(grabTimer){ clearInterval(grabTimer); grabTimer=null; } }
+  async function empezarAudio(){ if(grab||enviandoAudio||audioPend)return;
+    if(!state.me||!miEmail){ note("No pudimos identificarte para mandar un audio."); return; }
+    if(!grabadorDisponible()){ note("Este navegador no permite grabar audio."); return; }
+    try{ grab=await empezarGrabacion(); }catch(e){ grab=null; note((e&&e.message)||"No se pudo abrir el micrófono."); return; }
+    grabCanal=chatChan; grabRe=(respondiendoA&&msgPorId(respondiendoA))?respondiendoA:null;
+    pintarGrab();
+    grabTimer=setInterval(()=>{ if(!grab)return; if(grab.segundos()>=MAX_SEG){ enviarAudio(); return; } pintarGrab(); },250); }
+  function descartarAudio(){ if(enviandoAudio)return; cortarGrabTimer(); if(grab)grab.descartar(); grab=null; audioPend=null; pintarGrab(); }
+  async function enviarAudio(){ if(enviandoAudio)return;
+    let pend=audioPend;
+    if(!pend){ if(!grab)return; cortarGrabTimer(); const g=grab; grab=null; enviandoAudio=true; pintarGrab();
+      try{ pend={a:await g.terminar(), canal:grabCanal||chatChan, re:grabRe, id:"m"+uid()}; }
+      catch(e){ enviandoAudio=false; pintarGrab(); note((e&&e.message)||"No se pudo terminar la grabación."); return; } }
+    enviandoAudio=true; audioPend=pend; pintarGrab();
+    try{ const ruta=await subirAudio(pend.a,miEmail,pend.id);
+      const m={id:pend.id,from:state.me,text:"",ts:nowMs(),audio:{path:ruta,dur:pend.a.dur,type:pend.a.tipo,size:pend.a.blob.size}};
+      if(pend.re)m.re=pend.re;
+      if(respondiendoA===pend.re)respondiendoA=null;
+      msgsOf(pend.canal).push(m); audioPend=null; save(); if(active==="chat")renderChat(); }
+    catch(e){ // el audio queda guardado en memoria para reintentar: grabar tres minutos para perderlos por un corte de red no
+      note("No se pudo mandar el audio. Quedó guardado: probá con Reintentar."); }
+    finally{ enviandoAudio=false; pintarGrab(); } }
+  // Un solo reproductor para todo el chat: darle play a un audio corta el otro.
+  let sonando=null; const player=new Audio(); player.preload="auto";
+  ["play","pause","timeupdate","ended"].forEach(ev=>player.addEventListener(ev,()=>{ if(ev==="ended"){ sonando=null; } pintarReproductor(); }));
+  function pintarReproductor(){ document.querySelectorAll("#msgs .msgaudio").forEach(el=>{ const on=(el.dataset.audio===sonando);
+      const b=el.querySelector(".aplay"); const tocando=on&&!player.paused;
+      b.innerHTML=tocando?`<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1" fill="currentColor"/><rect x="11.5" y="4.5" width="3" height="11" rx="1" fill="currentColor"/></svg>`:`<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg>`; b.title=tocando?"Pausar":"Escuchar"; el.classList.toggle("on",on);
+      // MediaRecorder deja el webm sin duración en sus datos (el navegador dice
+      // Infinity), así que la cuenta usa la que se guardó al grabar.
+      const total=Number(el.dataset.dur)||0, bar=el.querySelector(".abar span");
+      bar.style.width=on&&total?Math.min(100,player.currentTime/total*100)+"%":"0%";
+      el.querySelector(".adur").textContent=on?mmss(player.currentTime)+" / "+mmss(total):mmss(total); }); }
+  async function tocarAudio(m){ const id=m.id;
+    if(sonando===id){ if(player.paused)player.play().catch(()=>{}); else player.pause(); return; }
+    const el=document.querySelector(`#msgs [data-audio="${id}"]`); if(el)el.classList.add("cargando");
+    try{ const url=await urlDeAudio(m.audio.path); player.pause(); sonando=id; player.src=url; await player.play(); }
+    catch(e){ sonando=null; note("No se pudo reproducir el audio."); }
+    finally{ const e2=document.querySelector(`#msgs [data-audio="${id}"]`); if(e2)e2.classList.remove("cargando"); pintarReproductor(); } }
+  function adelantarAudio(m,bar,e){ if(sonando!==m.id)return; const total=Number(m.audio.dur)||0; if(!total)return;
+    const r=bar.getBoundingClientRect(); player.currentTime=Math.max(0,Math.min(total,(e.clientX-r.left)/r.width*total)); pintarReproductor(); }
   function ponerEmoji(e){ const inp=document.getElementById("msgInput"); if(!inp)return;
     const a=inp.selectionStart==null?inp.value.length:inp.selectionStart, b=inp.selectionEnd==null?a:inp.selectionEnd;
     inp.value=inp.value.slice(0,a)+e+inp.value.slice(b);
@@ -2348,6 +2415,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   fPerson.addEventListener("change",renderActive);
   document.getElementById("weekGoals").addEventListener("input",e=>{ state.weekGoals=e.target.value; save(); });
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
+  document.getElementById("micBtn").addEventListener("click",empezarAudio);
+  if(!grabadorDisponible())document.getElementById("micBtn").classList.add("sinmic");
+  document.getElementById("recCancel").addEventListener("click",descartarAudio);
+  document.getElementById("recSend").addEventListener("click",enviarAudio);
   document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
   document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
   document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg();

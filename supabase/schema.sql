@@ -185,3 +185,36 @@ create policy "team reads documentos" on storage.objects
 -- A propósito NO hay políticas de escritura: desde la app nadie puede subir ni
 -- pisar un documento. Se sube desde el panel de Supabase, a mano, igual que dar
 -- de baja a alguien de allowed_emails.
+
+-- 11) Audios del chat. Van a un bucket propio y NO adentro de app_state: los
+--     adjuntos del chat hoy se guardan en la fila compartida (tope 400 KB)
+--     porque todo el equipo la carga en cada cambio. Un audio ahí la haría
+--     engordar para siempre, y cuanto más pesa cada guardado, más fácil es que
+--     dos se pisen. En el mensaje queda solo la ruta del archivo.
+--
+--     Cada uno sube a una carpeta con su email, y solo ahí: nadie puede subir
+--     a nombre de otro ni borrar un audio ajeno. No hay política de update, así
+--     que un audio nunca se pisa.
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('chat-audios', 'chat-audios', false, 10485760,
+        array['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'])
+on conflict (id) do nothing;
+
+drop policy if exists "team reads chat audios" on storage.objects;
+create policy "team reads chat audios" on storage.objects
+  for select using (bucket_id = 'chat-audios' and public.is_allowed());
+
+drop policy if exists "team uploads own chat audios" on storage.objects;
+create policy "team uploads own chat audios" on storage.objects
+  for insert with check (
+    bucket_id = 'chat-audios' and public.is_allowed()
+    and (storage.foldername(name))[1] = (auth.jwt() ->> 'email')
+  );
+
+drop policy if exists "team deletes own chat audios" on storage.objects;
+create policy "team deletes own chat audios" on storage.objects
+  for delete using (
+    bucket_id = 'chat-audios' and public.is_allowed()
+    and (storage.foldername(name))[1] = (auth.jwt() ->> 'email')
+  );

@@ -110,6 +110,10 @@ function esRenombre(oldData: any, newData: any): boolean {
 function cuerpoDe(m: any): string {
   if (!m) return "";
   if (m.ev) return "Propuso un evento";
+  if (m.audio) {
+    const s = Math.max(0, Math.round(Number(m.audio.dur) || 0));
+    return `Mandó un audio (${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")})`;
+  }
   if (m.file) return `Mandó un archivo: ${m.file.name || "archivo"}`;
   return String(m.text || "").slice(0, 140);
 }

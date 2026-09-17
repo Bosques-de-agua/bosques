@@ -1402,3 +1402,26 @@
     .docnom{flex-direction:column;gap:0}
     .docver{font-size:11px}
   }
+
+  /* ---------- AUDIOS DEL CHAT ----------
+     La barra de grabación va con clases y no con [hidden]: .btn trae
+     display:inline-flex y le gana al display:none del atributo. */
+  .composer .recbar{display:none}
+  .composer.grabando .recbar{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+  .composer.grabando > #attachBtn,.composer.grabando > #emojiBtn,.composer.grabando > #micBtn,.composer.grabando > #msgInput,.composer.grabando > #sendMsg{display:none}
+  #micBtn.sinmic{display:none}
+  .recdot{width:10px;height:10px;border-radius:50%;background:#D8453A;flex:none;animation:recpulso 1.2s ease-in-out infinite}
+  .composer.recfallo .recdot{animation:none;background:var(--ink-faint)}
+  @keyframes recpulso{0%,100%{opacity:1}50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.recdot{animation:none}}
+  .rectime{font-family:var(--font-mono);font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .recmax{font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+  .recsp{flex:1}
+  .msgaudio{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-pill);padding:5px 12px 5px 5px;margin-top:2px;min-width:210px;max-width:320px}
+  .msgaudio .aplay{width:30px;height:30px;border-radius:50%;border:0;display:grid;place-items:center;flex:none;cursor:pointer;background:var(--fill-primary);color:var(--on-primary)}
+  .msgaudio .aplay svg{width:14px;height:14px}
+  .msgaudio.cargando .aplay{opacity:.55;cursor:progress}
+  .msgaudio .abar{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;cursor:pointer}
+  .msgaudio .abar span{display:block;height:100%;width:0;background:var(--fill-primary)}
+  .msgaudio .adur{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  @media(max-width:620px){ .msgaudio{min-width:0;max-width:100%} .composer.grabando .recmax{display:none} }
