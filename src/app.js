@@ -455,7 +455,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // los "no leídos" son de cada persona, no del equipo
     if(d.chatSeen&&Object.values(d.chatSeen).some(v=>typeof v==="number"))d.chatSeen={};
     Object.keys(d.chatSeen||{}).forEach(p=>{ if(!d.chatSeen[p]||typeof d.chatSeen[p]!=="object")d.chatSeen[p]={}; });
-    const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due=""; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
+    const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due="";
+      if(k.avances!=null)k.avances=Array.isArray(k.avances)?k.avances.filter(a=>a&&typeof a.text==="string"&&a.id):[]; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
       if(!Array.isArray(k.owners))k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; k.owners=k.owners.map(o=>String(o).trim()).filter(Boolean); delete k.owner;
       if(!Array.isArray(k.files))k.files=[];
       if(k.prio==null||!PRIO[k.prio])k.prio="";
@@ -507,7 +508,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(selId&&!N(selId))closePanel();
     if(taskOpen&&!curTask())closeTask();
     if(panelOpen&&N(selId))renderPanelBody(N(selId));
-    if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); syncTaskDone(curTask()); }
+    if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); syncTaskDone(curTask()); }
     loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
   }
   // Mi porción privada: es lo único que sube a la tabla con permisos.
@@ -583,6 +584,53 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     renderActive(); save(); }
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
 
+  // ---------- AVANCES DE UNA TAREA ----------
+  // Cada novedad queda como una entrada con quién y cuándo; la más nueva es "lo
+  // actual" y las anteriores quedan como historia. Las Notas siguen aparte, para
+  // lo fijo (contactos, requisitos). Cualquiera puede corregir o borrar un
+  // avance: a veces hay que mejorar uno ya escrito.
+  const SIN_NOVEDADES_DIAS=14;
+  // Más nuevo primero; si dos tienen la misma hora, gana el que se agregó después.
+  function avancesDe(k){ if(!Array.isArray(k&&k.avances))return []; return k.avances.map((a,i)=>[a,i]).sort((x,y)=>((y[0].ts||0)-(x[0].ts||0))||(y[1]-x[1])).map(x=>x[0]); }
+  const ultimoAvance=k=>avancesDe(k)[0]||null;
+  const diasDesde=ts=>Math.max(0,Math.floor((nowMs()-(ts||0))/DAY));
+  function haceTxt(ts){ const n=diasDesde(ts); return n===0?"hoy":n===1?"ayer":"hace "+n+" días"; }
+  function fechaCorta(ts){ const d=new Date(ts); return dosCifras(d.getDate())+"/"+dosCifras(d.getMonth()+1); }
+  // En la tarjeta del tablero: casi invisible si está al día; amarillo si se quedó quieta.
+  function marcaAvance(k){ const u=ultimoAvance(k); if(!u)return "";
+    const n=diasDesde(u.ts), quieta=!k.done&&n>=SIN_NOVEDADES_DIAS;
+    return `<span class="kavance${quieta?" quieta":""}" title="Último avance: ${esc(u.by||"")} · ${esc(haceTxt(u.ts))}">${quieta?"sin novedades · "+n+" d":esc(haceTxt(u.ts))}</span>`; }
+  let avEdit=null;   // {id, text} mientras se corrige un avance
+  function renderTAvances(){ const box=document.getElementById("tAvances"); if(!box)return; const k=curTask(); if(!k){ box.innerHTML=""; return; }
+    // Si se estaba corrigiendo uno, lo tipeado sobrevive al redibujo.
+    const ed=box.querySelector("textarea.aved"); if(ed&&avEdit)avEdit.text=ed.value;
+    const lista=avancesDe(k);
+    box.innerHTML=lista.length?lista.map((a,i)=>{ const editando=avEdit&&avEdit.id===a.id;
+      return `<div class="avrow${i===0?" actual":""}" data-av="${esc(a.id)}">${avatarMarkup(a.by||"?","av")}<div class="avbody"><div class="avwho">${esc(a.by||"")} · ${esc(haceTxt(a.ts))} · ${esc(fechaCorta(a.ts))}${a.ed?" · editado":""}${i===0?'<span class="avnow">actual</span>':""}</div>`
+        +(editando?`<textarea class="txt aved" rows="2"></textarea><div class="avedbtns"><button class="rowbtn" data-avok>Guardar</button><button class="rowbtn" data-avno>Cancelar</button></div>`:`<div class="avtxt">${conLinks(a.text)}</div>`)
+        +`</div>${editando?"":`<div class="avacts"><button class="avb" data-aved title="Corregir">${ICO.lapiz}</button><button class="avb" data-avdel title="Borrar">✕</button></div>`}</div>`; }).join("")
+      :`<div class="avvacio">Todavía no hay avances. El primero que escribas queda como el estado actual.</div>`;
+    const ta=box.querySelector("textarea.aved"); if(ta){ ta.value=avEdit.text; autoAlto(ta); ta.focus(); try{ ta.setSelectionRange(ta.value.length,ta.value.length); }catch(e){}
+      ta.addEventListener("input",()=>{ avEdit.text=ta.value; autoAlto(ta); });
+      ta.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); guardarAvEdit(); } if(e.key==="Escape"){ e.stopPropagation(); avEdit=null; renderTAvances(); } }); }
+    box.querySelectorAll("[data-av]").forEach(row=>{ const id=row.dataset.av;
+      const bE=row.querySelector("[data-aved]"); if(bE)bE.addEventListener("click",()=>{ const a=(curTask().avances||[]).find(x=>x.id===id); if(!a)return; avEdit={id,text:a.text}; renderTAvances(); });
+      const bD=row.querySelector("[data-avdel]"); if(bD)bD.addEventListener("click",()=>confirmar("Se borra este avance de la tarea, para todos.",()=>{ const k2=curTask(); if(!k2||!k2.avances)return; k2.avances=k2.avances.filter(x=>x.id!==id); save(); renderTAvances(); renderActive(); },{title:"Borrar avance",yes:"Borrar"}));
+      const ok=row.querySelector("[data-avok]"); if(ok)ok.addEventListener("click",guardarAvEdit);
+      const no=row.querySelector("[data-avno]"); if(no)no.addEventListener("click",()=>{ avEdit=null; renderTAvances(); }); }); }
+  function guardarAvEdit(){ if(!avEdit)return; const k=curTask(); const a=k&&(k.avances||[]).find(x=>x.id===avEdit.id);
+    const t=(avEdit.text||"").trim(); avEdit=null;
+    if(a&&t&&t!==a.text){ a.text=t; a.ed=nowMs(); save(); renderActive(); }
+    renderTAvances(); }
+  function agregarAvance(){ const inp=document.getElementById("tAvInput"); const k=curTask(); if(!inp||!k)return;
+    const t=inp.value.trim(); if(!t){ inp.focus(); return; }
+    if(!Array.isArray(k.avances))k.avances=[];
+    k.avances.push({id:"a"+uid(),by:state.me||"",ts:nowMs(),text:t});
+    inp.value=""; autoAlto(inp); save(); renderTAvances(); renderActive(); }
+  // Los cuadros de texto de la ficha miden lo que tienen adentro (con un
+  // tope): no ocupan lugar de más, y se pueden estirar a mano como siempre.
+  function autoAlto(el,tope){ if(!el)return; el.style.height="auto"; el.style.height=Math.min(el.scrollHeight+2,tope||260)+"px"; }
+
   // ---------- NOTAS AL PASAR EL MOUSE ----------
   // Parado sobre una tarea (en Tareas, en Estructura o en Mi panel: listas,
   // Mi foco y calendario), a los ~0,4 s aparece un
@@ -597,9 +645,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function ocultarNotas(){ clearTimeout(tipTimer); tipTimer=null; tipSobre=null; tipNotas.classList.remove("on"); }
   // Cada vista marca la tarea con su propio atributo; el id es el mismo.
   const idTip=el=>el.dataset.item||el.dataset.task||el.dataset.priv||el.dataset.tipitem;
-  function mostrarNotas(el){ const k=tareaPorId(idTip(el)); const notas=k?String(k.notas||"").trim():"";
-    if(!notas){ ocultarNotas(); return; }
-    tipNotas.innerHTML=`<div class="tiplab">Notas</div><div class="tiptxt">${esc(notas)}</div>`;
+  // Muestra el último avance: en qué está la tarea. Sin avances, no aparece nada.
+  function mostrarNotas(el){ const k=tareaPorId(idTip(el)); const u=k?ultimoAvance(k):null;
+    if(!u){ ocultarNotas(); return; }
+    tipNotas.innerHTML=`<div class="tiplab">Último avance · ${esc(u.by||"")} · ${esc(haceTxt(u.ts))}</div><div class="tiptxt">${esc(u.text)}</div>`;
     tipNotas.style.left="0px"; tipNotas.style.top="0px"; tipNotas.classList.add("on");
     const r=el.getBoundingClientRect(), tw=tipNotas.offsetWidth, th=tipNotas.offsetHeight;
     let top=r.bottom+6; if(top+th>innerHeight-8)top=Math.max(8,r.top-th-6);
@@ -1172,7 +1221,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.dataset.item=k.id; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -2450,9 +2499,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); updateAvisos(); } }
     drawer.classList.remove("on"); panelOpen=false;
     tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
+    avEdit=null; const avIn=document.getElementById("tAvInput"); if(avIn){ avIn.value=""; }
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
-    renderTOwners(); renderTBelong(); renderTFiles();
-    taskDrawer.classList.add("on"); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
+    renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances();
+    taskDrawer.classList.add("on"); requestAnimationFrame(()=>{ autoAlto(tObj); autoAlto(tNotas); autoAlto(document.getElementById("tAvInput")); }); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
   function closeTask(){ taskOpen=false; taskDrawer.classList.remove("on"); scrim.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); if(active==="panel")renderPanel(); }
   function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done;
     tTitle.classList.toggle("done",!!k.done);
@@ -2540,8 +2590,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   tDueTime.addEventListener("change",()=>{ const k=curTask(); if(!k)return;
     if(tDueTime.value&&!k.due){ tDueTime.value=""; note("Poné primero la fecha: una hora sola no se puede ubicar en el calendario."); return; }
     k.dueTime=tDueTime.value; save(); renderActive(); });
-  tObj.addEventListener("input",()=>{ const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
-  tNotas.addEventListener("input",()=>{ const k=curTask(); if(k){k.notas=tNotas.value;save();} });
+  tObj.addEventListener("input",()=>{ autoAlto(tObj); const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
+  tNotas.addEventListener("input",()=>{ autoAlto(tNotas); const k=curTask(); if(k){k.notas=tNotas.value;save();} });
+  document.getElementById("tAvAdd").addEventListener("click",agregarAvance);
+  document.getElementById("tAvInput").addEventListener("input",e=>autoAlto(e.target,160));
+  document.getElementById("tAvInput").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); agregarAvance(); } });
   document.getElementById("tDel").addEventListener("click",()=>{ const k=curTask(); if(!k)return;
     const titulo=k.title||"Tarea"; const copia=JSON.parse(JSON.stringify(k)); const nodoId=selTaskNode;
     if(isPriv()){ const arr=privList(); if(!arr){ note("No pudimos identificarte para borrarla."); return; }

@@ -1482,3 +1482,30 @@
 .msgaudio .avel{flex:none;min-width:34px;height:22px;padding:0 6px;border-radius:var(--r-pill);border:1px solid var(--line);
   background:var(--surface);color:var(--ink-soft);font:600 11px var(--font-mono);cursor:pointer}
 .msgaudio .avel:hover{color:var(--ink);border-color:var(--wood)}
+
+/* Avances de una tarea: la más nueva arriba, marcada como "actual". */
+textarea.txt.autoalto{min-height:34px;overflow-y:auto}
+.avadd{display:flex;gap:8px;align-items:flex-end;margin-bottom:6px}
+.avadd textarea{flex:1;min-width:0;resize:none;min-height:34px}
+.avlist{display:flex;flex-direction:column}
+.avrow{display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line-soft);position:relative}
+.avrow .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-person);flex:none;margin-top:1px}
+.avbody{flex:1;min-width:0}
+.avwho{font-size:11.5px;color:var(--ink-faint);margin-bottom:2px}
+.avnow{margin-left:6px;font-size:10.5px;padding:1px 7px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--wood) 20%,transparent);color:var(--wood-deep)}
+.avtxt{font-size:13px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-soft)}
+.avrow.actual .avtxt{color:var(--ink)}
+.avtxt .msglink{color:var(--wood-deep);text-decoration:underline;text-underline-offset:2px}
+.avacts{display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.avrow:hover .avacts,.avacts:focus-within{opacity:1}
+@media (hover:none){ .avacts{opacity:.6} }
+.avb{border:none;background:none;color:var(--ink-faint);cursor:pointer;padding:2px 4px;font-size:12px;display:inline-flex;align-items:center}
+.avb:hover{color:var(--wood-deep)}
+.avb .ico{width:14px;height:14px}
+.avedbtns{display:flex;gap:6px;margin-top:6px}
+.avvacio{font-size:12.5px;color:var(--ink-faint);padding:4px 0}
+/* En la tarjeta del tablero: cuándo fue el último avance. Minimalista; en
+   amarillo solo si la tarea lleva 14 días o más sin novedades. */
+.kcard .kavance{font-size:10.5px;color:var(--ink-faint);white-space:nowrap}
+.kcard .kavance.quieta{color:#8a5a00;background:#fff1c7;border-radius:var(--r-pill);padding:0 6px}
+[data-theme="dark"] .kcard .kavance.quieta{color:#ffd978;background:rgba(255,200,60,.14)}
