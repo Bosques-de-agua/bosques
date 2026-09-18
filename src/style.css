@@ -1509,3 +1509,10 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .kcard .kavance{font-size:10.5px;color:var(--ink-faint);white-space:nowrap}
 .kcard .kavance.quieta{color:#8a5a00;background:#fff1c7;border-radius:var(--r-pill);padding:0 6px}
 [data-theme="dark"] .kcard .kavance.quieta{color:#ffd978;background:rgba(255,200,60,.14)}
+
+/* "En espera": de quién y desde hace cuánto, en la tarjeta del tablero. */
+#tEsperaRow[hidden]{display:none}
+.tespdesde{font-weight:400;color:var(--ink-faint);text-transform:none;letter-spacing:0}
+.kcard .kespera{font-size:10.5px;white-space:nowrap;border-radius:var(--r-pill);padding:0 6px;
+  color:color-mix(in srgb,var(--s-espera,#b8860b) 80%,var(--ink));background:color-mix(in srgb,var(--s-espera,#b8860b) 16%,transparent);
+  max-width:100%;overflow:hidden;text-overflow:ellipsis}

@@ -347,7 +347,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function newTask(){ return {id:"i"+uid(),title:"",owners:[],status:"sin",prio:"",due:"",dueTime:"",notas:"",objetivo:"",done:false,doneAt:null,archived:false,archivedAt:null,files:[]}; }
   function archiveTask(k){ if(k.status!=="listo")setStatus(k,"listo"); if(!k.doneAt)k.doneAt=nowMs(); k.archived=true; k.archivedAt=nowMs(); }
   function newNode(o){ const id=uid(); state.nodes[id]=Object.assign({id,kind:"neuron",parent:null,children:[],x:0,y:0,prio:"media",hue:null,scale:1,objetivo:"",contexto:"",encargados:[],links:[],items:[]},o); return id; }
-  function setStatus(k,st){ k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
+  // "En espera": se anota solo desde cuándo, y de quién lo escribe cada uno
+  // en la ficha. Al salir de la espera se limpia, así no queda un "espera a…"
+  // viejo si la tarea vuelve a esperar a otra persona.
+  function setStatus(k,st){ if(st==="espera"&&k.status!=="espera")k.esperaDesde=nowMs();
+    if(st!=="espera"){ delete k.esperaDesde; delete k.esperaDe; }
+    k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
   function setDone(k,val){ setStatus(k, val?"listo":(k.status==="listo"?"curso":k.status)); }
   function nowMs(){ return new Date().getTime(); }
 
@@ -600,6 +605,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function marcaAvance(k){ const u=ultimoAvance(k); if(!u)return "";
     const n=diasDesde(u.ts), quieta=!k.done&&n>=SIN_NOVEDADES_DIAS;
     return `<span class="kavance${quieta?" quieta":""}" title="Último avance: ${esc(u.by||"")} · ${esc(haceTxt(u.ts))}">${quieta?"sin novedades · "+n+" d":esc(haceTxt(u.ts))}</span>`; }
+  function marcaEspera(k){ if(k.status!=="espera")return ""; const quien=String(k.esperaDe||"").trim();
+    const nd=k.esperaDesde?diasDesde(k.esperaDesde):null, d=nd===null?"":nd===0?" · hoy":" · "+nd+" d";
+    if(!quien&&!d)return "";
+    return `<span class="kespera" title="En espera${quien?" de "+esc(quien):""}${k.esperaDesde?" desde el "+esc(fechaCorta(k.esperaDesde)):""}">${quien?"espera a "+esc(quien):"en espera"}${d}</span>`; }
+  function syncEspera(k){ const row=document.getElementById("tEsperaRow"); if(!row)return;
+    const en=!!k&&k.status==="espera"; row.hidden=!en; if(!en)return;
+    const inp=document.getElementById("tEsperaDe"); if(document.activeElement!==inp)inp.value=k.esperaDe||"";
+    document.getElementById("tEsperaDesde").textContent=k.esperaDesde?"· desde el "+fechaCorta(k.esperaDesde)+" ("+haceTxt(k.esperaDesde)+")":""; }
   let avEdit=null;   // {id, text} mientras se corrige un avance
   function renderTAvances(){ const box=document.getElementById("tAvances"); if(!box)return; const k=curTask(); if(!k){ box.innerHTML=""; return; }
     // Si se estaba corrigiendo uno, lo tipeado sobrevive al redibujo.
@@ -697,6 +710,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     {id:"tTitle",  set:v=>{ const k=curTask(); if(k)k.title=v; }},
     {id:"tObj",    set:v=>{ const k=curTask(); if(k)k.objetivo=v; }},
     {id:"tNotas",  set:v=>{ const k=curTask(); if(k)k.notas=v; }},
+    {id:"tEsperaDe", set:v=>{ const k=curTask(); if(k&&k.status==="espera")k.esperaDe=v; }},
     {id:"weekGoals", set:v=>{ state.weekGoals=v; }},
   ];
   function reaplicarEdicionEnCurso(){
@@ -1221,7 +1235,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.dataset.item=k.id; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaEspera(k)}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -2504,7 +2518,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances();
     taskDrawer.classList.add("on"); requestAnimationFrame(()=>{ autoAlto(tObj); autoAlto(tNotas); autoAlto(document.getElementById("tAvInput")); }); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
   function closeTask(){ taskOpen=false; taskDrawer.classList.remove("on"); scrim.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); if(active==="panel")renderPanel(); }
-  function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done;
+  function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done; syncEspera(k);
     tTitle.classList.toggle("done",!!k.done);
     // innerHTML y no textContent: el icono es un SVG, y con textContent se
     // imprimía el código tal cual. Iba entre comillas rectas, así que además
@@ -2593,6 +2607,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   tObj.addEventListener("input",()=>{ autoAlto(tObj); const k=curTask(); if(k){k.objetivo=tObj.value;save();} });
   tNotas.addEventListener("input",()=>{ autoAlto(tNotas); const k=curTask(); if(k){k.notas=tNotas.value;save();} });
   document.getElementById("tAvAdd").addEventListener("click",agregarAvance);
+  document.getElementById("tEsperaDe").addEventListener("input",e=>{ const k=curTask(); if(k&&k.status==="espera"){ k.esperaDe=e.target.value; save(); } });
   document.getElementById("tAvInput").addEventListener("input",e=>autoAlto(e.target,160));
   document.getElementById("tAvInput").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); agregarAvance(); } });
   document.getElementById("tDel").addEventListener("click",()=>{ const k=curTask(); if(!k)return;
