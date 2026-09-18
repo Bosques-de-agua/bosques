@@ -1458,3 +1458,22 @@
   /* Ninguna ventana emergente puede ser más alta que la pantalla: sin esto, en
      una notebook chica el botón de abajo quedaba afuera y no había cómo llegar. */
   .modal .box{max-height:calc(100dvh - 24px);overflow:auto}
+
+/* Foto de un grupo del chat: se elige en el formulario del grupo y se ve en
+   la lista de canales y en la cabecera. */
+.gmfoto{display:flex;align-items:center;gap:10px}
+.gmav{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none}
+.gmav .ico{width:20px;height:20px;color:var(--on-person)}
+#gmFotoQuitar[hidden]{display:none}
+.chathead .headav{display:inline-grid;width:22px;height:22px;border-radius:50%;vertical-align:-5px;margin-right:2px}
+
+/* Menciones (@nombre): la lista que se abre al escribir "@" y cómo se ven
+   en el mensaje. La que te nombra a vos se nota más. */
+.composer{position:relative}
+.mencionpop{position:absolute;left:14px;bottom:calc(100% - 6px);min-width:180px;max-width:calc(100% - 28px);max-height:220px;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:4px;z-index:30}
+.mencionpop .menop{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r-sm);cursor:pointer;font-size:13.5px}
+.mencionpop .menop.on,.mencionpop .menop:hover{background:var(--surface-2)}
+.mencionpop .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-person);flex:none}
+.msg .mencion{font-weight:600;color:var(--wood-deep)}
+.msg .mencion.yo{background:color-mix(in srgb,var(--wood) 22%,transparent);border-radius:4px;padding:0 3px}

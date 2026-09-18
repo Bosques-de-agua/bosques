@@ -1402,7 +1402,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(chan.startsWith("grp:")){ const g=groupOf(chan); if(!g)return []; return g.msgs||(g.msgs=[]); }
     const other=chan.slice(3), me=state.me||""; if(!me||!other||other===me)return [];
     const k=dmKey(me,other); return state.chat.dm[k]||(state.chat.dm[k]=[]); }
-  function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return ICO.grupo+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
+  // La foto de un grupo: 80x80 en JPEG (~4 KB), guardada adentro del grupo,
+  // igual que las de perfil. Solo se acepta un data URL de imagen: la escribe
+  // cualquiera del equipo y termina adentro de un style="".
+  const fotoValida=u=>typeof u==="string"&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(u);
+  function grupoAv(g,cls){ if(g&&fotoValida(g.foto))return `<span class="${cls} hasimg" style="background-image:url('${g.foto}')"></span>`;
+    return `<span class="${cls}" style="background:var(--accent-priv)">${ICO.grupo}</span>`; }
+  function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return (fotoValida(g.foto)?grupoAv(g,"av headav"):ICO.grupo)+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
 
   // ---------- EMOJIS, RESPUESTAS Y TILDES ----------
   // Emojis a mano. No es un teclado completo a propósito: una grilla corta se
@@ -1534,7 +1540,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return n?`<span class="channuevo" title="${n===1?"1 mensaje sin leer":n+" mensajes sin leer"}">${n>9?"9+":n}</span>`:""; };
     const cls=chan=>`chanitem ${chan===chatChan?"on":""}${(chan!==chatChan&&sinLeerDe(chan))?" nuevo":""}`;
     list.innerHTML=`<div class="chsec">Canales</div><div class="${cls("team")}" data-ch="team"><span class="av" style="background:var(--wood)">${ICO.equipo}</span><span class="chname">Equipo</span>${aviso("team")}</div>`+
-      myGroups().map(g=>`<div class="${cls("grp:"+g.id)}" data-ch="grp:${g.id}"><span class="av" style="background:var(--accent-priv)">${ICO.grupo}</span><span class="chname">${esc(g.name)}</span>${aviso("grp:"+g.id)}</div>`).join("")+
+      myGroups().map(g=>`<div class="${cls("grp:"+g.id)}" data-ch="grp:${g.id}">${grupoAv(g,"av")}<span class="chname">${esc(g.name)}</span>${aviso("grp:"+g.id)}</div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
       allPeople().filter(p=>p&&p!==me).map(p=>`<div class="${cls("dm:"+p)}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span>${aviso("dm:"+p)}</div>`).join("");
@@ -1619,9 +1625,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       while(/[.,;:!?'»”\]]$/.test(u)||(/\)$/.test(u)&&(u.split("(").length<u.split(")").length)))u=u.slice(0,-1);
       if(!u)continue;
       const href=/^www\./i.test(u)?"https://"+u:u;
-      out+=esc(s.slice(desde,m.index))+`<a class="msglink" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`+verBtn({url:href,name:u,kind:kindOfUrl(href)});
+      out+=conMenciones(s.slice(desde,m.index))+`<a class="msglink" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`+verBtn({url:href,name:u,kind:kindOfUrl(href)});
       desde=m.index+u.length; RE_LINK.lastIndex=desde; }
-    return out+esc(s.slice(desde)); }
+    return out+conMenciones(s.slice(desde)); }
   function msgHTML(m,me){ const mm=(m.from===me);
     if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev||!veoEvento(ev))return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div>${esParaTodos(ev)?"":`<div class="evpara">${ICO.candado}<span>${esc(invitadosDe(ev).join(", "))}</span></div>`}<div class="rsvp">${puedeResponder(ev)?`<button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button>`:""}<span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
@@ -1661,7 +1667,51 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // Solo cuenta si el mensaje al que respondés sigue en este canal.
     if(respondiendoA&&msgPorId(respondiendoA))m.re=respondiendoA;
     respondiendoA=null;
-    msgsOf(chatChan).push(m); inp.value=""; ajustarAlto(); save(); renderChat(); }
+    msgsOf(chatChan).push(m); inp.value=""; cerrarMencion(); ajustarAlto(); save(); renderChat(); }
+  // ---------- MENCIONES (@nombre) ----------
+  // Al escribir "@" se abre la lista de la gente del canal. Se guarda como
+  // texto común ("@Juampi"): no hace falta nada nuevo en la base, y al
+  // mostrar el mensaje se resalta, más fuerte si la mención es a vos.
+  function genteDelCanal(chan){ const me=state.me; let g;
+    if(chan==="team"){ g=nombresEquipo(); if(!g.length)g=allPeople(); }
+    else if(chan.startsWith("grp:")){ const gr=groupOf(chan); g=gr?(gr.members||[]):[]; }
+    else g=[chan.slice(3)];
+    return [...new Set(g)].filter(p=>p&&p!==me); }
+  let mencion=null;   // {desde, opciones, sel} mientras la lista está abierta
+  function cerrarMencion(){ mencion=null; const p=document.getElementById("mencionPop"); if(p)p.remove(); }
+  function buscarMencion(){ const inp=document.getElementById("msgInput"); if(!inp)return;
+    const antes=inp.value.slice(0,inp.selectionStart||0);
+    const m=antes.match(/(^|\s)@([^\s@]*)$/u); if(!m){ cerrarMencion(); return; }
+    const q=norm(m[2]); const ops=genteDelCanal(chatChan).filter(p=>norm(p).startsWith(q)).sort((a,b)=>a.localeCompare(b));
+    if(!ops.length){ cerrarMencion(); return; }
+    const desde=antes.length-m[2].length-1;
+    mencion={desde,opciones:ops,sel:mencion&&mencion.desde===desde?Math.min(mencion.sel,ops.length-1):0};
+    pintarMencion(); }
+  function pintarMencion(){ const inp=document.getElementById("msgInput"), c=inp&&inp.closest(".composer"); if(!c||!mencion)return;
+    let p=document.getElementById("mencionPop");
+    if(!p){ p=document.createElement("div"); p.id="mencionPop"; p.className="mencionpop"; p.setAttribute("role","listbox"); c.appendChild(p);
+      // mousedown y no click: el click llega después de que el cajón perdió el foco.
+      p.addEventListener("mousedown",e=>{ const b=e.target.closest("[data-men]"); if(!b)return; e.preventDefault(); elegirMencion(b.dataset.men); }); }
+    p.innerHTML=mencion.opciones.map((n,i)=>`<div class="menop${i===mencion.sel?" on":""}" data-men="${esc(n)}" role="option">${avatarMarkup(n,"av")}<span>${esc(n)}</span></div>`).join(""); }
+  function elegirMencion(nombre){ const inp=document.getElementById("msgInput"); if(!inp||!mencion)return;
+    const fin=inp.selectionStart||0, txt="@"+nombre+" ";
+    inp.value=inp.value.slice(0,mencion.desde)+txt+inp.value.slice(fin);
+    const p=mencion.desde+txt.length; cerrarMencion(); inp.focus(); try{ inp.setSelectionRange(p,p); }catch(e){} ajustarAlto(); }
+  // Devuelve true si la tecla era para la lista (y no hay que hacer nada más).
+  function teclaMencion(e){ if(!mencion)return false; const n=mencion.opciones.length;
+    if(e.key==="ArrowDown"){ mencion.sel=(mencion.sel+1)%n; pintarMencion(); }
+    else if(e.key==="ArrowUp"){ mencion.sel=(mencion.sel-1+n)%n; pintarMencion(); }
+    else if((e.key==="Enter"&&!e.shiftKey)||e.key==="Tab"){ elegirMencion(mencion.opciones[mencion.sel]); }
+    else if(e.key==="Escape"){ cerrarMencion(); }
+    else return false;
+    e.preventDefault(); e.stopPropagation(); return true; }
+  // Al mostrar: "@Nombre" solo cuenta si Nombre es alguien del equipo.
+  function conMenciones(s){ const nombres=[...new Set(allPeople().concat(nombresEquipo()))].filter(Boolean).sort((a,b)=>b.length-a.length);
+    if(!nombres.length||s.indexOf("@")<0)return esc(s);
+    const re=new RegExp("@("+nombres.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")(?![\\p{L}\\p{N}_])","giu");
+    const me=norm(state.me||""); let out="", desde=0, m;
+    while((m=re.exec(s))){ out+=esc(s.slice(desde,m.index))+`<span class="mencion${norm(m[1])===me?" yo":""}">${esc(m[0])}</span>`; desde=m.index+m[0].length; }
+    return out+esc(s.slice(desde)); }
   // El cajón crece con lo que se escribe, hasta un tope (después, scroll).
   function ajustarAlto(){ const inp=document.getElementById("msgInput"); if(!inp)return;
     inp.style.height="auto"; inp.style.height=inp.scrollHeight+2+"px"; }
@@ -1891,7 +1941,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     myGroups().forEach(g=>{ u+=sinLeerDe("grp:"+g.id); });
     return u; }
   // ---------- grupos de chat ----------
-  let grpEditId=null, grpMembers=[];
+  let grpEditId=null, grpMembers=[], grpFoto="";
+  function pintarGrpFoto(){ const p=document.getElementById("gmFotoPrev"); if(!p)return;
+    p.outerHTML=grupoAv({foto:grpFoto},"gmav").replace("<span ",'<span id="gmFotoPrev" ');
+    document.getElementById("gmFotoBtn").textContent=grpFoto?"Cambiar foto":"Elegir foto";
+    document.getElementById("gmFotoQuitar").hidden=!grpFoto; }
   function openGroupModal(gid){ const me=state.me;
     if(!me){ note("No pudimos identificarte para armar un grupo."); return; }
     grpEditId=gid; const g=gid?groupsAll()[gid]:null;
@@ -1899,6 +1953,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.getElementById("gmTitle").textContent=g?"Editar grupo":"Nuevo grupo";
     document.getElementById("gmName").value=g?g.name:"";
     document.getElementById("gmDel").style.display=g?"":"none";
+    grpFoto=(g&&fotoValida(g.foto))?g.foto:""; pintarGrpFoto();
     renderGrpMembers();
     document.getElementById("groupModal").classList.add("on"); setTimeout(()=>document.getElementById("gmName").focus(),40); }
   function renderGrpMembers(){ const me=state.me;
@@ -1910,8 +1965,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!name){ note("Ponele un nombre al grupo."); return; }
     if(grpMembers.length<2){ note("Un grupo necesita al menos dos personas."); return; }
     const gs=groupsAll();
-    if(grpEditId&&gs[grpEditId]){ gs[grpEditId].name=name; gs[grpEditId].members=grpMembers.slice(); }
-    else { const id="g"+uid(); gs[id]={id,name,members:grpMembers.slice(),msgs:[],by:state.me||""}; chatChan="grp:"+id; }
+    let g;
+    if(grpEditId&&gs[grpEditId]){ g=gs[grpEditId]; g.name=name; g.members=grpMembers.slice(); }
+    else { const id="g"+uid(); g=gs[id]={id,name,members:grpMembers.slice(),msgs:[],by:state.me||""}; chatChan="grp:"+id; }
+    if(grpFoto)g.foto=grpFoto; else delete g.foto;
     save(); closeGM(); renderChat(); }
   function delGM(){ const gid=grpEditId, gs=groupsAll(), g=gs[gid]; if(!g)return; closeGM();
     confirmar(`Se borra el grupo "${g.name}" y todos sus mensajes, para todos los que están adentro.`,()=>{ delete gs[gid]; if(chatChan==="grp:"+gid)chatChan="team"; save(); renderChat(); },{title:"Eliminar grupo",yes:"Eliminar",danger:true}); }
@@ -2496,6 +2553,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("gmCancel").addEventListener("click",closeGM);
   document.getElementById("gmSave").addEventListener("click",saveGM);
   document.getElementById("gmDel").addEventListener("click",delGM);
+  document.getElementById("gmFotoBtn").addEventListener("click",()=>document.getElementById("gmFotoFile").click());
+  document.getElementById("gmFotoQuitar").addEventListener("click",()=>{ grpFoto=""; pintarGrpFoto(); });
+  document.getElementById("gmFotoFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value="";
+    if(!f)return; if(!/^image\//.test(f.type||"")){ note("Elegí una imagen."); return; }
+    loadAvatar(f,u=>{ grpFoto=u; pintarGrpFoto(); }); });
   document.getElementById("groupModal").addEventListener("click",e=>{ if(e.target.id==="groupModal")closeGM(); });
   document.getElementById("gmName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveGM(); } });
   document.getElementById("driveSearch").addEventListener("input",e=>{ driveQuery=e.target.value; renderDrive(); });
@@ -2549,9 +2611,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // Enter envía; Shift+Enter baja de renglón (lo hace solo el <textarea>).
   // `isComposing`: mientras el teclado arma un carácter (acentos, sugerencias
   // del celular), ese Enter es del teclado, no un "enviar".
-  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); sendMsg(); }
+  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(teclaMencion(e))return;
+    if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); sendMsg(); }
     if(e.key==="Escape"&&respondiendoA){ e.stopPropagation(); cancelarRespuesta(); } });
-  document.getElementById("msgInput").addEventListener("input",ajustarAlto);
+  document.getElementById("msgInput").addEventListener("input",()=>{ ajustarAlto(); buscarMencion(); });
+  document.getElementById("msgInput").addEventListener("blur",()=>setTimeout(cerrarMencion,120));
   document.getElementById("emojiBtn").addEventListener("click",e=>{ e.stopPropagation(); abrirEmojis(e.currentTarget,ponerEmoji); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });
   // cambiar de identidad afecta panel, chat, privadas y archivo: hay que refrescar todo y soltar lo que estaba abierto
