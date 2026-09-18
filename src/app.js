@@ -1637,8 +1637,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
-        +(m.text?`<div style="margin-top:6px">${conLinks(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
-    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${conLinks(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+        +(m.text?`<div class="msgtxt" style="margin-top:6px">${conLinks(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
+    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div class="msgtxt">${conLinks(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
   // Los botones del mensaje, arriba a la derecha. Aparecen al pasar por
   // encima; en pantalla táctil, siempre. Borrar es solo lo propio: hacía
   // falta igual, pero sobre todo porque un adjunto pesado se quedaba adentro
@@ -1661,7 +1661,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // Solo cuenta si el mensaje al que respondés sigue en este canal.
     if(respondiendoA&&msgPorId(respondiendoA))m.re=respondiendoA;
     respondiendoA=null;
-    msgsOf(chatChan).push(m); inp.value=""; save(); renderChat(); }
+    msgsOf(chatChan).push(m); inp.value=""; ajustarAlto(); save(); renderChat(); }
+  // El cajón crece con lo que se escribe, hasta un tope (después, scroll).
+  function ajustarAlto(){ const inp=document.getElementById("msgInput"); if(!inp)return;
+    inp.style.height="auto"; inp.style.height=inp.scrollHeight+2+"px"; }
   // ---------- AUDIOS ----------
   // Se graba con el micrófono de la compu, se sube al bucket privado y en el
   // mensaje queda solo la ruta (ver src/audios.js por qué no va adentro).
@@ -1719,7 +1722,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function ponerEmoji(e){ const inp=document.getElementById("msgInput"); if(!inp)return;
     const a=inp.selectionStart==null?inp.value.length:inp.selectionStart, b=inp.selectionEnd==null?a:inp.selectionEnd;
     inp.value=inp.value.slice(0,a)+e+inp.value.slice(b);
-    inp.focus(); const p=a+e.length; try{ inp.setSelectionRange(p,p); }catch(err){} }
+    inp.focus(); const p=a+e.length; try{ inp.setSelectionRange(p,p); }catch(err){} ajustarAlto(); }
   // Lo que se adjunta al chat NO se guarda aparte: viaja dentro de la misma
   // fila que comparte todo el equipo. O sea que el peso de un adjunto se lo
   // banca cada guardado de cada persona, para siempre. Con el limite viejo de
@@ -2543,8 +2546,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("recSend").addEventListener("click",enviarAudio);
   document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
   document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
-  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter")sendMsg();
+  // Enter envía; Shift+Enter baja de renglón (lo hace solo el <textarea>).
+  // `isComposing`: mientras el teclado arma un carácter (acentos, sugerencias
+  // del celular), ese Enter es del teclado, no un "enviar".
+  document.getElementById("msgInput").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); sendMsg(); }
     if(e.key==="Escape"&&respondiendoA){ e.stopPropagation(); cancelarRespuesta(); } });
+  document.getElementById("msgInput").addEventListener("input",ajustarAlto);
   document.getElementById("emojiBtn").addEventListener("click",e=>{ e.stopPropagation(); abrirEmojis(e.currentTarget,ponerEmoji); });
   document.getElementById("evModal").addEventListener("click",e=>{ if(e.target.id==="evModal")closeEv(); });
   // cambiar de identidad afecta panel, chat, privadas y archivo: hay que refrescar todo y soltar lo que estaba abierto

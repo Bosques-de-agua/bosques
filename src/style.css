@@ -649,6 +649,8 @@
   /* La cruz de borrar aparece al pasar por encima del propio mensaje; en
      pantalla táctil no hay "pasar por encima", así que ahí se ve siempre. */
   .msg{position:relative}
+  /* Los saltos de renglón (Shift+Enter) se respetan al mostrar el mensaje. */
+  .msg .msgtxt{white-space:pre-wrap}
   /* Links pegados en un mensaje. Una dirección larga no tiene espacios donde
      cortar y rompería la burbuja: se corta en cualquier letra. */
   .msg .msglink{color:var(--wood-deep);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;word-break:break-word}
@@ -736,10 +738,10 @@
   .rsvp button.yes.on{background:linear-gradient(180deg,color-mix(in srgb,var(--s-listo) 88%,#fff),var(--s-listo));color:var(--on-accent);border-color:color-mix(in srgb,var(--s-listo) 70%,#000);box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 14%,transparent),inset 0 1px 0 color-mix(in srgb,var(--sheen) 35%,transparent)}
   .rsvp button.no.on{background:linear-gradient(180deg,color-mix(in srgb,var(--s-bloq) 88%,#fff),var(--s-bloq));color:var(--on-accent);border-color:color-mix(in srgb,var(--s-bloq) 70%,#000);box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 14%,transparent),inset 0 1px 0 color-mix(in srgb,var(--sheen) 35%,transparent)}
   .rsvp .tally{font-size:11px;color:var(--ink-faint)}
-  .composer{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:10px;background:var(--panel)}
-  .composer input{flex:1;font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:9px 12px;outline:none}
-  .composer input:focus{border-color:var(--wood)}
-  .composer input:disabled{opacity:.6}
+  .composer{border-top:1px solid var(--line);padding:12px 14px;display:flex;align-items:flex-end;gap:10px;background:var(--panel)}
+  .composer #msgInput{flex:1;resize:none;overflow-y:auto;max-height:140px;line-height:1.4;font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:9px 12px;outline:none}
+  .composer #msgInput:focus{border-color:var(--wood)}
+  .composer #msgInput:disabled{opacity:.6}
   .previewbadge{font-size:10px;background:color-mix(in srgb,var(--sky) 20%,transparent);color:var(--sky);border-radius:var(--r-pill);padding:2px 9px;font-weight:700}
   .msgfile{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-ctl);padding:7px 9px;margin-top:2px}
   .msgfile .fic{font-size:17px;flex:none;line-height:1}
@@ -754,7 +756,7 @@
      pantalla. Medido a 390px: el botón terminaba en el píxel 549 de 390, o
      sea invisible e intocable. Es la misma trampa que dejó el selector
      Árbol/Mapa fuera de pantalla en su momento, y se arregla igual. */
-  .composer input{min-width:0}
+  .composer #msgInput{min-width:0}
   /* Y aun cediendo, en 390px le quedaban 64px para escribir. Con la lista de
      canales al lado no hay ancho para todo en un renglón: el cajón se lleva
      el primero entero y los botones bajan al segundo. */
@@ -769,7 +771,7 @@
        renglón. Cuántos son se ve al entrar. */
     .chanitem .channuevo{position:absolute;top:5px;right:5px;min-width:9px;width:9px;height:9px;padding:0;font-size:0}
     .composer{padding:10px 8px;gap:6px;flex-wrap:wrap}
-    .composer input{flex:1 0 100%;order:-1}
+    .composer #msgInput{flex:1 0 100%;order:-1}
     .composer .btn-primary{margin-left:auto;padding:9px 14px}
   }
   /* LOGIN */
