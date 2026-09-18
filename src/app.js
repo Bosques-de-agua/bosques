@@ -668,7 +668,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const left=Math.min(Math.max(8,r.left),innerWidth-tw-8);
     tipNotas.style.left=left+"px"; tipNotas.style.top=top+"px"; }
   if(conMouse){
-    document.addEventListener("mouseover",e=>{ const el=e.target.closest(".kcard[data-item], .taskrow[data-item], .listline[data-task], .listline[data-priv], .chipcal[data-tipitem]");
+    document.addEventListener("mouseover",e=>{ const el=e.target.closest(".kcard[data-item], .taskrow[data-item], .listline[data-task], .listline[data-priv], .chipcal[data-tipitem], .semline[data-task]");
       if(el===tipSobre)return; ocultarNotas(); if(!el)return;
       tipSobre=el; tipTimer=setTimeout(()=>{ if(tipSobre===el&&el.isConnected)mostrarNotas(el); },400); });
     ["pointerdown","dragstart","scroll","wheel"].forEach(ev=>document.addEventListener(ev,ocultarNotas,true));
@@ -723,7 +723,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(n)n.text=el.value;
       return; }
     const e=EDITORES.find(x=>x.id===el.id); if(!e)return;
-    try{ e.set(el.value); }catch(err){ console.error("No se pudo reaplicar la edición en curso:",err); }
+    try{ e.set(el.isContentEditable?sanearObjetivos(el.innerHTML):el.value); }catch(err){ console.error("No se pudo reaplicar la edición en curso:",err); }
   }
 
   // ---------- ESTADO DEL GUARDADO ----------
@@ -1173,17 +1173,18 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.addEventListener("click",()=>{ if(!openFdrop)return; document.querySelectorAll(".fmenu.on").forEach(m=>m.classList.remove("on")); openFdrop=null; });
   // La pestaña tiene dos lecturas del mismo trabajo: las tareas sueltas y los
   // temas con su encargado, que es un piso más arriba.
-  const tareasVista=()=>state.tareasVista==="temas"?"temas":"tareas";
-  function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg)wg.value=state.weekGoals||"";
+  const tareasVista=()=>(state.tareasVista==="temas"||state.tareasVista==="semana")?state.tareasVista:"tareas";
+  function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg&&!wg.contains(document.activeElement))wg.innerHTML=objetivosHTML(state.weekGoals);
     const v=tareasVista();
     const seg=document.getElementById("tareasViewSeg");
     if(seg)seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
     const tb=document.querySelector("#tab-tareas .tbar"), tb2=document.querySelector("#tab-tareas .tbar2");
-    if(tb)tb.hidden=v==="temas"; if(tb2)tb2.hidden=v==="temas";
-    const bar=document.getElementById("temasBar"), board=document.getElementById("temasBoard");
-    if(bar)bar.hidden=v!=="temas"; if(board)board.hidden=v!=="temas";
-    kanban.hidden=v==="temas";
+    if(tb)tb.hidden=v!=="tareas"; if(tb2)tb2.hidden=v!=="tareas";
+    const bar=document.getElementById("temasBar"), board=document.getElementById("temasBoard"), sem=document.getElementById("semanaBoard");
+    if(bar)bar.hidden=v!=="temas"; if(board)board.hidden=v!=="temas"; if(sem)sem.hidden=v!=="semana";
+    kanban.hidden=v!=="tareas";
     if(v==="temas"){ renderTemasBoard(); return; }
+    if(v==="semana"){ renderSemana(); return; }
     renderFilterBar(); const f=tfil(); const items=filteredItems(); kanban.innerHTML="";
     document.getElementById("taskCount").textContent=items.length+(items.length===1?" tarea":" tareas");
     // Agrupar por tema se sacó: generaba una columna por cada tema con tareas
@@ -1194,6 +1195,82 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       people.forEach(p=>{ if(f.people.length&&!f.people.includes(p))return; kanban.appendChild(makeCol(p,avColor(p),groups[p],{person:p})); });
       if(!f.people.length||f.people.includes("__none")) kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
     else { STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); } }
+  // ---------- OBJETIVOS DE LA SEMANA (con formato) ----------
+  // Es un solo texto compartido, ahora con negrita, título, cuatro colores y
+  // casilleros. Lo escribe cualquiera y se muestra como HTML en los cuatro
+  // navegadores: por eso pasa SIEMPRE por un saneado que solo deja esas
+  // etiquetas (sin esto, alguien podría meter código). Los textos viejos, sin
+  // formato, se muestran igual que antes.
+  const WG_COLORES={c1:"#b0563a",c2:"#1b6b4f",c3:"#3f6fb5",c4:"#8e4bc9"};
+  const WG_OK=new Set(Object.values(WG_COLORES));
+  const WG_TAGS=new Set(["B","STRONG","I","EM","U","H3","DIV","P","BR","UL","LI","FONT","INPUT"]);
+  function sanearObjetivos(html){ const t=document.createElement("template"); t.innerHTML=String(html||"");
+    const limpiar=nodo=>{ [...nodo.childNodes].forEach(n=>{
+      if(n.nodeType===3)return;
+      if(n.nodeType!==1||/^(SCRIPT|STYLE|TEMPLATE|IFRAME|OBJECT|SVG|MATH)$/i.test(n.tagName)){ n.remove(); return; }
+      limpiar(n);
+      if(!WG_TAGS.has(n.tagName)){ n.replaceWith(...n.childNodes); return; }
+      if(n.tagName==="INPUT"&&n.getAttribute("type")!=="checkbox"){ n.remove(); return; }
+      const color=n.tagName==="FONT"?String(n.getAttribute("color")||"").toLowerCase():"", marcado=n.tagName==="INPUT"&&n.hasAttribute("checked");
+      [...n.attributes].forEach(a=>n.removeAttribute(a.name));
+      if(n.tagName==="FONT"){ if(WG_OK.has(color))n.setAttribute("color",color); else { n.replaceWith(...n.childNodes); return; } }
+      if(n.tagName==="INPUT"){ n.setAttribute("type","checkbox"); if(marcado)n.setAttribute("checked",""); } }); };
+    limpiar(t.content); return t.innerHTML; }
+  function objetivosHTML(v){ const s=String(v||"");
+    if(!/<[a-z][\s\S]*>/i.test(s))return esc(s).replace(/\n/g,"<br>");   // texto viejo, sin formato
+    return sanearObjetivos(s); }
+  // Cada renglón de una lista de casilleros empieza con su casillero, también
+  // los que crea Enter.
+  function asegurarCasilleros(wg){ wg.querySelectorAll("ul > li").forEach(li=>{
+    const cbs=li.querySelectorAll("input"); cbs.forEach((c,i)=>{ if(i>0)c.remove(); });
+    if(!cbs.length){ const cb=document.createElement("input"); cb.type="checkbox"; li.insertBefore(cb,li.firstChild); }
+    else if(li.firstChild!==cbs[0])li.insertBefore(cbs[0],li.firstChild); }); }
+  // Enter dentro de la lista lo maneja la app: el del navegador clonaba el
+  // casillero de formas raras. Renglón con texto → uno nuevo debajo, con su
+  // casillero; renglón vacío → se sale de la lista.
+  function enterEnLista(wg,e){ const sel=getSelection(); if(!sel.rangeCount)return false;
+    let li=sel.anchorNode; while(li&&li!==wg&&li.tagName!=="LI")li=li.parentNode;
+    if(!li||li===wg)return false;
+    e.preventDefault();
+    const nuevo=li.textContent.trim()?document.createElement("li"):document.createElement("div");
+    if(nuevo.tagName==="LI"){ const cb=document.createElement("input"); cb.type="checkbox"; nuevo.appendChild(cb); }
+    nuevo.appendChild(document.createElement("br"));
+    if(nuevo.tagName==="LI")li.after(nuevo); else { const ul=li.parentNode; li.remove(); ul.after(nuevo); if(!ul.children.length)ul.remove(); }
+    const r=document.createRange(); r.setStart(nuevo,nuevo.childNodes.length-1); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+    guardarObjetivos(); return true; }
+  function guardarObjetivos(){ const wg=document.getElementById("weekGoals"); if(!wg)return;
+    const h=sanearObjetivos(wg.innerHTML); state.weekGoals=(wg.textContent.trim()||wg.querySelector("input"))?h:""; save(); }
+
+  // ---------- SEMANA: la revisión del lunes ----------
+  // Una lectura, no datos nuevos: se arma sola con lo que ya está cargado.
+  // Tocar una tarea abre su ficha, para resolverla ahí mismo en la reunión.
+  function renderSemana(){ const box=document.getElementById("semanaBoard"); if(!box)return;
+    const ahora=nowMs(), hoy=ymdLocal(new Date()), en=d=>ymdLocal(new Date(ahora+d*DAY));
+    const abiertas=activeItems().filter(x=>!x.k.done);
+    const terminadas=allItems().filter(x=>x.k.done&&x.k.doneAt&&ahora-x.k.doneAt<=7*DAY).sort((a,b)=>b.k.doneAt-a.k.doneAt);
+    const vencidas=abiertas.filter(x=>x.k.due&&x.k.due<hoy).sort((a,b)=>a.k.due<b.k.due?-1:1);
+    const proximas=abiertas.filter(x=>x.k.due&&x.k.due>=hoy&&x.k.due<=en(7)).sort((a,b)=>a.k.due<b.k.due?-1:1);
+    const sinMov=abiertas.map(x=>{ const u=ultimoAvance(x.k);
+        const dEsp=(x.k.status==="espera"&&x.k.esperaDesde)?diasDesde(x.k.esperaDesde):-1, dAv=u?diasDesde(u.ts):-1;
+        if(dEsp>=SIN_NOVEDADES_DIAS)return {x,d:dEsp,txt:(x.k.esperaDe?"espera a "+x.k.esperaDe:"en espera")+" · "+dEsp+" d"};
+        if(dAv>=SIN_NOVEDADES_DIAS)return {x,d:dAv,txt:dAv+" d sin novedades"};
+        return null; }).filter(Boolean).sort((a,b)=>b.d-a.d);
+    const sinResp=abiertas.filter(x=>!ownersOf(x.k).length&&x.k.due&&x.k.due<=en(14)).sort((a,b)=>a.k.due<b.k.due?-1:1);
+    const niNi=abiertas.filter(x=>!ownersOf(x.k).length&&!x.k.due).length;
+    const dm=ds=>{ const [y,m,d]=ds.split("-"); return d+"/"+m; };
+    const fila=(x,meta,cls)=>`<div class="semline" data-node="${esc(x.node.id)}" data-task="${esc(x.k.id)}"><span class="st">${esc(x.k.title||"Tarea")}</span><span class="sm${cls?" "+cls:""}">${esc(meta)}</span></div>`;
+    const quien=x=>{ const o=ownersOf(x.k); return o.length?o.join(", "):"sin responsable"; };
+    const bloque=(titulo,lista,html,extra,cls)=>`<section class="semblk"><h3>${titulo}<span class="semn${cls&&lista.length?" "+cls:""}">${lista.length}</span></h3>${lista.length?html:'<div class="semvacio">Nada por acá.</div>'}${extra||""}</section>`;
+    box.innerHTML=`<div class="semgrid">`
+      +bloque("Se terminó en los últimos 7 días",terminadas,terminadas.map(x=>fila(x,quien(x))).join(""))
+      +bloque("Vencidas",vencidas,vencidas.map(x=>fila(x,"venció "+dm(x.k.due)+" · "+quien(x),"mal")).join(""),"","mal")
+      +bloque("Vencen en los próximos 7 días",proximas,proximas.map(x=>fila(x,(x.k.due===hoy?"hoy":dm(x.k.due))+" · "+quien(x))).join(""))
+      +bloque("Sin movimiento",sinMov,sinMov.map(o=>fila(o.x,o.txt,"ojo")).join(""),"","ojo")
+      +bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,(x.k.due<hoy?"venció ":"vence ")+dm(x.k.due))).join(""),
+        niNi?`<div class="semnota">Además, ${niNi} tarea${niNi===1?" no tiene":"s no tienen"} fecha ni responsable.</div>`:"")
+      +`</div><p class="semayuda">Sin responsable muestra solo las que vencen en las próximas 2 semanas. Sin movimiento: 14 días o más sin avances, o esperando.</p>`;
+    box.querySelectorAll(".semline").forEach(r=>r.addEventListener("click",()=>openTask(r.dataset.node,r.dataset.task))); }
+
   // Los temas, en columnas por encargado: la misma lectura que "por persona"
   // de las tareas, un piso más arriba. Los que no tienen encargado quedan
   // afuera —son la mayoría y taparían lo demás—, pero se pueden pedir: ver
@@ -2718,7 +2795,25 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   ntModal.addEventListener("click",e=>{ if(e.target===ntModal)closeNT(); });
 
   fPerson.addEventListener("change",renderActive);
-  document.getElementById("weekGoals").addEventListener("input",e=>{ state.weekGoals=e.target.value; save(); });
+  { const wg=document.getElementById("weekGoals");
+    wg.addEventListener("input",()=>{ asegurarCasilleros(wg); guardarObjetivos(); });
+    wg.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing)enterEnLista(wg,e); });
+    // Tildar un casillero: el tilde tiene que quedar escrito en el HTML para que viaje.
+    wg.addEventListener("click",e=>{ const cb=e.target; if(!(cb&&cb.tagName==="INPUT"))return;
+      if(cb.checked)cb.setAttribute("checked",""); else cb.removeAttribute("checked"); guardarObjetivos(); });
+    // Pegar trae formato de cualquier lado: entra como texto.
+    wg.addEventListener("paste",e=>{ e.preventDefault(); const t=(e.clipboardData||window.clipboardData).getData("text/plain"); document.execCommand("insertText",false,t); });
+    document.getElementById("wgBar").addEventListener("mousedown",e=>{ const b=e.target.closest("[data-wg]"); if(!b)return; e.preventDefault();
+      if(!wg.contains(document.getSelection().anchorNode))wg.focus();
+      try{ document.execCommand("styleWithCSS",false,false); }catch(err){}
+      const c=b.dataset.wg;
+      if(c==="bold")document.execCommand("bold");
+      else if(c==="h3")document.execCommand("formatBlock",false,"h3");
+      else if(c==="p")document.execCommand("formatBlock",false,"div");
+      else if(c==="c0")document.execCommand("removeFormat");
+      else if(WG_COLORES[c])document.execCommand("foreColor",false,WG_COLORES[c]);
+      else if(c==="check"){ document.execCommand("insertHTML",false,'<ul><li><input type="checkbox"> </li></ul>'); asegurarCasilleros(wg); }
+      guardarObjetivos(); }); }
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
   document.getElementById("micBtn").addEventListener("click",empezarAudio);
   if(!grabadorDisponible())document.getElementById("micBtn").classList.add("sinmic");

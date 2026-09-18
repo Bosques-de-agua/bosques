@@ -139,13 +139,14 @@
         <li>El <b>casillero</b> de la tarjeta la marca como terminada. Las terminadas se archivan solas a los 7 días, o mandalas antes con el botón de archivar.</li>
         <li>Un clic en la tarjeta abre su ficha con objetivo, notas y responsables.</li>
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
-        <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button></div></h1>
-      <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><textarea id="weekGoals" autocapitalize="sentences" autocorrect="on" placeholder="¿Qué queremos lograr esta semana?"></textarea></div>
+        <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button></div></h1>
+      <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><div class="wgbar" id="wgBar" role="toolbar" aria-label="Formato de los objetivos"><button data-wg="bold" title="Negrita"><b>N</b></button><button data-wg="h3" title="Título">T</button><button data-wg="p" title="Texto normal" class="wgt">t</button><span class="wgsep"></span><button data-wg="c1" class="wgdot" title="Terracota"></button><button data-wg="c2" class="wgdot" title="Verde"></button><button data-wg="c3" class="wgdot" title="Azul"></button><button data-wg="c4" class="wgdot" title="Violeta"></button><button data-wg="c0" title="Quitar formato" class="wgt">✕</button><span class="wgsep"></span><button data-wg="check" title="Lista con casilleros">☑</button></div><div id="weekGoals" class="wgedit" contenteditable="true" spellcheck="true" data-ph="¿Qué queremos lograr esta semana?"></div></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
       <div class="tbar temasbar" id="temasBar" hidden></div>
       <div class="kanban temaboard" id="temasBoard" hidden></div>
+      <div class="semana" id="semanaBoard" hidden></div>
     </div></section>
 
 
