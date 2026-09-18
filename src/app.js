@@ -3036,7 +3036,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
 
   // Si llegaste desde una notificación, abrimos esa tarea directamente.
   try{ const q=new URLSearchParams(window.location.search);
-    if(q.get("vista")==="semana"){ state.tareasVista="semana"; showTab("tareas"); history.replaceState(null,"",window.location.pathname); } }catch(e){}
+    if(q.get("vista")==="semana"){ state.tareasVista="semana"; showTab("tareas"); history.replaceState(null,"",window.location.pathname); }
+    // El aviso de "se actualizó un documento" abre ese documento.
+    const doc=q.get("doc"); if(doc&&/^[a-z0-9-]+$/.test(doc)&&document.getElementById("tab-"+doc)){ showTab(doc); history.replaceState(null,"",window.location.pathname); } }catch(e){}
   try{ const q=new URLSearchParams(window.location.search); const tid=q.get("tarea");
     if(tid){ const hit=allItems().find(x=>x.k.id===tid);
       if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }
