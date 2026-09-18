@@ -1517,25 +1517,20 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
   color:color-mix(in srgb,var(--s-espera,#b8860b) 80%,var(--ink));background:color-mix(in srgb,var(--s-espera,#b8860b) 16%,transparent);
   max-width:100%;overflow:hidden;text-overflow:ellipsis}
 
-/* Objetivos de la semana con formato. Los colores se guardan como un valor
-   fijo pero se pintan con variables, así se leen bien en claro y en oscuro. */
-:root{--wg1:#a4502f;--wg2:#1b6b4f;--wg3:#2f5f9f;--wg4:#7c3fb3}
-[data-theme="dark"]{--wg1:#f0a07c;--wg2:#7fd3aa;--wg3:#8fb6ee;--wg4:#c9a2f0}
-.wgbar{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin:0 0 6px}
-.wgbar button{height:26px;min-width:28px;padding:0 7px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);border-radius:var(--r-sm);cursor:pointer;font:inherit;font-size:12.5px}
+/* Objetivos de la semana: negrita, dos títulos y casilleros. La barra va
+   arriba a la derecha, en el mismo renglón que el rótulo. */
+.weekgoals .wghead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.weekgoals .wghead .wglab{margin-bottom:0}
+.wgbar{display:flex;align-items:center;gap:3px;flex:none}
+.wgbar button{height:24px;min-width:26px;padding:0 6px;border:1px solid var(--line);background:transparent;color:var(--ink-faint);border-radius:var(--r-sm);cursor:pointer;font:inherit;font-size:11.5px;line-height:1}
 .wgbar button:hover{border-color:var(--wood);color:var(--ink)}
-.wgbar .wgt{font-size:11px}
-.wgbar .wgdot{min-width:18px;width:18px;height:18px;padding:0;border-radius:50%}
-.wgbar [data-wg="c1"]{background:var(--wg1)} .wgbar [data-wg="c2"]{background:var(--wg2)} .wgbar [data-wg="c3"]{background:var(--wg3)} .wgbar [data-wg="c4"]{background:var(--wg4)}
-.wgsep{width:1px;height:16px;background:var(--line);margin:0 4px}
 .wgedit{min-height:52px;font-size:14px;line-height:1.55;color:var(--ink);outline:none;overflow-wrap:anywhere}
 .wgedit:empty::before{content:attr(data-ph);color:var(--ink-faint)}
 .wgedit h3{font-size:17px;font-weight:650;margin:2px 0 4px;color:var(--ink)}
+.wgedit h4{font-size:15px;font-weight:650;margin:2px 0 3px;color:var(--ink)}
 .wgedit ul{list-style:none;padding:0;margin:2px 0}
 .wgedit li{display:flex;gap:8px;align-items:baseline}
 .wgedit li input{margin:0;flex:none;transform:translateY(1px);cursor:pointer}
-.wgedit font[color="#b0563a"]{color:var(--wg1)} .wgedit font[color="#1b6b4f"]{color:var(--wg2)}
-.wgedit font[color="#3f6fb5"]{color:var(--wg3)} .wgedit font[color="#8e4bc9"]{color:var(--wg4)}
 /* Semana: la revisión del lunes. */
 #semanaBoard[hidden]{display:none}
 .semgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;align-items:start}

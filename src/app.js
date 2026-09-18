@@ -1215,14 +1215,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(!f.people.length||f.people.includes("__none")) kanban.appendChild(makeCol("Sin asignar",cssv("--ink-faint"),sinA,{person:""})); }
     else { STORD.filter(st=>!f.status.length||f.status.includes(st)).forEach(st=>kanban.appendChild(makeCol(STATUS[st].l,cssv(STATUS[st].v),items.filter(x=>x.k.status===st),{status:st}))); } }
   // ---------- OBJETIVOS DE LA SEMANA (con formato) ----------
-  // Es un solo texto compartido, ahora con negrita, título, cuatro colores y
-  // casilleros. Lo escribe cualquiera y se muestra como HTML en los cuatro
+  // Es un solo texto compartido, ahora con negrita, dos tamaños de título y
+  // casilleros (los colores se sacaron: Nico lo quiso mínimo). Lo escribe cualquiera y se muestra como HTML en los cuatro
   // navegadores: por eso pasa SIEMPRE por un saneado que solo deja esas
   // etiquetas (sin esto, alguien podría meter código). Los textos viejos, sin
   // formato, se muestran igual que antes.
-  const WG_COLORES={c1:"#b0563a",c2:"#1b6b4f",c3:"#3f6fb5",c4:"#8e4bc9"};
-  const WG_OK=new Set(Object.values(WG_COLORES));
-  const WG_TAGS=new Set(["B","STRONG","I","EM","U","H3","DIV","P","BR","UL","LI","FONT","INPUT"]);
+  const WG_TAGS=new Set(["B","STRONG","I","EM","U","H3","H4","DIV","P","BR","UL","LI","INPUT"]);
   function sanearObjetivos(html){ const t=document.createElement("template"); t.innerHTML=String(html||"");
     const limpiar=nodo=>{ [...nodo.childNodes].forEach(n=>{
       if(n.nodeType===3)return;
@@ -1230,9 +1228,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       limpiar(n);
       if(!WG_TAGS.has(n.tagName)){ n.replaceWith(...n.childNodes); return; }
       if(n.tagName==="INPUT"&&n.getAttribute("type")!=="checkbox"){ n.remove(); return; }
-      const color=n.tagName==="FONT"?String(n.getAttribute("color")||"").toLowerCase():"", marcado=n.tagName==="INPUT"&&n.hasAttribute("checked");
+      const marcado=n.tagName==="INPUT"&&n.hasAttribute("checked");
       [...n.attributes].forEach(a=>n.removeAttribute(a.name));
-      if(n.tagName==="FONT"){ if(WG_OK.has(color))n.setAttribute("color",color); else { n.replaceWith(...n.childNodes); return; } }
       if(n.tagName==="INPUT"){ n.setAttribute("type","checkbox"); if(marcado)n.setAttribute("checked",""); } }); };
     limpiar(t.content); return t.innerHTML; }
   function objetivosHTML(v){ const s=String(v||"");
@@ -1732,9 +1729,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // chanTitle ya devuelve HTML (icono + nombre escapado): volver a escapar
     // acá imprimía el SVG como texto.
     head.innerHTML=`<span>${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
-      <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro.</li>
+      <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro. Con <b>editar</b> le cambiás nombre, gente y foto.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
-      <li><b>＋ Evento</b> propone una reunión: se publica con <b>Voy / No voy</b> y aparece en el calendario de todos.</li>
+      <li><b>＋ Evento</b> propone una reunión con <b>Voy / No voy</b>. Arranca invitando a la gente de este chat; aparece en el calendario de los invitados.</li>
+      <li>Escribí <b>@</b> para nombrar a alguien del canal. Los links se pueden tocar. <b>Shift+Enter</b> baja de renglón.</li>
+      <li>En los audios, el botón <b>1×</b> cambia la velocidad a 1,5× y 2×.</li>
       <li>Los mensajes llegan a los demás al instante, y si tienen las notificaciones activadas les avisa al celular.</li>
       <li>Pasando por encima de un mensaje aparecen <b>responder</b> (↩) y <b>reaccionar</b> (☺) — también en los eventos. En el teléfono se ven siempre.</li>
       <li>En el Equipo y en los grupos, cada mensaje lleva un <b>tono del color de quien escribe</b>, para no tener que leer el nombre.</li>
@@ -2890,15 +2889,18 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(cb.checked)cb.setAttribute("checked",""); else cb.removeAttribute("checked"); guardarObjetivos(); });
     // Pegar trae formato de cualquier lado: entra como texto.
     wg.addEventListener("paste",e=>{ e.preventDefault(); const t=(e.clipboardData||window.clipboardData).getData("text/plain"); document.execCommand("insertText",false,t); });
+    // Dónde estaba el cursor dentro del cuadro: si el clic en la barra lo movió,
+    // se repone antes de aplicar el formato.
+    let wgRango=null;
+    document.addEventListener("selectionchange",()=>{ const s=document.getSelection(); if(s.rangeCount&&wg.contains(s.anchorNode))wgRango=s.getRangeAt(0).cloneRange(); });
     document.getElementById("wgBar").addEventListener("mousedown",e=>{ const b=e.target.closest("[data-wg]"); if(!b)return; e.preventDefault();
-      if(!wg.contains(document.getSelection().anchorNode))wg.focus();
+      { const s=document.getSelection(); if(!wg.contains(s.anchorNode)){ wg.focus(); if(wgRango&&wg.contains(wgRango.startContainer)){ s.removeAllRanges(); s.addRange(wgRango); } } }
       try{ document.execCommand("styleWithCSS",false,false); }catch(err){}
       const c=b.dataset.wg;
+      // Un título se apaga con el mismo botón: otro clic lo vuelve texto.
+      const bloque=()=>{ let n=document.getSelection().anchorNode; while(n&&n!==wg&&!(n.nodeType===1&&/^(H3|H4|DIV|P|LI)$/.test(n.tagName)))n=n.parentNode; return n&&n!==wg?n.tagName:""; };
       if(c==="bold")document.execCommand("bold");
-      else if(c==="h3")document.execCommand("formatBlock",false,"h3");
-      else if(c==="p")document.execCommand("formatBlock",false,"div");
-      else if(c==="c0")document.execCommand("removeFormat");
-      else if(WG_COLORES[c])document.execCommand("foreColor",false,WG_COLORES[c]);
+      else if(c==="h3"||c==="h4")document.execCommand("formatBlock",false,bloque()===c.toUpperCase()?"div":c);
       else if(c==="check"){ document.execCommand("insertHTML",false,'<ul><li><input type="checkbox"> </li></ul>'); asegurarCasilleros(wg); }
       guardarObjetivos(); }); }
   document.getElementById("sendMsg").addEventListener("click",sendMsg);

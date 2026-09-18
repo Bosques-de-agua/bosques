@@ -93,12 +93,14 @@
   <main id="main">
     <section class="tab" id="tab-panel"><div class="wrap">
       <h1 class="h1">Mi panel<span class="infob" tabindex="0">i<span class="infopop"><b>Tu día, solo lo tuyo</b><ul>
-        <li>En el <b>calendario</b> ves los eventos del equipo y tus tareas con fecha. Tocá un día vacío para crear un evento.</li>
+        <li>En el <b>calendario</b> ves los eventos a los que estás invitado, tus tareas con fecha y las que no tienen responsable. Tocá un día vacío para crear un evento.</li>
+        <li>Si conectaste tu <b>Google Calendar</b> (en Configuración), tus eventos personales aparecen con <b>borde punteado</b> y en su propio bloque. Solo los ves vos.</li>
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
         <li><b>Tu foco</b> tiene dos pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas), y <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama.</li>
         <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
-        <li>Tu <b>foto</b> y <b>tu color</b> te identifican en toda la app.</li></ul></span></span></h1>
+        <li>Pasando el mouse por una tarea ves su <b>último avance</b>.</li>
+        <li>Tu <b>foto</b> y <b>tu color</b> te identifican en toda la app; se cambian en Configuración.</li></ul></span></span></h1>
       <div id="calMount" style="margin-top:18px"></div>
       <div id="upcoming" style="margin-top:22px"></div>
       <div id="myTasks" style="margin-top:22px"></div>
@@ -117,6 +119,7 @@
         <li>El triangulito ▶ de un sub-tema lo abre o lo cierra en el lugar.</li>
         <li>Podés <b>arrastrar una tarea</b> de un tema a otro.</li>
         <li>El <b>buscador</b> encuentra temas, sub-temas y tareas por nombre, objetivo, notas o responsable.</li>
+        <li>Pasando el mouse por una tarea ves su <b>último avance</b>.</li>
         <li>Cada <b>nivel de profundidad</b> tiene su color: proyecto, macro-tema, sub-tema y así hacia adentro.</li></ul></span></span><div class="seg2 estviews" id="estViewSeg"><button data-v="arbol" class="on">Árbol</button><button data-v="mapa">Mapa</button></div></h1>
       <div class="srchbar"><input class="srch" id="estSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tema, sub-tema o tarea…"><button class="rowbtn" id="estSearchClear" hidden>✕ limpiar</button><span class="srchinfo" id="estSearchInfo"></span></div>
       </div>
@@ -137,10 +140,14 @@
         <li><b>Filtros</b> sí achica lo que se ve. Se pueden marcar varios a la vez y se cruzan entre sí: por ejemplo "En curso" + "Nico" + un tema.</li>
         <li><b>Arrastrá una tarjeta</b> de una columna a otra para cambiarle el estado, el responsable o el tema, según la vista en la que estés.</li>
         <li>El <b>casillero</b> de la tarjeta la marca como terminada. Las terminadas se archivan solas a los 7 días, o mandalas antes con el botón de archivar.</li>
-        <li>Un clic en la tarjeta abre su ficha con objetivo, notas y responsables.</li>
+        <li>Un clic en la tarjeta abre su ficha: <b>objetivo</b> (para qué es), <b>notas</b> (lo fijo: contactos, requisitos) y <b>avances</b> (qué va pasando; el más nuevo arriba). Cualquiera puede corregir o borrar un avance.</li>
+        <li>Abajo en la tarjeta: cuándo fue el <b>último avance</b>, en amarillo si pasaron 14 días sin novedades; y en las tareas en espera, <b>de quién</b> se espera y hace cuánto. Pasando el mouse ves el último avance.</li>
+        <li>El <b>↻</b> marca una tarea que se repite: al terminarla se crea sola la siguiente.</li>
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
-        <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button></div></h1>
-      <div class="weekgoals"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><div class="wgbar" id="wgBar" role="toolbar" aria-label="Formato de los objetivos"><button data-wg="bold" title="Negrita"><b>N</b></button><button data-wg="h3" title="Título">T</button><button data-wg="p" title="Texto normal" class="wgt">t</button><span class="wgsep"></span><button data-wg="c1" class="wgdot" title="Terracota"></button><button data-wg="c2" class="wgdot" title="Verde"></button><button data-wg="c3" class="wgdot" title="Azul"></button><button data-wg="c4" class="wgdot" title="Violeta"></button><button data-wg="c0" title="Quitar formato" class="wgt">✕</button><span class="wgsep"></span><button data-wg="check" title="Lista con casilleros">☑</button></div><div id="weekGoals" class="wgedit" contenteditable="true" spellcheck="true" data-ph="¿Qué queremos lograr esta semana?"></div></div>
+        <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li>
+        <li><b>Semana</b> es la revisión del lunes: lo terminado en 7 días, lo vencido, lo que vence en 7 días, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
+        <li>Los <b>objetivos de la semana</b> los escribe cualquiera; arriba a la derecha tenés negrita, dos tamaños de título y lista con casilleros.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button></div></h1>
+      <div class="weekgoals"><div class="wghead"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><div class="wgbar" id="wgBar" role="toolbar" aria-label="Formato de los objetivos"><button data-wg="bold" title="Negrita"><b>N</b></button><button data-wg="h3" title="Título grande (otro clic lo vuelve texto)">T1</button><button data-wg="h4" title="Título chico (otro clic lo vuelve texto)">T2</button><button data-wg="check" title="Lista con casilleros">☑</button></div></div><div id="weekGoals" class="wgedit" contenteditable="true" spellcheck="true" data-ph="¿Qué queremos lograr esta semana?"></div></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
@@ -154,7 +161,9 @@
       <h1 class="h1">Configuración<span class="infob" tabindex="0">i<span class="infopop"><b>Todo lo que se ajusta, en un solo lugar</b><ul>
         <li>Arriba, <b>vos</b>: tu nombre, tu foto y tu color. Es como te ve el resto en toda la app.</li>
         <li>Después, <b>cómo se ve</b>: el tema claro u oscuro y el fondo.</li>
-        <li>Abajo, <b>el equipo</b>: quiénes entran y cómo sumar a alguien nuevo.</li></ul></span></span></h1>
+        <li><b>Avisos</b>: activá las notificaciones en cada dispositivo. Los lunes a las 9 llega el resumen de tu semana.</li>
+        <li><b>Google Calendar</b>: sumá lo de la app a tu Google Calendar como un calendario aparte, y ves tus eventos personales en tu panel.</li>
+        <li>Abajo, <b>el equipo</b>: quiénes entran y cómo sumar a alguien nuevo; y el <b>respaldo</b>, para bajar una copia.</li></ul></span></span></h1>
       <div id="profile"></div>
       <div id="config" style="margin-top:22px"></div>
     </div></section>
@@ -173,7 +182,7 @@
     <section class="tab" id="tab-drive"><div class="wrap">
       <h1 class="h1">Drive<span class="infob" tabindex="0">i<span class="infopop"><b>La documentación del proyecto, ordenada por tema</b><ul>
         <li>Se junta acá todo lo que el equipo vincula desde las fichas de temas y tareas.</li>
-        <li>Para sumar algo: copiá el link desde Drive y pegalo con <b>＋ vincular archivo</b>.</li>
+        <li>Para sumar algo: <b>＋ vincular archivo</b>, y ahí elegilo con <b>Elegir de mi Drive</b> o pegá el link.</li>
         <li>El archivo <b>no se copia</b>: queda apuntando a Drive, así siempre ves la última versión.</li>
         <li>El link funciona para quien tenga acceso en Drive: compartí la carpeta con todo el equipo.</li></ul></span></span></h1>
       <div class="srchbar"><input class="srch" id="driveSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar archivo o carpeta…"><select class="pick drivetema" id="driveTema" title="Ver solo los archivos de un tema"></select><button class="rowbtn" id="driveTemaClear" hidden>✕ ver todos</button><div style="flex:1"></div><button class="btn btn-primary" id="driveAdd"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vincular archivo</button></div>
