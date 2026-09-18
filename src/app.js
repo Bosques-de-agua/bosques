@@ -571,7 +571,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.querySelectorAll(".navtab").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
 
   // ---------- NOTAS AL PASAR EL MOUSE ----------
-  // Parado sobre una tarea (en Tareas o en Estructura), a los ~0,4 s aparece un
+  // Parado sobre una tarea (en Tareas, en Estructura o en Mi panel: listas,
+  // Mi foco y calendario), a los ~0,4 s aparece un
   // recuadro con sus notas: una vista rápida de en qué está, sin abrir la ficha.
   // Sin notas no aparece nada. Solo con mouse: en pantallas táctiles no hay
   // "pasar por encima", y un toque abre la ficha como siempre.
@@ -581,7 +582,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function tareaPorId(id){ const x=allItems().find(y=>y.k.id===id); if(x)return x.k;
     const p=state.me&&state.privTasks&&state.privTasks[state.me]; return Array.isArray(p)?(p.find(k=>k.id===id)||null):null; }
   function ocultarNotas(){ clearTimeout(tipTimer); tipTimer=null; tipSobre=null; tipNotas.classList.remove("on"); }
-  function mostrarNotas(el){ const k=tareaPorId(el.dataset.item); const notas=k?String(k.notas||"").trim():"";
+  // Cada vista marca la tarea con su propio atributo; el id es el mismo.
+  const idTip=el=>el.dataset.item||el.dataset.task||el.dataset.priv||el.dataset.tipitem;
+  function mostrarNotas(el){ const k=tareaPorId(idTip(el)); const notas=k?String(k.notas||"").trim():"";
     if(!notas){ ocultarNotas(); return; }
     tipNotas.innerHTML=`<div class="tiplab">Notas</div><div class="tiptxt">${esc(notas)}</div>`;
     tipNotas.style.left="0px"; tipNotas.style.top="0px"; tipNotas.classList.add("on");
@@ -590,7 +593,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const left=Math.min(Math.max(8,r.left),innerWidth-tw-8);
     tipNotas.style.left=left+"px"; tipNotas.style.top=top+"px"; }
   if(conMouse){
-    document.addEventListener("mouseover",e=>{ const el=e.target.closest(".kcard[data-item], .taskrow[data-item]");
+    document.addEventListener("mouseover",e=>{ const el=e.target.closest(".kcard[data-item], .taskrow[data-item], .listline[data-task], .listline[data-priv], .chipcal[data-tipitem]");
       if(el===tipSobre)return; ocultarNotas(); if(!el)return;
       tipSobre=el; tipTimer=setTimeout(()=>{ if(tipSobre===el&&el.isConnected)mostrarNotas(el); },400); });
     ["pointerdown","dragstart","scroll","wheel"].forEach(ev=>document.addEventListener(ev,ocultarNotas,true));
@@ -2258,7 +2261,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return a.hora<b.hora?-1:a.hora>b.hora?1:0; }));
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':''}" ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}">${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':''}" ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${shown}${more}`:''}</div>`; }
     mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
