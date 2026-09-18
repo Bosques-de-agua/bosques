@@ -1553,3 +1553,6 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .semvacio{font-size:12.5px;color:var(--ink-faint);padding:4px 0}
 .semnota{font-size:11.5px;color:var(--ink-faint);padding-top:8px;border-top:1px solid var(--line-soft);margin-top:4px}
 .semayuda{font-size:11.5px;color:var(--ink-faint);margin:12px 2px 0}
+
+/* Tarea que se repite: un ↻ chiquito al lado del título, nada más. */
+.kcard .krep{flex:none;font-size:12px;line-height:1;color:var(--ink-faint);margin-left:2px}

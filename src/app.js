@@ -350,9 +350,27 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // "En espera": se anota solo desde cuándo, y de quién lo escribe cada uno
   // en la ficha. Al salir de la espera se limpia, así no queda un "espera a…"
   // viejo si la tarea vuelve a esperar a otra persona.
+  // ---------- TAREAS QUE SE REPITEN ----------
+  // Al terminar una tarea que se repite, se crea sola la siguiente: mismo
+  // título, responsables, prioridad, objetivo y notas; avances vacíos y la
+  // fecha corrida un período. `repSig` evita crear dos si alguien la destilda
+  // y la vuelve a tildar.
+  const REPITE={semana:"cada semana",mes:"cada mes",anio:"cada año"};
+  function sumarPeriodo(ymd,rep){ const [y,m,d]=(ymd||ymdLocal(new Date())).split("-").map(Number);
+    if(rep==="semana")return ymdLocal(new Date(y,m-1,d+7));
+    const mm=rep==="anio"?m-1:m, yy=rep==="anio"?y+1:y;
+    const ult=new Date(yy,mm+1,0).getDate();                 // 31 de enero → 28 (o 29) de febrero
+    return ymdLocal(new Date(yy,mm,Math.min(d,ult))); }
+  function crearSiguiente(k){ if(!REPITE[k.repite]||k.repSig)return;
+    let arr=null; const hit=allItems().find(x=>x.k===k); if(hit)arr=hit.node.items;
+    else { const p=state.me&&state.privTasks&&state.privTasks[state.me]; if(Array.isArray(p)&&p.includes(k))arr=p; }
+    if(!arr)return;
+    const n=newTask(); Object.assign(n,{title:k.title,owners:ownersOf(k).slice(),prio:k.prio||"",objetivo:k.objetivo||"",notas:k.notas||"",dueTime:k.dueTime||"",repite:k.repite,
+      due:sumarPeriodo(k.due,k.repite),files:(k.files||[]).map(f=>Object.assign({},f,{id:"f"+uid()}))});
+    arr.splice(arr.indexOf(k)+1,0,n); k.repSig=n.id; }
   function setStatus(k,st){ if(st==="espera"&&k.status!=="espera")k.esperaDesde=nowMs();
     if(st!=="espera"){ delete k.esperaDesde; delete k.esperaDe; }
-    k.status=st; if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
+    k.status=st; if(st==="listo")crearSiguiente(k); if(st==="listo"){ k.done=true; if(!k.doneAt)k.doneAt=nowMs(); } else { k.done=false; k.doneAt=null; k.archived=false; k.archivedAt=null; } }
   function setDone(k,val){ setStatus(k, val?"listo":(k.status==="listo"?"curso":k.status)); }
   function nowMs(){ return new Date().getTime(); }
 
@@ -461,7 +479,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(d.chatSeen&&Object.values(d.chatSeen).some(v=>typeof v==="number"))d.chatSeen={};
     Object.keys(d.chatSeen||{}).forEach(p=>{ if(!d.chatSeen[p]||typeof d.chatSeen[p]!=="object")d.chatSeen[p]={}; });
     const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due="";
-      if(k.avances!=null)k.avances=Array.isArray(k.avances)?k.avances.filter(a=>a&&typeof a.text==="string"&&a.id):[]; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
+      if(k.avances!=null)k.avances=Array.isArray(k.avances)?k.avances.filter(a=>a&&typeof a.text==="string"&&a.id):[];
+      if(k.repite!=null&&!["semana","mes","anio"].includes(k.repite))delete k.repite; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
       if(!Array.isArray(k.owners))k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; k.owners=k.owners.map(o=>String(o).trim()).filter(Boolean); delete k.owner;
       if(!Array.isArray(k.files))k.files=[];
       if(k.prio==null||!PRIO[k.prio])k.prio="";
@@ -1312,7 +1331,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.dataset.item=k.id; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaEspera(k)}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${REPITE[k.repite]?`<span class="krep" title="Se repite ${REPITE[k.repite]}">↻</span>`:""}${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaEspera(k)}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -2589,7 +2608,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(state.me&&ownersOf(k).includes(state.me)){ state.tasksSeen=state.tasksSeen||{};
       const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); updateAvisos(); } }
     drawer.classList.remove("on"); panelOpen=false;
-    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k);
+    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k); document.getElementById("tRepite").value=REPITE[k.repite]?k.repite:"";
     avEdit=null; const avIn=document.getElementById("tAvInput"); if(avIn){ avIn.value=""; }
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
     renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances();
@@ -2673,6 +2692,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("tDoneChk").addEventListener("change",e=>{ const k=curTask(); if(!k)return; setDone(k,e.target.checked); tStatus.value=k.status; syncTaskDone(k); save(); renderActive(); });
   document.getElementById("tArch").addEventListener("click",()=>{ const k=curTask(); if(!k)return; archiveTask(k); save(); closeTask(); renderActive(); refreshChrome(); });
   tPrio.addEventListener("change",()=>{ const k=curTask(); if(k){k.prio=tPrio.value;syncTaskDots(k);save();renderActive();} });
+  document.getElementById("tRepite").addEventListener("change",e=>{ const k=curTask(); if(!k)return; const v=e.target.value;
+    if(REPITE[v])k.repite=v; else delete k.repite; delete k.repSig; save(); renderActive(); });
   tDue.addEventListener("change",()=>{ const k=curTask(); if(k){k.due=tDue.value;
     // Una hora sin día no dice nada y no se puede mostrar en el calendario:
     // si se borra la fecha, se va con ella.
