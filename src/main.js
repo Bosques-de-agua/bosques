@@ -6,6 +6,7 @@ import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { initPush, reengancharPush } from "./push.js";
 import { initPicker } from "./picker.js";
+import { initCalendario } from "./calendario.js";
 import { initPresencia } from "./presencia.js";
 
 if ("serviceWorker" in navigator) {
@@ -139,6 +140,8 @@ async function launchApp(session) {
   // Si no están cargadas las variables de Google, no instala nada y la app
   // sigue pidiendo el link pegado a mano.
   initPicker();
+  // Google Calendar por enlaces (ver src/calendario.js).
+  initCalendario(email);
 
   const app = startApp({
     seed,

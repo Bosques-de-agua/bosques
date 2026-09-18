@@ -1556,3 +1556,13 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 
 /* Tarea que se repite: un ↻ chiquito al lado del título, nada más. */
 .kcard .krep{flex:none;font-size:12px;line-height:1;color:var(--ink-faint);margin-left:2px}
+
+/* Tu Google Calendar en tu panel: otro estilo (borde punteado, sin relleno)
+   para que nunca se confunda con lo del equipo. */
+.chipcal.gcal{background:transparent !important;color:var(--ink-soft);border:1px dashed color-mix(in srgb,#4285f4 70%,var(--line));}
+.gdot{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px dashed #4285f4;vertical-align:0;margin-right:2px}
+.gcalcard .lab small{font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint);margin-left:6px}
+.gcalcard{margin-top:12px;border-style:dashed}
+.cfgcalbtns{display:flex;gap:6px;flex-wrap:wrap}
+.cfgcalest{font-size:12.5px;color:var(--ink-soft);min-height:0}
+#cfgCal[hidden]{display:none}

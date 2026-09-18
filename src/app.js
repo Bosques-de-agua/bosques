@@ -2032,6 +2032,26 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function puedeResponder(ev){ const me=state.me||""; return !!me&&(esParaTodos(ev)||ev.para.includes(me)); }
   function invitadosDe(ev){ return esParaTodos(ev)?allPeople():ev.para.slice(); }
   function eventosVisibles(){ return (state.events||[]).filter(veoEvento); }
+  // ---------- TU GOOGLE CALENDAR EN TU PANEL ----------
+  // Tus eventos personales de Google, leídos por la función `calendario`. Viven
+  // SOLO en memoria: no entran al estado, no se guardan, no los ve nadie más.
+  // Se muestran con otro estilo y aparte, para que no se confundan con lo del
+  // equipo.
+  let gEventos=[], gFirma="", gPidiendo=false, gError="";
+  function cargarGoogle(forzar){ const cal=window.__mesaCalendario; if(!cal||gPidiendo)return;
+    gPidiendo=true; const ahora=Date.now();
+    cal.eventos(ahora-40*DAY,ahora+100*DAY,forzar).then(r=>{ gError="";
+      const lista=(r&&Array.isArray(r.eventos))?r.eventos:[]; const f=JSON.stringify(lista);
+      if(f!==gFirma){ gFirma=f; gEventos=lista; if(active==="panel")renderPanel(); } })
+    .catch(e=>{ gError=String(e&&e.message||e); })
+    .finally(()=>{ gPidiendo=false; }); }
+  // Cada evento de Google, repartido por día (uno de varios días ocupa todos).
+  function googlePorDia(){ const out={};
+    gEventos.forEach(g=>{
+      if(g.diaEntero){ let d=g.fecha; let n=0; while(d&&d<(g.hasta||d)&&n<31){ (out[d]=out[d]||[]).push({g,hora:""}); const [y,m,dd]=d.split("-").map(Number); d=ymdLocal(new Date(y,m-1,dd+1)); n++; } if(!n)(out[g.fecha]=out[g.fecha]||[]).push({g,hora:""}); }
+      else { const t=new Date(g.inicio); const ds=ymdLocal(t); (out[ds]=out[ds]||[]).push({g,hora:dosCifras(t.getHours())+":"+dosCifras(t.getMinutes())}); } });
+    return out; }
+  function verGoogle(g,hora){ note(`${g.titulo}${hora?" · "+hora:""}. Es de tu Google Calendar: solo lo ves vos, y se cambia allá.`); }
   const mismaGente=(a,b)=>{ const x=[...new Set(a||[])], y=[...new Set(b||[])]; return x.length===y.length&&x.every(p=>y.includes(p)); };
   function destinoAviso(para,desde){ const me=state.me||"";
     if(!para||!para.length)return {tipo:"team"};
@@ -2226,6 +2246,24 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- CONFIGURACIÓN ----------
   // Todo lo tuyo en un solo lugar: quién sos, cómo se ve la app, avisos,
   // el equipo y el respaldo.
+  function montarCfgCalendario(){ const cal=window.__mesaCalendario, sec=document.getElementById("cfgCal"); if(!cal||!sec)return;
+    const est=document.getElementById("cfgCalEst"), sub=document.getElementById("cfgCalSub"), gIn=document.getElementById("cfgCalG");
+    let enlace="";
+    const ponerEnlace=u=>{ enlace=u; sub.href="https://calendar.google.com/calendar/r?cid="+encodeURIComponent(u.replace(/^https:/,"webcal:")); };
+    cal.estado().then(s=>{ sec.hidden=false; ponerEnlace(s.enlace);
+      gIn.placeholder=s.tieneGoogle?"Ya guardaste tu dirección. Pegá otra para cambiarla, o dejalo vacío y Guardar para quitarla.":"https://calendar.google.com/calendar/ical/…/basic.ics";
+      if(gError&&s.tieneGoogle)est.textContent="No se pudo leer tu Google Calendar: "+gError; })
+    .catch(()=>{ /* sin la tabla todavía: la sección no aparece */ });
+    document.getElementById("cfgCalCopy").addEventListener("click",()=>{ if(!enlace)return;
+      (navigator.clipboard?navigator.clipboard.writeText(enlace):Promise.reject()).then(()=>{ est.textContent="Enlace copiado. En Google Calendar: Otros calendarios → ＋ → Desde URL."; },()=>{ note("No se pudo copiar solo. Tu enlace es: "+enlace); }); });
+    document.getElementById("cfgCalRegen").addEventListener("click",()=>confirmar("El enlace actual deja de funcionar y hay que volver a agregar el nuevo en Google Calendar.",()=>{
+      cal.regenerar().then(u=>{ ponerEnlace(u); est.textContent="Listo: enlace nuevo. Sacá el calendario viejo de Google y agregá este."; }).catch(e=>note("No se pudo generar: "+(e.message||e))); },{title:"Generar otro enlace",yes:"Generar"}));
+    document.getElementById("cfgCalGOk").addEventListener("click",()=>{ const v=gIn.value.trim();
+      if(v&&!/^https:\/\/calendar\.google\.com\/calendar\/ical\/\S+\.ics$/i.test(v)){ note("Esa no parece la dirección secreta en formato iCal. Tiene que empezar con https://calendar.google.com/calendar/ical/ y terminar en .ics"); return; }
+      cal.guardarGoogle(v).then(()=>{ gIn.value=""; gFirma=""; gEventos=[]; est.textContent=v?"Guardado. Tus eventos aparecen en el calendario de tu panel.":"Listo: se quitó tu Google Calendar de la app."; cargarGoogle(true); gIn.placeholder=v?"Ya guardaste tu dirección. Pegá otra para cambiarla, o dejalo vacío y Guardar para quitarla.":"https://calendar.google.com/calendar/ical/…/basic.ics"; })
+        .catch(e=>note("No se pudo guardar: "+(e.message||e))); });
+    document.getElementById("cfgCalAyuda").addEventListener("click",e=>{ e.preventDefault();
+      note("En Google Calendar desde la compu: ⚙ Configuración → en la columna izquierda, tu calendario (tu nombre) → Integrar el calendario → \"Dirección secreta en formato iCal\". Copiala y pegala acá. Es privada: no se la pases a nadie."); }); }
   function renderConfig(){ const box=document.getElementById("config"); if(!box)return;
     const me=state.me||""; const yoM=miembroPorEmail(miEmail);
     const paleta=state.palette||"carbon";
@@ -2251,6 +2289,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         <div class="cfgrow"><span class="lbl">Notificaciones en este dispositivo<small>Te avisa cuando te asignan una tarea o te escriben, aunque tengas la app cerrada</small></span>
           <span id="cfgPush"></span></div>
       </div>
+      <div class="cfgsec" id="cfgCal" hidden><div class="lab">Google Calendar</div>
+        <div class="cfgrow"><span class="lbl">Lo de la app en tu Google Calendar<small>Aparece como un calendario aparte, "Estudio · Bosques de Agua": los eventos donde estás invitado y tus tareas con fecha. Nunca tus tareas privadas. Google lo actualiza cada varias horas.</small></span>
+          <span class="cfgcalbtns"><a class="btn" id="cfgCalSub" target="_blank" rel="noopener">Agregar a Google Calendar</a><button class="btn" id="cfgCalCopy">Copiar enlace</button></span></div>
+        <div class="cfgrow"><span class="lbl">Tu Google Calendar en la app<small>Tus eventos personales se ven solo en tu panel, con otro color. No los ve nadie más. <a href="#" id="cfgCalAyuda">¿De dónde saco la dirección?</a></small></span>
+          <input class="txt" id="cfgCalG" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"><button class="btn" id="cfgCalGOk">Guardar</button></div>
+        <div class="cfgrow"><span class="lbl">Enlace nuevo<small>Si compartiste tu enlace sin querer, generá otro: el anterior deja de funcionar.</small></span>
+          <button class="btn" id="cfgCalRegen">Generar otro</button></div>
+        <div class="cfgcalest" id="cfgCalEst"></div>
+      </div>
       <div class="cfgsec"><div class="lab">Equipo</div>
         <div id="cfgTeam"></div>
         <div class="cfgrow"><span class="lbl">Sumar a alguien<small>Recibe acceso con su propio correo</small></span>
@@ -2263,6 +2310,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
           <button class="btn danger" id="cfgRestore">Importar…</button></div>
       </div>
     </div>`;
+    montarCfgCalendario();
     const inp=document.getElementById("cfgNombre");
     const guardarNombre=()=>{ const nuevo=inp.value.trim();
       if(!nuevo){ note("El nombre no puede quedar vacío."); inp.value=me; return; }
@@ -2404,15 +2452,31 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const [y,m,d]=String(ds).split("-").map(Number); const f=new Date(y,m-1,d);
     const dias=Math.round((f-hoy)/86400000);
     return dias===0?"hoy":dias===1?"mañana":dias<7?"en "+dias+" días":dias<14?"la semana que viene":"en "+Math.round(dias/7)+" semanas"; }
+  // Tus próximos de Google, en su propio bloque debajo de los del equipo.
+  function googleProximosHTML(tope){ const hoy=ymdLocal(new Date());
+    // Uno por evento (no por día): un viaje de tres días sale una vez, "del 22 al 24".
+    const filas=gEventos.map(g=>{
+      if(g.diaEntero){ const [y,m,d]=String(g.hasta||g.fecha).split("-").map(Number); const ult=g.hasta?ymdLocal(new Date(y,m-1,d-1)):g.fecha;
+        if(ult<hoy)return null; return {ds:g.fecha,g,hora:"",fin:ult>g.fecha?ult:""}; }
+      const t=new Date(g.inicio), ds=ymdLocal(t); if(ds<hoy)return null;
+      return {ds,g,hora:dosCifras(t.getHours())+":"+dosCifras(t.getMinutes()),fin:""}; }).filter(Boolean)
+      .sort((a,b)=>(a.ds+(a.hora||"~"))<(b.ds+(b.hora||"~"))?-1:1);
+    if(!filas.length)return "";
+    const vis=tope?filas.slice(0,tope):filas;
+    return `<div class="card gcalcard"><div class="lab" style="margin-bottom:6px"><span class="gdot"></span> De tu Google Calendar <small>solo lo ves vos</small></div>`
+      +vis.map(o=>`<div class="evrow gcalrow"><div class="evrow-main"><b>${esc(o.g.titulo)}</b><span class="evrow-meta">${o.fin?"del "+esc(fechaLarga(o.ds))+" al "+esc(fechaLarga(o.fin)):esc(fechaLarga(o.ds))}${o.hora?" · "+esc(o.hora):""}</span></div></div>`).join("")
+      +(filas.length>vis.length?`<div class="evrow-meta" style="padding-top:6px">y ${filas.length-vis.length} más</div>`:"")+`</div>`; }
   function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return;
+    cargarGoogle();
     const today=ymdLocal(new Date()); const me=state.me; const solaEnPantalla=panelView()==="upcoming";
     // En el Panel completo es un resumen corto; siendo la unica cosa en
     // pantalla no tiene sentido recortar a seis.
     let evs=eventosVisibles().filter(e=>e.date>=today).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
     if(!solaEnPantalla)evs=evs.slice(0,6);
-    if(!evs.length){ box.innerHTML=solaEnPantalla
+    const gHTML=googleProximosHTML(solaEnPantalla?0:4);
+    if(!evs.length){ box.innerHTML=(solaEnPantalla
       ? `<div class="ph"><b>No hay nada agendado</b><div style="margin-top:6px;font-size:13px">Los eventos se crean tocando un día en el calendario.</div></div>`
-      : ""; return; }
+      : "")+gHTML; return; }
     if(!solaEnPantalla){
       box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">${ICO.calendario} Próximos eventos</div>`+evs.map(ev=>{
         const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
@@ -2460,6 +2524,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
     if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
     eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
+    const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,g:o.g})));
+    cargarGoogle();
     // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
     // tiene: si hay una reunión a las 9, quiero verla arriba de todo.
     Object.keys(byDay).forEach(ds=>byDay[ds].sort((a,b)=>{
@@ -2467,7 +2533,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return a.hora<b.hora?-1:a.hora>b.hora?1:0; }));
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':''}" ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${shown}${more}`:''}</div>`; }
     mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
@@ -2475,7 +2541,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     mount.querySelector('[data-cal="next"]').addEventListener("click",()=>{ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(); });
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
     mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; openEvNew(ds); }));
-    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else openEvView(c.id); })); }
+    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else if(c.type==="google")verGoogle(c.g,c.hora); else openEvView(c.id); })); }
   // A qué tema pertenece, al lado del nombre y antes de la prioridad. Va en
   // cursiva y apagado a propósito: tiene que poder ignorarse de un vistazo,
   // pero estar cuando el título de la tarea, solo, queda en el aire.
@@ -2967,6 +3033,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   window.addEventListener("resize",()=>{ if(active==="estructura"&&estView()==="mapa")applyCam(); });
 
   // Si llegaste desde una notificación, abrimos esa tarea directamente.
+  try{ const q=new URLSearchParams(window.location.search);
+    if(q.get("vista")==="semana"){ state.tareasVista="semana"; showTab("tareas"); history.replaceState(null,"",window.location.pathname); } }catch(e){}
   try{ const q=new URLSearchParams(window.location.search); const tid=q.get("tarea");
     if(tid){ const hit=allItems().find(x=>x.k.id===tid);
       if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }
