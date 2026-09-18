@@ -649,6 +649,13 @@
   /* La cruz de borrar aparece al pasar por encima del propio mensaje; en
      pantalla táctil no hay "pasar por encima", así que ahí se ve siempre. */
   .msg{position:relative}
+  /* Links pegados en un mensaje. Una dirección larga no tiene espacios donde
+     cortar y rompería la burbuja: se corta en cualquier letra. */
+  .msg .msglink{color:var(--wood-deep);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;word-break:break-word}
+  .msg .msglink:hover{text-decoration-thickness:2px}
+  .msg .fver{color:var(--ink-faint);border:none;background:none;cursor:pointer;padding:0 2px;margin-left:2px;display:inline-flex;vertical-align:-3px}
+  .msg .fver:hover{color:var(--wood-deep)}
+  .msg .fver .ico{width:15px;height:15px}
   .msg .msgx{position:absolute;top:-7px;right:-7px;width:20px;height:20px;line-height:1;border-radius:999px;
     border:1px solid var(--line);background:var(--surface);color:var(--ink-faint);font-size:11px;cursor:pointer;
     opacity:0;transition:opacity .12s;padding:0}

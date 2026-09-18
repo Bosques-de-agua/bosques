@@ -1606,6 +1606,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!varios)return "";
     const c=avColor(m.from);
     return ` style="background:color-mix(in srgb,${c} ${mm?16:9}%,var(--surface));border-color:color-mix(in srgb,${c} ${mm?42:26}%,var(--line))"`; }
+  // Los links pegados en un mensaje se vuelven clickeables y abren en otra
+  // pestaña. Se parte el texto CRUDO y se escapa cada pedazo por separado:
+  // buscar links sobre el texto ya escapado confundiría los &amp; con el final
+  // de la dirección. Solo http(s) o "www.", así nunca sale un javascript:.
+  // Los de Drive suman el ojo para verlos acá mismo, como en la pestaña Drive.
+  const RE_LINK=/(?:https?:\/\/|www\.)[^\s<>"]+/gi;
+  function conLinks(texto){ const s=String(texto==null?"":texto); let out="", desde=0, m;
+    RE_LINK.lastIndex=0;
+    while((m=RE_LINK.exec(s))){ let u=m[0];
+      // La puntuación del final es de la frase, no del link ("mirá esto: https://…).").
+      while(/[.,;:!?'»”\]]$/.test(u)||(/\)$/.test(u)&&(u.split("(").length<u.split(")").length)))u=u.slice(0,-1);
+      if(!u)continue;
+      const href=/^www\./i.test(u)?"https://"+u:u;
+      out+=esc(s.slice(desde,m.index))+`<a class="msglink" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`+verBtn({url:href,name:u,kind:kindOfUrl(href)});
+      desde=m.index+u.length; RE_LINK.lastIndex=desde; }
+    return out+esc(s.slice(desde)); }
   function msgHTML(m,me){ const mm=(m.from===me);
     if(m.ev){ const ev=(state.events||[]).find(e=>e.id===m.ev); if(!ev||!veoEvento(ev))return ""; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length; const mine=(ev.rsvp||{})[me];
       return `<div class="msg event" data-msg="${m.id}"><div class="who">${esc(m.from)} propuso un evento</div>${citaHTML(m)}<div class="evtitle" style="cursor:pointer">${ICO.calendario} ${esc(ev.title)}</div><div class="evmeta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}</div>${esParaTodos(ev)?"":`<div class="evpara">${ICO.candado}<span>${esc(invitadosDe(ev).join(", "))}</span></div>`}<div class="rsvp">${puedeResponder(ev)?`<button class="yes ${mine==="yes"?"on":""}" data-rsvp="yes">Voy</button><button class="no ${mine==="no"?"on":""}" data-rsvp="no">No voy</button>`:""}<span class="tally">${yes} confirmado${yes===1?"":"s"}</span></div>${pieMsg(m,me)}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
@@ -1621,8 +1637,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
         +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
-        +(m.text?`<div style="margin-top:6px">${esc(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
-    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${esc(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
+        +(m.text?`<div style="margin-top:6px">${conLinks(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
+    return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div>${conLinks(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
   // Los botones del mensaje, arriba a la derecha. Aparecen al pasar por
   // encima; en pantalla táctil, siempre. Borrar es solo lo propio: hacía
   // falta igual, pero sobre todo porque un adjunto pesado se quedaba adentro
