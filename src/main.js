@@ -157,7 +157,7 @@ async function launchApp(session) {
   });
   // El testigo de guardado: la app avisa en pantalla si algo no llegó a la base.
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
-  setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
+  setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err, "privado"));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 
   // Quién tiene la app abierta ahora, para el punto verde del chat. Va por el

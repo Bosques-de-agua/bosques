@@ -74,15 +74,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const initials=n=>{ if(!n)return"?"; const p=n.trim().split(/\s+/); return (p[0][0]+(p[1]?p[1][0]:"")).toUpperCase(); };
   // El color y la foto salen de la ficha del equipo; lo del estado compartido
   // queda solo como respaldo para datos anteriores a esa tabla.
-  const avColor=n=>{ const m=miembroPorNombre(n); if(m&&m.color)return m.color;
-    const c=state&&state.userColors&&state.userColors[n]; if(c)return c;
+  // Color y foto los escribe cada uno y terminan adentro de un style="" o un
+  // src="": solo se acepta un color o una imagen de verdad. Si no, alguien que
+  // tocara los datos a mano podría ejecutar código en el navegador del resto.
+  function colorOk(c){ return typeof c==="string"&&/^(#[0-9a-f]{3,8}|(rgb|hsl)a?\([\d\s.,%deg]+\))$/i.test(c.trim()); }
+  function fotoOk(u){ return typeof u==="string"&&/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(u); }
+  const avColor=n=>{ const m=miembroPorNombre(n); if(m&&colorOk(m.color))return m.color;
+    const c=state&&state.userColors&&state.userColors[n]; if(colorOk(c))return c;
     let h=0; for(const ch of (n||"")) h=(h*31+ch.charCodeAt(0))>>>0; return AV[h%AV.length]; };
-  const avFoto=n=>{ const m=miembroPorNombre(n); if(m&&m.avatar)return m.avatar;
-    return (state&&state.avatars)?state.avatars[n]:null; };
+  const avFoto=n=>{ const m=miembroPorNombre(n); if(m&&fotoOk(m.avatar))return m.avatar;
+    const f=(state&&state.avatars)?state.avatars[n]:null; return fotoOk(f)?f:null; };
   function avatarMarkup(name,cls,withTitle){ const t=withTitle?` title="${esc(name)}"`:""; const ph=avFoto(name); if(ph)return `<span class="${cls} hasimg" style="background-image:url('${ph}')"${t}></span>`; return `<span class="${cls}" style="background:${avColor(name)}"${t}>${esc(initials(name))}</span>`; }
   function loadAvatar(file,cb){ const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>{ const S=80,c=document.createElement("canvas"); c.width=S;c.height=S; const x=c.getContext("2d"); const m=Math.min(img.width,img.height); x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S); cb(c.toDataURL("image/jpeg",0.82)); }; img.src=r.result; }; r.readAsDataURL(file); }
   function depthOf(n){ let d=1,x=n; while(x&&x.parent){ d++; x=N(x.parent); } return d; }
-  function accentOf(node){ if(node.hue!=null) return `hsl(${node.hue} 45% 52%)`; return cssv(LVL[Math.min(depthOf(node),LVL.length)-1]); }
+  function accentOf(node){ if(node.hue!=null&&isFinite(node.hue)) return `hsl(${Number(node.hue)} 45% 52%)`; return cssv(LVL[Math.min(depthOf(node),LVL.length)-1]); }
   function baseSize(node){ const d=depthOf(node); const b=d===1?172:d===2?150:d===3?116:d===4?100:88; return Math.round(b*(node.scale||1)); }
   function childrenOf(id){ const n=N(id); return n?(n.children||[]).map(N).filter(Boolean):[]; }
   function pathOf(id){ const a=[]; let x=N(id); while(x){ a.unshift(x); x=N(x.parent); } return a; }
@@ -472,12 +477,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // cuando el contenido no cambió: sin él, el chat entra en un bucle
   // (dibujar -> guardar -> llega por sincronización -> dibujar -> ...).
   let lastPushed="";
+  // Lo mismo para lo privado. Sin esta guarda, CADA guardado (y el chat guarda
+  // al dibujarse) subía tu porción entera: una pestaña vieja abierta en la
+  // compu pisaba lo que acababas de escribir en el celular.
+  let lastPrivPushed="";
   function save(){
     try{ state.tab=active; }catch(e){}
     saveLocalPrefs(state); syncPeopleList();
     const shared=stripShared(state); const js=JSON.stringify(shared);
     if(js!==lastPushed){ lastPushed=js; pushRemoteState(shared); }
-    if(pushPrivateState){ const mine=myPrivateSlice(); if(mine)pushPrivateState(mine); }
+    if(pushPrivateState){ const mine=myPrivateSlice(); if(mine){ const pj=JSON.stringify(mine); if(pj!==lastPrivPushed){ lastPrivPushed=pj; pushPrivateState(mine); } } }
   }
   // Lo que llega del equipo pasa SIEMPRE por normalize(): es la puerta por
   // donde un cliente viejo podría inyectar el formato anterior.
@@ -523,7 +532,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // Lo privado también llega de afuera: desde tu otro dispositivo. Y también
   // pisa lo que estás escribiendo en este instante, así que va el mismo cuidado
   // que con el estado del equipo.
-  function applyPrivateState(p){ mountPrivate(p); reaplicarEdicionEnCurso(); if(active==="panel")renderPanel(); }
+  // Lo que llega es lo que ya está en la base: cuenta como guardado. Si encima
+  // se reaplicó algo que estabas escribiendo, eso sí se sube.
+  const marcarPrivGuardado=()=>{ try{ const mine=myPrivateSlice(); if(mine)lastPrivPushed=JSON.stringify(mine); }catch(e){} };
+  function applyPrivateState(p){ mountPrivate(p); marcarPrivGuardado(); reaplicarEdicionEnCurso();
+    { const mine=myPrivateSlice(); if(mine&&JSON.stringify(mine)!==lastPrivPushed)save(); } if(active==="panel")renderPanel(); }
   // Los datos privados vivían dentro de la fila compartida del equipo. La primera
   // vez que entrás, tu porción se copia a tu tabla y se saca de ahí.
   // Regla dura: se toca SOLO la porción propia, nunca la de otra persona.
@@ -652,21 +665,28 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
 
   // ---------- ESTADO DEL GUARDADO ----------
   let estadoGuardado="guardado", ultimoGuardado=null;
-  function mostrarEstadoGuardado(estado,err){
-    estadoGuardado=estado;
-    // Todo lo escrito hasta este instante ya está en la base: de acá sale la
-    // primera tilde. Se refresca sin redibujar el chat entero, que volvería a
-    // guardar y a pedir el foco.
-    if(estado==="guardado"){ ultimoGuardado=new Date(); guardadoHasta=nowMs(); refrescarTildes(); }
+  // Equipo y privado se guardan por separado y cada uno avisa lo suyo. Antes
+  // compartían el aviso: lo privado guardado a tiempo tapaba un fallo del
+  // equipo (decía "Guardado" y ponía la tilde a mensajes que no habían entrado).
+  const estados={equipo:"guardado",privado:"guardado"};
+  function mostrarEstadoGuardado(estado,err,origen){
+    origen=(origen==="privado")?"privado":"equipo"; estados[origen]=estado;
+    // Todo lo del equipo escrito hasta este instante ya está en la base: de acá
+    // sale la primera tilde. Se refresca sin redibujar el chat entero, que
+    // volvería a guardar y a pedir el foco.
+    if(estado==="guardado"&&origen==="equipo"){ guardadoHasta=nowMs(); refrescarTildes(); }
     // Un fallo suelta el guard anti-eco: si no, el mismo contenido nunca se
     // vuelve a intentar y el cambio queda solo en la pantalla de quien lo hizo.
-    if(estado==="error")lastPushed="";
+    if(estado==="error"){ if(origen==="equipo")lastPushed=""; else lastPrivPushed=""; }
+    // Lo que se muestra es lo peor de los dos.
+    const e=Object.values(estados); estado=e.includes("error")?"error":e.includes("guardando")?"guardando":"guardado";
+    estadoGuardado=estado; if(estado==="guardado")ultimoGuardado=new Date();
     const barra=document.getElementById("saveState"); if(!barra)return;
     if(estado==="error"){
       barra.className="savestate mal";
       barra.innerHTML='<span>No se pudo guardar. Tu trabajo está en pantalla pero todavía no en la base — no cierres esta pestaña.</span><button class="rowbtn" id="saveRetry">Reintentar</button>';
       const b=barra.querySelector("#saveRetry");
-      if(b)b.addEventListener("click",()=>{ lastPushed=""; mostrarEstadoGuardado("guardando"); save(); });
+      if(b)b.addEventListener("click",()=>{ lastPushed=""; lastPrivPushed=""; save(); });
       return;
     }
     // Si no pudimos LEER lo privado al entrar, la app no lo escribe a propósito
@@ -1408,7 +1428,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // La foto de un grupo: 80x80 en JPEG (~4 KB), guardada adentro del grupo,
   // igual que las de perfil. Solo se acepta un data URL de imagen: la escribe
   // cualquiera del equipo y termina adentro de un style="".
-  const fotoValida=u=>typeof u==="string"&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(u);
+  const fotoValida=fotoOk;
   function grupoAv(g,cls){ if(g&&fotoValida(g.foto))return `<span class="${cls} hasimg" style="background-image:url('${g.foto}')"></span>`;
     return `<span class="${cls}" style="background:var(--accent-priv)">${ICO.grupo}</span>`; }
   function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return (fotoValida(g.foto)?grupoAv(g,"av headav"):ICO.grupo)+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
@@ -1568,9 +1588,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // La hora sola no dice de qué día es. Cada vez que cambia el día entra un
     // separador, como en cualquier chat.
     let diaPrevio="";
-    box.innerHTML=msgs.length?msgs.map(m=>{ const d=diaDe(m.ts); let sep="";
+    // Si estabas leyendo más arriba, un redibujo que no pediste (alguien que
+    // entra, una reacción, un guardado ajeno) no te baja al final.
+    const mismoCanal=box.dataset.chan===chatChan, cercaDelFinal=box.scrollHeight-box.scrollTop-box.clientHeight<80, arriba=box.scrollTop;
+    box.dataset.chan=chatChan;
+    box.innerHTML=msgs.length?msgs.map(m=>{ const h=msgHTML(m,me); if(!h)return ""; const d=diaDe(m.ts); let sep="";
       if(d!==diaPrevio){ sep=`<div class="daysep"><span>${esc(etiquetaDia(m.ts))}</span></div>`; diaPrevio=d; }
-      return sep+msgHTML(m,me); }).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
+      return sep+h; }).join(""):`<div class="empty">Sin mensajes todavía. Escribí el primero.</div>`;
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
@@ -1586,8 +1610,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     pintarRespuesta();
     // El scroll va ANTES de guardar: marcar leído dispara un guardado y, si
     // falla, el aviso empuja la pantalla; que la lista quede abajo igual.
-    box.scrollTop=box.scrollHeight;
-    marcarLeido(chatChan,msgs); save(); updateChatBadge(); }
+    if(!mismoCanal||cercaDelFinal||irAlFinal)box.scrollTop=box.scrollHeight; else box.scrollTop=arriba;
+    irAlFinal=false;
+    // Leído es que alguien lo tuvo delante: con la pestaña en segundo plano no
+    // cuenta (daba ✓✓ y apagaba el aviso del celular sin que nadie lo viera).
+    // Se marca al volver a la pestaña.
+    if(document.visibilityState==="visible")marcarLeido(chatChan,msgs);
+    save(); updateChatBadge(); }
+  let irAlFinal=false;
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible"||active!=="chat")return;
+    if(marcarLeido(chatChan,msgsOf(chatChan))){ save(); updateChatBadge(); } });
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   // `chatSeen` (cuántos mensajes viste, guardado en ESTE navegador) fue lo que
   // se usó hasta ahora. Se lee una sola vez, al arrancar, para pasar esa marca
@@ -1645,7 +1677,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
-        +(/^image\//.test(f.type)&&f.data?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
+        +(/^image\//.test(f.type)&&fotoOk(f.data)?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
         +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
         +(m.text?`<div class="msgtxt" style="margin-top:6px">${conLinks(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
     return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div class="msgtxt">${conLinks(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
@@ -1671,7 +1703,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // Solo cuenta si el mensaje al que respondés sigue en este canal.
     if(respondiendoA&&msgPorId(respondiendoA))m.re=respondiendoA;
     respondiendoA=null;
-    msgsOf(chatChan).push(m); inp.value=""; cerrarMencion(); ajustarAlto(); save(); renderChat(); }
+    msgsOf(chatChan).push(m); inp.value=""; cerrarMencion(); ajustarAlto(); irAlFinal=true; save(); renderChat(); }
   // ---------- MENCIONES (@nombre) ----------
   // Al escribir "@" se abre la lista de la gente del canal. Se guarda como
   // texto común ("@Juampi"): no hace falta nada nuevo en la base, y al
@@ -1712,7 +1744,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // Al mostrar: "@Nombre" solo cuenta si Nombre es alguien del equipo.
   function conMenciones(s){ const nombres=[...new Set(allPeople().concat(nombresEquipo()))].filter(Boolean).sort((a,b)=>b.length-a.length);
     if(!nombres.length||s.indexOf("@")<0)return esc(s);
-    const re=new RegExp("@("+nombres.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")(?![\\p{L}\\p{N}_])","giu");
+    const re=new RegExp("(?<![\\p{L}\\p{N}_.])@("+nombres.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")(?![\\p{L}\\p{N}_])","giu");
     const me=norm(state.me||""); let out="", desde=0, m;
     while((m=re.exec(s))){ out+=esc(s.slice(desde,m.index))+`<span class="mencion${norm(m[1])===me?" yo":""}">${esc(m[0])}</span>`; desde=m.index+m[0].length; }
     return out+esc(s.slice(desde)); }
@@ -1750,7 +1782,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const m={id:pend.id,from:state.me,text:"",ts:nowMs(),audio:{path:ruta,dur:pend.a.dur,type:pend.a.tipo,size:pend.a.blob.size}};
       if(pend.re)m.re=pend.re;
       if(respondiendoA===pend.re)respondiendoA=null;
-      msgsOf(pend.canal).push(m); audioPend=null; save(); if(active==="chat")renderChat(); }
+      msgsOf(pend.canal).push(m); audioPend=null; irAlFinal=true; save(); if(active==="chat")renderChat(); }
     catch(e){ // el audio queda guardado en memoria para reintentar: grabar tres minutos para perderlos por un corte de red no
       note("No se pudo mandar el audio. Quedó guardado: probá con Reintentar."); }
     finally{ enviandoAudio=false; pintarGrab(); } }
@@ -1766,7 +1798,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function cambiarVel(){ const v=velAct(); state.velAudio=VELS[(VELS.indexOf(v)+1)%VELS.length]; aplicarVel(); save();
     document.querySelectorAll("#msgs .msgaudio .avel").forEach(b=>b.textContent=velTxt()); }
   ["play","pause","timeupdate","ended"].forEach(ev=>player.addEventListener(ev,()=>{ if(ev==="ended"){ sonando=null; } pintarReproductor(); }));
-  function pintarReproductor(){ document.querySelectorAll("#msgs .msgaudio").forEach(el=>{ const on=(el.dataset.audio===sonando);
+  function pintarReproductor(){ document.querySelectorAll("#msgs .msgaudio[data-audio]").forEach(el=>{ const on=(el.dataset.audio===sonando);
       const b=el.querySelector(".aplay"); const tocando=on&&!player.paused;
       b.innerHTML=tocando?`<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="5.5" y="4.5" width="3" height="11" rx="1" fill="currentColor"/><rect x="11.5" y="4.5" width="3" height="11" rx="1" fill="currentColor"/></svg>`:`<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg>`; b.title=tocando?"Pausar":"Escuchar"; el.classList.toggle("on",on);
       // MediaRecorder deja el webm sin duración en sus datos (el navegador dice
@@ -1814,7 +1846,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const guardar=(data,peso,tipo)=>{
       if(peso>MAXFILE){ note(`"${file.name}" pesa ${(peso/1024).toFixed(0)} KB y el tope acá es ${Math.round(MAXFILE/1024)} KB, porque los adjuntos del chat se guardan dentro de la app y los carga todo el equipo en cada cambio. Subilo a Drive y vinculalo desde la pestaña Drive: ahí no pesa, y además se puede ver sin salir de la app.`,"Muy pesado para el chat"); return; }
       msgsOf(chatChan).push({id:"m"+uid(),from:me,text:"",ts:nowMs(),file:{name:file.name,size:peso,type:tipo,data}});
-      save(); renderChat(); };
+      irAlFinal=true; save(); renderChat(); };
     const fallar=()=>note("No se pudo leer el archivo.");
     if(/^image\//.test(file.type||"")){ achicarImagen(file,(data,peso)=>guardar(data,peso,"image/jpeg"),fallar); return; }
     if(file.size>MAXFILE){ guardar(null,file.size,file.type||""); return; }   // avisa y corta
@@ -1900,7 +1932,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.querySelector("#evTitle").focus();
     box.querySelector("#evCreate").addEventListener("click",()=>{ const ti=box.querySelector("#evTitle").value.trim()||"Evento"; const da=box.querySelector("#evDate").value||da0; const ho=box.querySelector("#evTime").value||""; const de=box.querySelector("#evDesc").value.trim();
       const p=invitadosAhora();
-      if(ev){ ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de;
+      // Se busca el evento de nuevo por su id: si mientras el formulario estaba
+      // abierto llegó un guardado del equipo, el estado se reemplazó entero y
+      // `ev` quedó colgando de la copia vieja (lo editado no se guardaba).
+      if(ev){ ev=(state.events||[]).find(e=>e.id===ev.id);
+        if(!ev){ closeEv(); note("Ese evento ya no existe: alguien lo borró mientras lo editabas."); return; }
+        ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de;
         if(p.length){ ev.para=p; if(!ev.by)ev.by=me; } else delete ev.para;
         if(antes!==null&&antes!==undefined){
           if(!p.length)avisarEvento(ev,{tipo:"team"});
@@ -2714,7 +2751,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // La identidad la manda la sesión: no se elige a mano, así nadie puede
   // hacerse pasar por otro ni quedar con un nombre que ya no existe.
   if(yo&&yo.name)state.me=yo.name;
-  mountPrivate(priv);
+  mountPrivate(priv); marcarPrivGuardado();
   migrarMisPrivados(priv);
   // Primer arranque (o después de un renombre): se da por visto lo que ya
   // existe, para no mostrar treinta avisos.
