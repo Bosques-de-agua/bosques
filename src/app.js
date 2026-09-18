@@ -7,7 +7,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
 // aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -1575,6 +1575,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
       const ap=row.querySelector("[data-audio] .aplay"); if(ap)ap.addEventListener("click",()=>tocarAudio(m));
+      const av=row.querySelector("[data-audio] .avel"); if(av)av.addEventListener("click",cambiarVel);
       const ab=row.querySelector("[data-audio] .abar"); if(ab)ab.addEventListener("click",e=>adelantarAudio(m,ab,e));
       const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id));
       const rp=row.querySelector("[data-responder]"); if(rp)rp.addEventListener("click",()=>responderA(m.id));
@@ -1639,7 +1640,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       // Pasados seis meses el archivo ya no está: en vez de un play que falla, se avisa.
       if(nowMs()-(m.ts||0)>VENCE_DIAS*DAY)return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div class="msgaudio vencido"><span class="adur">Audio vencido · ${mmss(a.dur)} · se borró a los 6 meses</span></div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
-        +`<div class="msgaudio" data-audio="${m.id}" data-dur="${Number(a.dur)||0}"><button class="aplay" title="Escuchar"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg></button><div class="abar" title="Adelantar o volver"><span></span></div><span class="adur">${mmss(a.dur)}</span></div>`
+        +`<div class="msgaudio" data-audio="${m.id}" data-dur="${Number(a.dur)||0}"><button class="aplay" title="Escuchar"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 4.5v11l9-5.5z" fill="currentColor"/></svg></button><div class="abar" title="Adelantar o volver"><span></span></div><span class="adur">${mmss(a.dur)}</span><button class="avel" title="Velocidad de reproducción">${velTxt()}</button></div>`
         +pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
@@ -1755,6 +1756,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     finally{ enviandoAudio=false; pintarGrab(); } }
   // Un solo reproductor para todo el chat: darle play a un audio corta el otro.
   let sonando=null; const player=new Audio(); player.preload="auto";
+  // Velocidad, como en WhatsApp: 1× → 1,5× → 2× → 1×. Es de cada uno (LOCAL_KEYS)
+  // y vale para todos los audios. Va también en defaultPlaybackRate porque
+  // cambiar el src del reproductor vuelve playbackRate a ese valor.
+  const VELS=[1,1.5,2];
+  const velAct=()=>VELS.includes(state&&state.velAudio)?state.velAudio:1;
+  const velTxt=()=>String(velAct()).replace(".",",")+"×";
+  function aplicarVel(){ const v=velAct(); player.defaultPlaybackRate=v; player.playbackRate=v; }
+  function cambiarVel(){ const v=velAct(); state.velAudio=VELS[(VELS.indexOf(v)+1)%VELS.length]; aplicarVel(); save();
+    document.querySelectorAll("#msgs .msgaudio .avel").forEach(b=>b.textContent=velTxt()); }
   ["play","pause","timeupdate","ended"].forEach(ev=>player.addEventListener(ev,()=>{ if(ev==="ended"){ sonando=null; } pintarReproductor(); }));
   function pintarReproductor(){ document.querySelectorAll("#msgs .msgaudio").forEach(el=>{ const on=(el.dataset.audio===sonando);
       const b=el.querySelector(".aplay"); const tocando=on&&!player.paused;
@@ -1767,7 +1777,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   async function tocarAudio(m){ const id=m.id;
     if(sonando===id){ if(player.paused)player.play().catch(()=>{}); else player.pause(); return; }
     const el=document.querySelector(`#msgs [data-audio="${id}"]`); if(el)el.classList.add("cargando");
-    try{ const url=await urlDeAudio(m.audio.path); player.pause(); sonando=id; player.src=url; await player.play(); }
+    try{ const url=await urlDeAudio(m.audio.path); player.pause(); sonando=id; player.src=url; aplicarVel(); await player.play(); }
     catch(e){ sonando=null; note("No se pudo reproducir el audio."); }
     finally{ const e2=document.querySelector(`#msgs [data-audio="${id}"]`); if(e2)e2.classList.remove("cargando"); pintarReproductor(); } }
   function adelantarAudio(m,bar,e){ if(sonando!==m.id)return; const total=Number(m.audio.dur)||0; if(!total)return;

@@ -1477,3 +1477,8 @@
 .mencionpop .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-person);flex:none}
 .msg .mencion{font-weight:600;color:var(--wood-deep)}
 .msg .mencion.yo{background:color-mix(in srgb,var(--wood) 22%,transparent);border-radius:4px;padding:0 3px}
+
+/* Velocidad del audio (1× / 1,5× / 2×), como en WhatsApp. */
+.msgaudio .avel{flex:none;min-width:34px;height:22px;padding:0 6px;border-radius:var(--r-pill);border:1px solid var(--line);
+  background:var(--surface);color:var(--ink-soft);font:600 11px var(--font-mono);cursor:pointer}
+.msgaudio .avel:hover{color:var(--ink);border-color:var(--wood)}
