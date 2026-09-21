@@ -1551,6 +1551,12 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .semvacio{font-size:12.5px;color:var(--ink-faint);padding:4px 0}
 .semnota{font-size:11.5px;color:var(--ink-faint);padding-top:8px;border-top:1px solid var(--line-soft);margin-top:4px}
 .semayuda{font-size:11.5px;color:var(--ink-faint);margin:12px 2px 0}
+.semtit{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.semarch{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--wood);background:none;border:1px solid var(--line);border-radius:var(--r-pill);padding:2px 9px;cursor:pointer;white-space:nowrap}
+.semarch:hover{border-color:var(--wood);color:var(--wood-deep)}
+.semarch .ico{width:13px;height:13px}
+.semline.arch .st{color:var(--ink-faint);text-decoration:line-through}
+.focosem{margin-top:14px}
 
 /* Tarea que se repite: un ↻ chiquito al lado del título, nada más. */
 .kcard .krep{flex:none;font-size:12px;line-height:1;color:var(--ink-faint);margin-left:2px}

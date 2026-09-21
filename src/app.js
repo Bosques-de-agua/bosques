@@ -1260,10 +1260,31 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // ---------- SEMANA: la revisión del lunes ----------
   // Una lectura, no datos nuevos: se arma sola con lo que ya está cargado.
   // Tocar una tarea abre su ficha, para resolverla ahí mismo en la reunión.
+  // La misma revisión vive en dos lugares: en Tareas, la del equipo entero; en
+  // Mi foco, solo lo tuyo (con tus privadas, y sin el bloque "Sin
+  // responsable", que ahí no tiene sentido).
   function renderSemana(){ const box=document.getElementById("semanaBoard"); if(!box)return;
+    box.innerHTML=semanaHTML(null); wireSemana(box,()=>{ renderTareas(); refreshChrome(); }); }
+  function itemsSemana(persona){
+    if(!persona)return allItems();
+    const mias=allItems().filter(x=>ownersOf(x.k).includes(persona));
+    return mias.concat(privL(persona).map(k=>({k,node:null,priv:true}))); }
+  // Completadas = terminadas en los últimos 7 días. Las ya archivadas siguen
+  // en la lista (la revisión del lunes tiene que verlas), apagadas; el botón
+  // archiva de una vez las que todavía no lo están.
+  function completadasSemana(persona){ const ahora=nowMs();
+    return itemsSemana(persona).filter(x=>x.k.done&&x.k.doneAt&&ahora-x.k.doneAt<=7*DAY).sort((a,b)=>b.k.doneAt-a.k.doneAt); }
+  function wireSemana(box,despues){
+    box.querySelectorAll(".semline").forEach(r=>r.addEventListener("click",()=>openTask(r.dataset.node,r.dataset.task)));
+    const ab=box.querySelector("[data-archsem]"); if(!ab)return;
+    ab.addEventListener("click",e=>{ e.stopPropagation(); const persona=ab.dataset.archsem||null;
+      const lista=completadasSemana(persona).filter(x=>!x.k.archived); if(!lista.length)return;
+      confirmar(`Se van al Archivo ${lista.length} tarea${lista.length===1?"":"s"} completada${lista.length===1?"":"s"} esta semana. Podés restaurarlas cuando quieras.`,
+        ()=>{ lista.forEach(x=>archiveTask(x.k)); save(); despues(); },{title:"Archivar completadas",yes:"Archivar"}); }); }
+  function semanaHTML(persona){
     const ahora=nowMs(), hoy=ymdLocal(new Date()), en=d=>ymdLocal(new Date(ahora+d*DAY));
-    const abiertas=activeItems().filter(x=>!x.k.done);
-    const terminadas=allItems().filter(x=>x.k.done&&x.k.doneAt&&ahora-x.k.doneAt<=7*DAY).sort((a,b)=>b.k.doneAt-a.k.doneAt);
+    const abiertas=itemsSemana(persona).filter(x=>!x.k.archived&&!x.k.done);
+    const terminadas=completadasSemana(persona), sinArchivar=terminadas.filter(x=>!x.k.archived).length;
     const vencidas=abiertas.filter(x=>x.k.due&&x.k.due<hoy).sort((a,b)=>a.k.due<b.k.due?-1:1);
     const proximas=abiertas.filter(x=>x.k.due&&x.k.due>=hoy&&x.k.due<=en(7)).sort((a,b)=>a.k.due<b.k.due?-1:1);
     const sinMov=abiertas.map(x=>{ const u=ultimoAvance(x.k);
@@ -1271,21 +1292,23 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         if(dEsp>=SIN_NOVEDADES_DIAS)return {x,d:dEsp,txt:(x.k.esperaDe?"espera a "+x.k.esperaDe:"en espera")+" · "+dEsp+" d"};
         if(dAv>=SIN_NOVEDADES_DIAS)return {x,d:dAv,txt:dAv+" d sin novedades"};
         return null; }).filter(Boolean).sort((a,b)=>b.d-a.d);
-    const sinResp=abiertas.filter(x=>!ownersOf(x.k).length&&x.k.due&&x.k.due<=en(14)).sort((a,b)=>a.k.due<b.k.due?-1:1);
-    const niNi=abiertas.filter(x=>!ownersOf(x.k).length&&!x.k.due).length;
+    const sinResp=persona?[]:abiertas.filter(x=>!ownersOf(x.k).length&&x.k.due&&x.k.due<=en(14)).sort((a,b)=>a.k.due<b.k.due?-1:1);
+    const niNi=persona?0:abiertas.filter(x=>!ownersOf(x.k).length&&!x.k.due).length;
     const dm=ds=>{ const [y,m,d]=ds.split("-"); return d+"/"+m; };
-    const fila=(x,meta,cls)=>`<div class="semline" data-node="${esc(x.node.id)}" data-task="${esc(x.k.id)}"><span class="st">${esc(x.k.title||"Tarea")}</span><span class="sm${cls?" "+cls:""}">${esc(meta)}</span></div>`;
-    const quien=x=>{ const o=ownersOf(x.k); return o.length?o.join(", "):"sin responsable"; };
-    const bloque=(titulo,lista,html,extra,cls)=>`<section class="semblk"><h3>${titulo}<span class="semn${cls&&lista.length?" "+cls:""}">${lista.length}</span></h3>${lista.length?html:'<div class="semvacio">Nada por acá.</div>'}${extra||""}</section>`;
-    box.innerHTML=`<div class="semgrid">`
-      +bloque("Se terminó en los últimos 7 días",terminadas,terminadas.map(x=>fila(x,quien(x))).join(""))
+    const fila=(x,meta,cls)=>`<div class="semline${x.k.archived?" arch":""}" data-node="${x.priv?"__priv":esc(x.node.id)}" data-task="${esc(x.k.id)}"><span class="st">${esc(x.k.title||"Tarea")}</span><span class="sm${cls?" "+cls:""}">${esc(meta)}</span></div>`;
+    // En tu semana todo es tuyo: decir quién sobra. Ahí se dice el tema.
+    const quien=x=>{ if(persona)return x.priv?"privada":(x.node.name||"");
+      const o=ownersOf(x.k); return o.length?o.join(", "):"sin responsable"; };
+    const bloque=(titulo,lista,html,extra,cls,accion)=>`<section class="semblk"><h3><span class="semtit">${titulo}${accion||""}</span><span class="semn${cls&&lista.length?" "+cls:""}">${lista.length}</span></h3>${lista.length?html:'<div class="semvacio">Nada por acá.</div>'}${extra||""}</section>`;
+    const archBtn=sinArchivar?`<button class="semarch" data-archsem="${persona?esc(persona):""}" title="Mandar al Archivo las ${sinArchivar} que todavía no están">${ICO.archivar} archivar${sinArchivar<terminadas.length?" "+sinArchivar:""}</button>`:"";
+    return `<div class="semgrid">`
+      +bloque("Tareas completadas",terminadas,terminadas.map(x=>fila(x,(x.k.archived?"archivada · ":"")+quien(x))).join(""),"","",archBtn)
       +bloque("Vencidas",vencidas,vencidas.map(x=>fila(x,"venció "+dm(x.k.due)+" · "+quien(x),"mal")).join(""),"","mal")
       +bloque("Vencen en los próximos 7 días",proximas,proximas.map(x=>fila(x,(x.k.due===hoy?"hoy":dm(x.k.due))+" · "+quien(x))).join(""))
       +bloque("Sin movimiento",sinMov,sinMov.map(o=>fila(o.x,o.txt,"ojo")).join(""),"","ojo")
-      +bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,(x.k.due<hoy?"venció ":"vence ")+dm(x.k.due))).join(""),
-        niNi?`<div class="semnota">Además, ${niNi} tarea${niNi===1?" no tiene":"s no tienen"} fecha ni responsable.</div>`:"")
-      +`</div><p class="semayuda">Sin responsable muestra solo las que vencen en las próximas 2 semanas. Sin movimiento: 14 días o más sin avances, o esperando.</p>`;
-    box.querySelectorAll(".semline").forEach(r=>r.addEventListener("click",()=>openTask(r.dataset.node,r.dataset.task))); }
+      +(persona?"":bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,(x.k.due<hoy?"venció ":"vence ")+dm(x.k.due))).join(""),
+        niNi?`<div class="semnota">Además, ${niNi} tarea${niNi===1?" no tiene":"s no tienen"} fecha ni responsable.</div>`:""))
+      +`</div><p class="semayuda">Completadas: las terminadas en los últimos 7 días; se archivan solas a los ${ARCH_DAYS} días o con el botón.${persona?"":" Sin responsable muestra solo las que vencen en las próximas 2 semanas."} Sin movimiento: 14 días o más sin avances, o esperando.</p>`; }
 
   // Los temas, en columnas por encargado: la misma lectura que "por persona"
   // de las tareas, un piso más arriba. Los que no tienen encargado quedan
@@ -2571,9 +2594,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // cargo. El botón de tarea privada y el filtro de prioridad son de las
     // tareas, así que en la otra pestaña no aparecen.
     const vf=focoVista(), misTemas=temasDe(me);
-    const seg=`<div class="seg2 focoseg" id="focoSeg"><button data-fv="tareas"${vf==="tareas"?' class="on"':""}>Tus tareas<span class="segn">${allMine.length+allPriv.length}</span></button><button data-fv="temas"${vf==="temas"?' class="on"':""}>Tus temas<span class="segn">${misTemas.length}</span></button></div>`;
+    const seg=`<div class="seg2 focoseg" id="focoSeg"><button data-fv="tareas"${vf==="tareas"?' class="on"':""}>Tus tareas<span class="segn">${allMine.length+allPriv.length}</span></button><button data-fv="temas"${vf==="temas"?' class="on"':""}>Tus temas<span class="segn">${misTemas.length}</span></button><button data-fv="semana"${vf==="semana"?' class="on"':""}>Tu semana</button></div>`;
     const resumen=vf==="temas"
       ? `${misTemas.length?`${misTemas.length} tema${misTemas.length===1?"":"s"} a tu cargo`:"ningún tema a tu cargo"}`
+      : vf==="semana" ? "lo tuyo de los últimos y los próximos 7 días"
       : `${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}`;
     const cabecera=`<div class="myfoco"><span class="mfl"><b>Tu foco</b>${seg}<span class="mfc">${resumen}</span></span><span class="mfr">${vf==="tareas"?`<button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}`:""}</span></div>`;
     if(vf==="temas"){ box.innerHTML=cabecera+temasDelFoco(misTemas,me);
@@ -2586,6 +2610,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         if(!r.classList.contains("conmias")){ openPanel(id); return; }
         if(focoOpen.has(id))focoOpen.delete(id); else focoOpen.add(id); renderMyTasks(); }));
       wireLineasTarea(box,me); wireFocoSeg(); return; }
+    if(vf==="semana"){ box.innerHTML=cabecera+`<div class="semana focosem">${semanaHTML(me)}</div>`;
+      wireSemana(box,()=>{ renderPanel(); refreshChrome(); }); wireFocoSeg(); return; }
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
@@ -2609,7 +2635,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       cb.addEventListener("change",e=>{ const [nid,iid]=cb.dataset.donetask.split("|"); const nd=N(nid); const k=nd&&(nd.items||[]).find(x=>x.id===iid); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); refreshChrome(); }); });
     box.querySelectorAll("[data-donepriv]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
       cb.addEventListener("change",e=>{ const k=privL(me).find(x=>x.id===cb.dataset.donepriv); if(!k)return; setDone(k,e.target.checked); save(); renderPanel(); }); }); }
-  const focoVista=()=>state.focoVista==="temas"?"temas":"tareas";
+  const focoVista=()=>(state.focoVista==="temas"||state.focoVista==="semana")?state.focoVista:"tareas";
   function wireFocoSeg(){ const s=document.getElementById("focoSeg"); if(!s)return;
     s.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; state.focoVista=b.dataset.fv; save(); renderMyTasks(); }); }
   // Tus temas, agrupados por proyecto: son de dos mundos distintos y mezclados
