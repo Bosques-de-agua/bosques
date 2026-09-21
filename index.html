@@ -93,7 +93,8 @@
   <main id="main">
     <section class="tab" id="tab-panel"><div class="wrap">
       <h1 class="h1">Mi panel<span class="infob" tabindex="0">i<span class="infopop"><b>Tu día, solo lo tuyo</b><ul>
-        <li>En el <b>calendario</b> ves los eventos a los que estás invitado, tus tareas con fecha y las que no tienen responsable. Tocá un día vacío para crear un evento.</li>
+        <li>En el <b>calendario</b> ves los eventos a los que estás invitado (celestes; apagados cuando ya pasaron) y tus tareas con fecha y las que no tienen responsable (del color de su estado). Hoy va con borde terracota. <b>Tocá un día</b> y se abre todo lo que tiene, los horarios libres de 8 a 20 y el botón de nuevo evento; tocando un horario libre, el evento se crea a esa hora.</li>
+        <li>Un evento puede llevar hora <b>hasta</b>; sin ella se cuenta una hora. En <b>Próximos eventos</b> se queda una hora después de terminar y después sale.</li>
         <li>Si conectaste tu <b>Google Calendar</b> (en Configuración), tus eventos personales aparecen con <b>borde punteado</b> y en su propio bloque. Solo los ves vos.</li>
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
         <li><b>Tu foco</b> tiene tres pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas); <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama; y <b>Tu semana</b>, la revisión de la pestaña Tareas pero solo con lo tuyo: tus tareas completadas (con un botón para archivarlas todas juntas), lo vencido, lo que vence y lo que no se mueve.</li>
@@ -251,6 +252,9 @@
     <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt autoalto" id="tObj" autocapitalize="sentences" autocorrect="on" rows="1" placeholder="¿Para qué es esta tarea?"></textarea></div>
     <div class="sec"><div class="sh"><h3>Notas</h3></div><textarea class="txt autoalto" id="tNotas" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Información fija: contactos, requisitos, contexto…"></textarea></div>
     <div class="sec"><div class="sh"><h3>Avances</h3></div><div class="avadd"><textarea class="txt" id="tAvInput" rows="1" autocapitalize="sentences" autocorrect="on" placeholder="¿En qué está? Ej: mandé el borrador a Franco" title="Enter agrega · Shift+Enter baja de renglón"></textarea><button class="btn" id="tAvAdd">Agregar</button></div><div id="tAvances" class="avlist"></div></div>
+    <!-- Hasta acá, el contenido de la tarea. Debajo, dónde vive y qué tiene pegado. -->
+    <hr class="tsep">
+    <div class="sec" id="tPrivSec"><div id="tPrivBox"></div></div>
     <div class="sec"><div class="sh"><h3>Pertenece a</h3></div><div id="tBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="tAddFile">＋ archivo de Drive</button></div><div id="tFiles"></div></div>
   </div>

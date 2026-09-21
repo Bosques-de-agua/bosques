@@ -1570,3 +1570,42 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .cfgcalbtns{display:flex;gap:6px;flex-wrap:wrap}
 .cfgcalest{font-size:12.5px;color:var(--ink-soft);min-height:0}
 #cfgCal[hidden]{display:none}
+
+/* ── Calendario: hoy, lo que ya pasó, y el cuadro del día ──
+   Hoy lleva el color de contraste (terracota), no el acento de la paleta:
+   en Pizarra el acento es un celeste que se confundía con los eventos. */
+:root .calcell.today{border:2px solid var(--clay);box-shadow:none;background:color-mix(in srgb,var(--clay) 7%,var(--surface-2))}
+:root .calcell.today .dnum{color:var(--on-accent);background:var(--clay);border-radius:var(--r-pill);padding:0 6px;align-self:flex-start}
+.calcell.ya .dnum{color:var(--ink-faint)}
+.chipcal.ev.pasado{background:color-mix(in srgb,var(--sky) 28%,var(--surface-3));color:var(--ink-faint)}
+.chipcal.gcal.pasado{opacity:.55}
+.calcell{position:relative}
+.calhay{display:none}
+@media (max-width:640px){ .calhay{display:block;position:absolute;right:5px;top:5px;font-size:9.5px;font-weight:700;color:var(--ink-soft);background:var(--surface-3);border-radius:var(--r-pill);padding:0 5px;line-height:1.5} }
+.diatit{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.diatit small{font-size:12px;font-weight:500;color:var(--ink-faint);text-transform:none}
+.dialista{display:flex;flex-direction:column;margin-top:4px}
+.diarow{display:flex;align-items:flex-start;gap:10px;padding:9px 4px;border-top:1px solid var(--line-soft);cursor:pointer}
+.diarow:first-child{border-top:none}
+.diarow:hover b{color:var(--wood-deep)}
+.diahora{flex:none;width:92px;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-soft);padding-top:2px;font-variant-numeric:tabular-nums}
+.diamarca{flex:none;width:9px;height:9px;border-radius:50%;margin-top:5px}
+.diacuerpo{display:flex;flex-direction:column;gap:2px;min-width:0}
+.diacuerpo b{font-weight:600;font-size:13.5px;color:var(--ink)}
+.diameta{font-size:11.5px;color:var(--ink-faint)}
+.diarow.pasado b,.diarow.pasado .diahora{color:var(--ink-faint)}
+.diarow.pasado .diamarca{opacity:.4}
+.diavacio{font-size:13px;color:var(--ink-faint);margin:6px 0}
+.dialab{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);margin:16px 0 8px}
+.dialab small{text-transform:none;letter-spacing:0;font-family:var(--font-body,inherit);font-size:11px;margin-left:4px}
+.dialibres{display:flex;flex-wrap:wrap;gap:6px}
+.dialibre{font:inherit;font-family:var(--font-mono);font-size:12px;padding:4px 10px;border-radius:var(--r-pill);border:1px dashed var(--line);background:var(--surface-2);color:var(--ink-soft);cursor:pointer}
+.dialibre:hover{border-style:solid;border-color:var(--sky);color:var(--ink)}
+.diavolver{font:inherit;font-size:12px;color:var(--wood-deep);background:none;border:none;padding:0;margin-bottom:6px;cursor:pointer}
+@media (max-width:560px){ .diahora{width:74px} }
+
+/* ── Ficha de tarea: el contenido (objetivo, notas, avances) arriba; una
+   línea; y abajo dónde vive la tarea y lo que tiene pegado. ── */
+.tsep{border:none;border-top:1px solid color-mix(in srgb,var(--ink-faint) 45%,transparent);margin:24px 0 4px}
+#tPrivSec[hidden]{display:none}
+#tPrivSec{margin-top:12px}

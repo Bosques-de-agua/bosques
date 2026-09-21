@@ -465,7 +465,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     d.taskFilters.prio=d.taskFilters.prio.filter(p=>p==="__none"||PRIO[p]);
     d.taskFilters.temas=d.taskFilters.temas.filter(t=>d.nodes[t]);   // un tema borrado dejaba el tablero vacío sin explicación
     if(!Array.isArray(d.panelFilter))d.panelFilter=[]; d.panelFilter=d.panelFilter.filter(p=>p==="__none"||PRIO[p]);
-    if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc="";
+    if(!Array.isArray(d.treeOpen))d.treeOpen=[]; d.treeOpen=d.treeOpen.filter(t=>d.nodes[t]); (d.events||[]).forEach(ev=>{ if(ev.rsvp==null)ev.rsvp={}; if(ev.time==null)ev.time=""; if(ev.desc==null)ev.desc=""; if(ev.hasta!=null&&!/^\d{1,2}:\d{2}$/.test(ev.hasta))delete ev.hasta;
       // para: nombres de los invitados. Sin lista (o vacía) = todo el equipo.
       if(Array.isArray(ev.para)){ ev.para=[...new Set(ev.para.map(String).filter(Boolean))]; if(!ev.para.length)delete ev.para; } else if(ev.para!=null)delete ev.para; });
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
@@ -1269,11 +1269,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!persona)return allItems();
     const mias=allItems().filter(x=>ownersOf(x.k).includes(persona));
     return mias.concat(privL(persona).map(k=>({k,node:null,priv:true}))); }
-  // Completadas = terminadas en los últimos 7 días. Las ya archivadas siguen
-  // en la lista (la revisión del lunes tiene que verlas), apagadas; el botón
-  // archiva de una vez las que todavía no lo están.
+  // Completadas = terminadas en los últimos 7 días. Las recién archivadas se
+  // quedan un día más, tachadas y al final, para que se vea lo que se acaba
+  // de mandar; después salen y la lista queda limpia. El botón archiva de una
+  // vez las que todavía no lo están.
+  const ARCH_VISIBLE=DAY;
   function completadasSemana(persona){ const ahora=nowMs();
-    return itemsSemana(persona).filter(x=>x.k.done&&x.k.doneAt&&ahora-x.k.doneAt<=7*DAY).sort((a,b)=>b.k.doneAt-a.k.doneAt); }
+    return itemsSemana(persona).filter(x=>x.k.done&&x.k.doneAt&&ahora-x.k.doneAt<=7*DAY&&(!x.k.archived||ahora-(x.k.archivedAt||0)<ARCH_VISIBLE))
+      .sort((a,b)=>(!!a.k.archived-!!b.k.archived)||(b.k.doneAt-a.k.doneAt)); }
   function wireSemana(box,despues){
     box.querySelectorAll(".semline").forEach(r=>r.addEventListener("click",()=>openTask(r.dataset.node,r.dataset.task)));
     const ab=box.querySelector("[data-archsem]"); if(!ab)return;
@@ -1308,7 +1311,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +bloque("Sin movimiento",sinMov,sinMov.map(o=>fila(o.x,o.txt,"ojo")).join(""),"","ojo")
       +(persona?"":bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,(x.k.due<hoy?"venció ":"vence ")+dm(x.k.due))).join(""),
         niNi?`<div class="semnota">Además, ${niNi} tarea${niNi===1?" no tiene":"s no tienen"} fecha ni responsable.</div>`:""))
-      +`</div><p class="semayuda">Completadas: las terminadas en los últimos 7 días; se archivan solas a los ${ARCH_DAYS} días o con el botón.${persona?"":" Sin responsable muestra solo las que vencen en las próximas 2 semanas."} Sin movimiento: 14 días o más sin avances, o esperando.</p>`; }
+      +`</div><p class="semayuda">Completadas: las terminadas en los últimos 7 días; se archivan solas a los ${ARCH_DAYS} días o con el botón, y las archivadas quedan tachadas un día antes de salir de la lista.${persona?"":" Sin responsable muestra solo las que vencen en las próximas 2 semanas."} Sin movimiento: 14 días o más sin avances, o esperando.</p>`; }
 
   // Los temas, en columnas por encargado: la misma lectura que "por persona"
   // de las tareas, un piso más arriba. Los que no tienen encargado quedan
@@ -2039,7 +2042,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(window.claude&&window.claude.downloads){ try{ const b=await (await fetch(f.data)).blob(); await window.claude.downloads.save({filename:f.name,data:b}); return; }catch(err){ if(err&&err.code==="declined")return; } }
     try{ const a=document.createElement("a"); a.href=f.data; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); }
     catch(e){ note("No se pudo descargar el archivo."); } }
-  function closeEv(){ document.getElementById("evModal").classList.remove("on"); }
+  function closeEv(){ volverADia=null; document.getElementById("evModal").classList.remove("on"); }
   // ---------- EVENTOS: para quién es cada uno ----------
   // Un evento es de todo el equipo, o solo de algunas personas (la lista "para", con
   // sus nombres). Si es de algunas, solo lo ven ellas —en el calendario, en
@@ -2054,6 +2057,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function puedeResponder(ev){ const me=state.me||""; return !!me&&(esParaTodos(ev)||ev.para.includes(me)); }
   function invitadosDe(ev){ return esParaTodos(ev)?allPeople():ev.para.slice(); }
   function eventosVisibles(){ return (state.events||[]).filter(veoEvento); }
+  // ---------- CUÁNDO EMPIEZA Y TERMINA UN EVENTO ----------
+  // La hora de fin ("hasta") es opcional. Sin ella, un evento dura una hora
+  // (lo mismo que se manda a Google Calendar); sin hora, dura todo el día.
+  const HORA_RE=/^\d{1,2}:\d{2}$/;
+  const aMin=h=>{ const [a,b]=h.split(":").map(Number); return a*60+b; };
+  const deMin=m=>dosCifras(Math.floor(m/60))+":"+dosCifras(m%60);
+  function evRango(ev){ const [y,m,d]=String(ev.date||"").split("-").map(Number); if(!y)return null;
+    if(!ev.time||!HORA_RE.test(ev.time))return {ini:new Date(y,m-1,d).getTime(),fin:new Date(y,m-1,d+1).getTime(),todoElDia:true};
+    const i=aMin(ev.time); let f=(ev.hasta&&HORA_RE.test(ev.hasta))?aMin(ev.hasta):i+60; if(f<=i)f=i+60;
+    return {ini:new Date(y,m-1,d,0,i).getTime(),fin:new Date(y,m-1,d,0,f).getTime(),todoElDia:false}; }
+  const evPasado=ev=>{ const r=evRango(ev); return !!r&&nowMs()>=r.fin; };
+  // En Próximos eventos se queda una hora más después de terminar (una
+  // reunión de 10 sin hora de fin se va a las 12), y después desaparece.
+  const EV_GRACIA=60*60000;
+  const evVigente=ev=>{ const r=evRango(ev); return !!r&&nowMs()<r.fin+(r.todoElDia?0:EV_GRACIA); };
+  const horaEv=ev=>ev.time?ev.time+(ev.hasta&&HORA_RE.test(ev.hasta)?"–"+ev.hasta:""):"";
   // ---------- TU GOOGLE CALENDAR EN TU PANEL ----------
   // Tus eventos personales de Google, leídos por la función `calendario`. Viven
   // SOLO en memoria: no entran al estado, no se guardan, no los ve nadie más.
@@ -2099,9 +2118,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.values(groupsAll()).forEach(g=>{ g.msgs=f(g.msgs); });
     Object.keys(state.chat.dm||{}).forEach(k=>{ state.chat.dm[k]=f(state.chat.dm[k]); }); }
 
-  function openEvNew(presetDate,desde){ evForm(null,(typeof presetDate==="string")?presetDate:null,(typeof desde==="string")?desde:null); }
+  function openEvNew(presetDate,desde,presetHora){ evForm(null,(typeof presetDate==="string")?presetDate:null,(typeof desde==="string")?desde:null,(typeof presetHora==="string"&&HORA_RE.test(presetHora))?presetHora:""); }
   function openEvEdit(id){ const ev=(state.events||[]).find(e=>e.id===id); if(ev&&veoEvento(ev))evForm(ev); }
-  function evForm(ev,presetDate,desde){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date()); const me=state.me||"";
+  function evForm(ev,presetDate,desde,presetHora){ const box=document.getElementById("evBox"); const today=ymdLocal(new Date()); const me=state.me||"";
+    const hora0=ev?(ev.time||""):(presetHora||""), hasta0=ev?(ev.hasta||""):"";
     const da0=ev?ev.date:((presetDate&&/^\d{4}-\d{2}-\d{2}$/.test(presetDate))?presetDate:today);
     // Invitados de arranque: los del evento; si es nuevo, la gente del chat desde donde se crea.
     let para;
@@ -2113,7 +2133,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     let modo=para.length?"algunos":"todos";
     const antes=ev?(esParaTodos(ev)?null:ev.para.slice()):undefined;   // null = era de todo el equipo
     const gente=allPeople().filter(Boolean);
-    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" autocapitalize="sentences" autocorrect="on" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${ev?esc(ev.time||""):""}"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿A quién invitás?</label><div class="seg2 evmodo"><button type="button" data-modo="todos">Todo el equipo</button><button type="button" data-modo="algunos">Elegir personas</button></div><div class="gmlist evgente" id="evGente">${gente.map(p=>`<label class="fopt"><input type="checkbox" data-p="${esc(p)}" ${p===me?"checked disabled":""}><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}${p===me?" (vos)":""}</span></label>`).join("")}</div><div class="evdestino" id="evDestino"></div></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar"}</button></div>`;
+    box.innerHTML=`<h2>${ev?"Editar evento":"Nuevo evento"}</h2><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Título</label><input class="txt" id="evTitle" autocapitalize="sentences" autocorrect="on" placeholder="Reunión de equipo" value="${ev?esc(ev.title):""}"></div></div><div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="evDate" value="${da0}"></div><div class="c"><label>Hora</label><input type="time" class="txt" id="evTime" value="${esc(hora0)}"></div><div class="c"><label>Hasta <small>opcional</small></label><input type="time" class="txt" id="evHasta" value="${esc(hasta0)}" title="Sin hora de fin, se cuenta una hora"></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>Descripción (opcional)</label><textarea class="txt" id="evDesc" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="Lugar, agenda, notas…">${ev?esc(ev.desc||""):""}</textarea></div></div><div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿A quién invitás?</label><div class="seg2 evmodo"><button type="button" data-modo="todos">Todo el equipo</button><button type="button" data-modo="algunos">Elegir personas</button></div><div class="gmlist evgente" id="evGente">${gente.map(p=>`<label class="fopt"><input type="checkbox" data-p="${esc(p)}" ${p===me?"checked disabled":""}><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}${p===me?" (vos)":""}</span></label>`).join("")}</div><div class="evdestino" id="evDestino"></div></div></div><div class="row"><div style="flex:1"></div><button class="btn" id="evCancel">Cancelar</button><button class="btn btn-primary" id="evCreate">${ev?"Guardar cambios":"Crear y avisar"}</button></div>`;
     const invitadosAhora=()=>modo==="todos"?[]:[...new Set(para)];
     const pintar=()=>{ box.querySelectorAll("[data-modo]").forEach(b=>b.classList.toggle("on",b.dataset.modo===modo));
       box.querySelector("#evGente").style.display=modo==="algunos"?"":"none";
@@ -2129,23 +2149,25 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.querySelectorAll("#evGente [data-p]").forEach(cb=>cb.addEventListener("change",()=>{ const p=cb.dataset.p; if(cb.checked){ if(!para.includes(p))para.push(p); } else para=para.filter(x=>x!==p); pintar(); }));
     pintar();
     document.getElementById("evModal").classList.add("on");
-    box.querySelector("#evCancel").addEventListener("click",()=>{ if(ev)openEvView(ev.id); else closeEv(); });
+    box.querySelector("#evCancel").addEventListener("click",()=>{ if(ev)openEvView(ev.id); else if(volverADia)abrirDia(volverADia); else closeEv(); });
     box.querySelector("#evTitle").focus();
     box.querySelector("#evCreate").addEventListener("click",()=>{ const ti=box.querySelector("#evTitle").value.trim()||"Evento"; const da=box.querySelector("#evDate").value||da0; const ho=box.querySelector("#evTime").value||""; const de=box.querySelector("#evDesc").value.trim();
+      // "Hasta" vale solo con hora de inicio y si es después de ella.
+      let ha=box.querySelector("#evHasta").value||""; if(!ho||!HORA_RE.test(ha)||aMin(ha)<=aMin(ho))ha="";
       const p=invitadosAhora();
       // Se busca el evento de nuevo por su id: si mientras el formulario estaba
       // abierto llegó un guardado del equipo, el estado se reemplazó entero y
       // `ev` quedó colgando de la copia vieja (lo editado no se guardaba).
       if(ev){ ev=(state.events||[]).find(e=>e.id===ev.id);
         if(!ev){ closeEv(); note("Ese evento ya no existe: alguien lo borró mientras lo editabas."); return; }
-        ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de;
+        ev.title=ti; ev.date=da; ev.time=ho; ev.desc=de; if(ha)ev.hasta=ha; else delete ev.hasta;
         if(p.length){ ev.para=p; if(!ev.by)ev.by=me; } else delete ev.para;
         if(antes!==null&&antes!==undefined){
           if(!p.length)avisarEvento(ev,{tipo:"team"});
           else { const nuevos=p.filter(x=>x!==me&&!antes.includes(x)); if(nuevos.length)avisarEvento(ev,{tipo:"privados",a:nuevos}); } }
         save(); renderActive(); openEvView(ev.id); return; }
       const id="ev"+uid(); const rsvp={}; if(me)rsvp[me]="yes";
-      const nuevo={id,date:da,title:ti,time:ho,desc:de,rsvp,by:me}; if(p.length)nuevo.para=p;
+      const nuevo={id,date:da,title:ti,time:ho,desc:de,rsvp,by:me}; if(ha)nuevo.hasta=ha; if(p.length)nuevo.para=p;
       state.events.push(nuevo);
       avisarEvento(nuevo,destinoAviso(p,desde));
       save(); closeEv(); renderActive(); }); }
@@ -2153,8 +2175,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function gcalUrl(ev){ const pad=n=>String(n).padStart(2,"0");
     const [y,m,d]=(ev.date||"").split("-").map(Number); if(!y)return "";
     let dates;
-    if(ev.time&&/^\d{1,2}:\d{2}$/.test(ev.time)){ const [hh,mm]=ev.time.split(":").map(Number);
-      const ini=new Date(y,m-1,d,hh,mm), fin=new Date(ini.getTime()+60*60000);
+    if(ev.time&&/^\d{1,2}:\d{2}$/.test(ev.time)){ const r=evRango(ev);
+      const ini=new Date(r.ini), fin=new Date(r.fin);
       const f=x=>`${x.getFullYear()}${pad(x.getMonth()+1)}${pad(x.getDate())}T${pad(x.getHours())}${pad(x.getMinutes())}00`;
       dates=f(ini)+"/"+f(fin);
     } else { const ini=new Date(y,m-1,d), fin=new Date(y,m-1,d+1);
@@ -2167,10 +2189,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const inv=invitadosDe(ev);
     const rows=inv.map(p=>{ const v=(ev.rsvp||{})[p]; return `<div class="arow"><span>${esc(p)}</span><span class="ap">${v==="yes"?"Voy":v==="no"?"No voy":"— sin responder"}</span></div>`; }).join("");
     const quienes=esParaTodos(ev)?`<p class="evquienes">${ICO.equipo}<span>Todo el equipo</span></p>`:`<p class="evquienes">${ICO.candado}<span>Solo invitados: ${esc(inv.join(", "))}</span></p>`;
-    box.innerHTML=`<h2>${esc(ev.title)}</h2><p>${ICO.calendario} ${esc(ev.date)}${ev.time?" · "+ICO.reloj+" "+esc(ev.time):""}</p>${quienes}${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${puedeResponder(ev)?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">No estás entre los invitados.</p>'}<div class="pop-l" style="margin-top:14px">${esParaTodos(ev)?"Asistencia del equipo":"Asistencia de los invitados"}</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">${ICO.calendario} Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
+    box.innerHTML=(volverADia?`<button class="diavolver" id="evVolverDia">‹ ${esc(mayus(fechaLarga(volverADia)))}</button>`:"")+`<h2>${esc(ev.title)}</h2><p>${ICO.calendario} ${esc(ev.date)}${ev.time?" · "+ICO.reloj+" "+esc(horaEv(ev)):""}</p>${quienes}${ev.desc?`<p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin-top:-6px">${esc(ev.desc)}</p>`:""}${puedeResponder(ev)?`<div class="pop-l">Tu respuesta</div><div class="rsvp"><button class="yes ${(ev.rsvp||{})[me]==="yes"?"on":""}" data-rv="yes">Voy</button><button class="no ${(ev.rsvp||{})[me]==="no"?"on":""}" data-rv="no">No voy</button></div>`:'<p style="color:var(--ink-faint);font-size:12px">No estás entre los invitados.</p>'}<div class="pop-l" style="margin-top:14px">${esParaTodos(ev)?"Asistencia del equipo":"Asistencia de los invitados"}</div>${rows}<div class="row" style="margin-top:14px"><a class="btn" href="${esc(gcalUrl(ev))}" target="_blank" rel="noopener noreferrer" title="Se abre Google Calendar con el evento ya cargado; vos confirmás">${ICO.calendario} Agregar a mi calendario</a><div style="flex:1"></div><button class="btn" id="evEdit">✎ Editar</button><button class="btn danger" id="evDel">Eliminar</button><button class="btn btn-primary" id="evOk">Listo</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelectorAll("[data-rv]").forEach(b=>b.addEventListener("click",()=>{ setRsvp(id,b.dataset.rv); openEvView(id); }));
     box.querySelector("#evEdit").addEventListener("click",()=>openEvEdit(id));
+    const vd=box.querySelector("#evVolverDia"); if(vd)vd.addEventListener("click",()=>abrirDia(volverADia));
     box.querySelector("#evOk").addEventListener("click",closeEv);
     box.querySelector("#evDel").addEventListener("click",()=>{ closeEv(); confirmar(esParaTodos(ev)?"El evento se borra para todo el equipo.":"El evento se borra para todos los invitados.",()=>{ state.events=state.events.filter(e=>e.id!==id); quitarTarjetasEvento(id); save(); renderActive(); },{title:"Eliminar evento",yes:"Eliminar",danger:true}); }); }
   function setRsvp(id,val){ if(!state.me){ note("No pudimos identificarte para responder."); return; } const ev=(state.events||[]).find(e=>e.id===id); if(!ev||!puedeResponder(ev))return; ev.rsvp=ev.rsvp||{}; if(ev.rsvp[state.me]===val)delete ev.rsvp[state.me]; else ev.rsvp[state.me]=val; save(); if(active==="chat")renderChat(); if(active==="panel")renderPanel(); }
@@ -2493,7 +2516,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const today=ymdLocal(new Date()); const me=state.me; const solaEnPantalla=panelView()==="upcoming";
     // En el Panel completo es un resumen corto; siendo la unica cosa en
     // pantalla no tiene sentido recortar a seis.
-    let evs=eventosVisibles().filter(e=>e.date>=today).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
+    let evs=eventosVisibles().filter(e=>e.date>=today&&evVigente(e)).sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
     if(!solaEnPantalla)evs=evs.slice(0,6);
     const gHTML=googleProximosHTML(solaEnPantalla?0:4);
     if(!evs.length){ box.innerHTML=(solaEnPantalla
@@ -2503,7 +2526,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       box.innerHTML=`<div class="card"><div class="lab" style="margin-bottom:6px">${ICO.calendario} Próximos eventos</div>`+evs.map(ev=>{
         const mine=(ev.rsvp||{})[me]; const yes=Object.values(ev.rsvp||{}).filter(v=>v==="yes").length;
         const tag=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':`<span class="evtag">${yes} van</span>`;
-        return `<div class="evrow" data-ev="${ev.id}"><div class="evrow-main"><b>${esc(ev.title)}</b><span class="evrow-meta">${esc(ev.date)}${ev.time?" · "+esc(ev.time):""}${ev.desc?" · "+esc(ev.desc):""}</span></div>${tag}</div>`; }).join("")+`</div>`;
+        return `<div class="evrow" data-ev="${ev.id}"><div class="evrow-main"><b>${esc(ev.title)}</b><span class="evrow-meta">${esc(ev.date)}${ev.time?" · "+esc(horaEv(ev)):""}${ev.desc?" · "+esc(ev.desc):""}</span></div>${tag}</div>`; }).join("")+`</div>`;
     } else {
       // Agenda: una ficha por evento, agrupada por dia.
       let ultimoDia=""; let html="";
@@ -2516,7 +2539,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         const sinResponder=invitadosDe(ev).filter(p=>!rs[p]);
         const tuya=mine==="yes"?'<span class="evtag yes">vas</span>':mine==="no"?'<span class="evtag no">no vas</span>':'<span class="evtag">sin responder</span>';
         html+=`<div class="agev" data-ev="${esc(ev.id)}">
-          <div class="aghora">${ev.time?esc(ev.time):"—"}</div>
+          <div class="aghora">${ev.time?esc(horaEv(ev)):"—"}</div>
           <div class="agcuerpo">
             <div class="agtit"><b>${esc(ev.title||"Evento")}</b>${tuya}</div>
             ${ev.desc?`<div class="agdesc">${esc(ev.desc)}</div>`:""}
@@ -2537,33 +2560,85 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       state.panelView="cal"; save(); renderPanel();
       const cel=document.querySelector('.calcell[data-day="'+b.dataset.cal+'"]');
       if(cel){ cel.classList.add("resaltada"); cel.scrollIntoView({behavior:"smooth",block:"center"}); } })); }
-  function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date()); const me=state.me; const byDay={};
+  // Todo lo que cae en cada día, en el orden en que se lee: lo que tiene hora
+  // primero y en orden. Lo usan la grilla del mes y el cuadro del día.
+  function calPorDia(){ const me=state.me; const byDay={};
     const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
     // Una tarea sin responsable es del equipo, así que va al calendario de
     // todos. El filtro de antes la escondía de todas partes: desde que la
     // identidad sale del email de la sesión, `me` nunca está vacío, y una
     // fecha sin dueño no aparecía en el calendario de nadie.
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
-    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
-    eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,id:ev.id}));
-    const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,g:o.g})));
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
+    eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,titulo:ev.title||"Evento",id:ev.id,ev,pasado:evPasado(ev)}));
+    const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,titulo:o.g.titulo,g:o.g,pasado:!o.g.diaEntero&&!!o.g.fin&&nowMs()>=new Date(o.g.fin).getTime()})));
     cargarGoogle();
     // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
     // tiene: si hay una reunión a las 9, quiero verla arriba de todo.
     Object.keys(byDay).forEach(ds=>byDay[ds].sort((a,b)=>{
       if(!!a.hora!==!!b.hora)return a.hora?-1:1;
       return a.hora<b.hora?-1:a.hora>b.hora?1:0; }));
+    return byDay; }
+  function renderCalendar(){ const mount=document.getElementById("calMount"); if(!mount)return; const y=cal.y,m=cal.m; const first=new Date(y,m,1); const startDow=(first.getDay()+6)%7; const daysIn=new Date(y,m+1,0).getDate(); const todayS=ymdLocal(new Date());
+    const byDay=calPorDia();
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':''}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
-      cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${shown}${more}`:''}</div>`; }
+      // En el teléfono los chips no entran: un puntito dice que ese día hay algo.
+      const hay=chips.length?`<span class="calhay" aria-hidden="true">${chips.length}</span>`:"";
+      cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}${inMonth&&ds<todayS?' ya':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${hay}${shown}${more}`:''}</div>`; }
     mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
     mount.querySelector('[data-cal="prev"]').addEventListener("click",()=>{ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderCalendar(); });
     mount.querySelector('[data-cal="next"]').addEventListener("click",()=>{ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(); });
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
-    mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; openEvNew(ds); }));
+    mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; abrirDia(ds); }));
     mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else if(c.type==="google")verGoogle(c.g,c.hora); else openEvView(c.id); })); }
+  // ---------- EL CUADRO DEL DÍA ----------
+  // Tocar un día abre todo lo que tiene (en la grilla entran tres cosas y en
+  // el teléfono ninguna), los huecos libres de la jornada y el botón de nuevo
+  // evento. Un hueco libre crea el evento con esa hora ya puesta.
+  const JORNADA=[8*60,20*60], HUECO_MIN=30;
+  let volverADia=null;   // si el evento se abrió desde el cuadro del día, se puede volver
+  const mayus=s=>{ s=String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); };
+  function huecosLibres(ds,items){ const hoy=ymdLocal(new Date()); if(ds<hoy)return [];
+    let desde=JORNADA[0];
+    if(ds===hoy){ const t=new Date(); desde=Math.max(desde,Math.ceil((t.getHours()*60+t.getMinutes())/30)*30); }
+    const ocupado=[];
+    items.forEach(c=>{
+      if(c.type==="event"){ const r=evRango(c.ev); if(r&&!r.todoElDia){ const i=new Date(r.ini); const a=i.getHours()*60+i.getMinutes(); ocupado.push([a,a+(r.fin-r.ini)/60000]); } }
+      else if(c.type==="task"&&c.hora&&HORA_RE.test(c.hora)){ const a=aMin(c.hora); ocupado.push([a,a+60]); }
+      else if(c.type==="google"&&c.g&&!c.g.diaEntero&&c.g.inicio){ const i=new Date(c.g.inicio), f=c.g.fin?new Date(c.g.fin):new Date(i.getTime()+3600000);
+        const a=i.getHours()*60+i.getMinutes(); ocupado.push([a,ymdLocal(f)===ds?f.getHours()*60+f.getMinutes():24*60]); } });
+    ocupado.sort((x,y)=>x[0]-y[0]);
+    const libres=[]; let cur=desde;
+    ocupado.forEach(([a,b])=>{ if(a-cur>=HUECO_MIN&&cur<JORNADA[1])libres.push([cur,Math.min(a,JORNADA[1])]); cur=Math.max(cur,b); });
+    if(JORNADA[1]-cur>=HUECO_MIN)libres.push([cur,JORNADA[1]]);
+    return libres.filter(([a,b])=>b-a>=HUECO_MIN); }
+  function abrirDia(ds){ const box=document.getElementById("evBox"); const me=state.me; const hoy=ymdLocal(new Date());
+    const items=calPorDia()[ds]||[];
+    const fila=(c,i)=>{ let hora="—", meta="", marca="", cls=c.pasado?" pasado":"";
+      if(c.type==="event"){ const ev=c.ev; hora=ev.time?horaEv(ev):"todo el día"; marca="background:var(--sky)";
+        const mio=(ev.rsvp||{})[me]; meta=(c.pasado?"terminó · ":"")+(mio==="yes"?"vas":mio==="no"?"no vas":puedeResponder(ev)?"sin responder":"no estás invitado")+(esParaTodos(ev)?" · todo el equipo":" · "+invitadosDe(ev).join(", ")); }
+      else if(c.type==="task"){ hora=c.hora||"—"; marca="background:"+c.color;
+        const n=c.node?N(c.node):null; meta="Tarea · "+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:"")); }
+      else { hora=c.hora||"todo el día"; marca="border:1px dashed #4285f4"; meta="Tu Google Calendar · solo lo ves vos"; }
+      return `<div class="diarow${cls}" data-i="${i}"><span class="diahora">${esc(hora)}</span><span class="diamarca" style="${marca}"></span><span class="diacuerpo"><b>${esc(c.titulo||c.label)}</b><span class="diameta">${esc(meta)}</span></span></div>`; };
+    const libres=huecosLibres(ds,items);
+    const pasoYa=ds<hoy;
+    box.innerHTML=`<h2 class="diatit">${esc(mayus(fechaLarga(ds)))}<small>${esc(ds===hoy?"hoy":cuantoFalta(ds))}</small></h2>`
+      +(items.length?`<div class="dialista">${items.map(fila).join("")}</div>`:`<p class="diavacio">${pasoYa?"No hubo nada este día.":"No hay nada agendado."}</p>`)
+      +(pasoYa?"":`<div class="dialab">Horarios libres <small>de ${deMin(JORNADA[0])} a ${deMin(JORNADA[1])} · tocá uno para crear el evento ahí</small></div>`
+        +(libres.length?`<div class="dialibres">${libres.map(([a,b])=>`<button class="dialibre" data-h="${deMin(a)}">${deMin(a)}–${deMin(b)}</button>`).join("")}</div>`:`<p class="diavacio">No quedan huecos de media hora o más.</p>`))
+      +`<div class="row" style="margin-top:14px"><div style="flex:1"></div><button class="btn" id="diaCerrar">Cerrar</button><button class="btn btn-primary" id="diaNuevo">＋ Nuevo evento</button></div>`;
+    document.getElementById("evModal").classList.add("on");
+    box.querySelector("#diaCerrar").addEventListener("click",closeEv);
+    box.querySelector("#diaNuevo").addEventListener("click",()=>{ volverADia=ds; openEvNew(ds); });
+    box.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{ volverADia=ds; openEvNew(ds,null,b.dataset.h); }));
+    box.querySelectorAll(".diarow").forEach(r=>r.addEventListener("click",()=>{ const c=items[+r.dataset.i]; if(!c)return;
+      if(c.type==="event"){ volverADia=ds; openEvView(c.id); }
+      else if(c.type==="task"){ closeEv(); if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); }
+      else verGoogle(c.g,c.hora); })); }
   // A qué tema pertenece, al lado del nombre y antes de la prioridad. Va en
   // cursiva y apagado a propósito: tiene que poder ignorarse de un vistazo,
   // pero estar cuando el título de la tarea, solo, queda en el aire.
@@ -2672,6 +2747,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderTFiles(){ const k=curTask(); if(!k)return; renderFileList(document.getElementById("tFiles"),k,()=>{ renderTFiles(); renderActive(); },"task"); }
   function renderTBelong(){ const k=curTask(); if(!k)return; const box=document.getElementById("tBelong");
     document.getElementById("tKind").textContent=isPriv()?"Tarea privada":"Tarea";
+    const privSec=document.getElementById("tPrivSec"), privBox=document.getElementById("tPrivBox");
+    privSec.hidden=isPriv(); privBox.innerHTML="";
     if(isPriv()){
       box.innerHTML=`<div class="subrow" style="cursor:default;border-left:3px solid var(--accent-priv)"><span class="orb" style="background:var(--accent-priv)"></span><span class="t"><b>${ICO.candado} Tarea privada</b><span>Solo la ves vos — no aparece para el equipo</span></span></div>`
         +`<div style="margin-top:8px"><label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:4px">Pasarla al equipo</label><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="pick" id="tMoveNode" style="flex:1 1 190px"></select><button class="btn" id="tMoveGo">Compartir</button></div></div>`;
@@ -2684,8 +2761,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       return; }
     const node=N(selTaskNode); if(!node)return;
     const path=pathOf(selTaskNode); const label=path[path.length-1].name; const trail=path.map(p=>p.name).slice(0,-1).join(" › ")||"raíz";
-    box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><button class="fed" id="tReparent" title="Cambiar de tema">${ICO.lapiz}</button><span class="go">↗</span></div>`
-      +`<button class="rowbtn" id="tMakePriv" style="margin-top:8px">${ICO.candado} Convertir en tarea privada</button>`;
+    box.innerHTML=`<div class="subrow" id="tGoNode"><span class="orb" style="background:${accentOf(node)}"></span><span class="t"><b>${esc(label)}</b><span>${esc(trail)}</span></span><button class="fed" id="tReparent" title="Cambiar de tema">${ICO.lapiz}</button><span class="go">↗</span></div>`;
+    privBox.innerHTML=`<button class="rowbtn" id="tMakePriv">${ICO.candado} Convertir en tarea privada</button>`;
     document.getElementById("tGoNode").addEventListener("click",e=>{ if(e.target.closest("#tReparent"))return; closeTask(); openPanel(selTaskNode); });
     document.getElementById("tReparent").addEventListener("click",e=>{ e.stopPropagation(); pedirNuevoTema(k); });
     document.getElementById("tMakePriv").addEventListener("click",()=>{ const me=state.me; if(!me){ note("No pudimos identificarte."); return; }
