@@ -526,6 +526,9 @@
   .phead input.title{font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);border:none;background:transparent;width:100%;margin-top:6px;padding:2px 0;outline:none;border-bottom:2px solid transparent}
   .phead input.title:focus{border-bottom-color:var(--wood)}
   .pctl{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  /* display:flex le gana a [hidden]: sin esta linea, esconder un renglon del
+     formulario no lo esconde (el mismo tropezon que .docacc .btn[hidden]). */
+  .pctl[hidden]{display:none}
   .pctl .c{flex:1 1 120px;min-width:110px}
   .pctl label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:4px}
   .dotlab{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:baseline;background:var(--line);box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 12%,transparent)}
@@ -1466,6 +1469,12 @@
    la lista de canales y en la cabecera. */
 .gmfoto{display:flex;align-items:center;gap:10px}
 .gmav{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none}
+/* La foto por defecto del Equipo es el isotipo de Bosques de Agua: una silueta
+   BLANCA y mucho mas alta que ancha. Va centrada sobre el circulo de madera y
+   medida a lo alto — con el `cover` de .hasimg se le cortarian la punta de la
+   gota y la base. El color va ACA y no en un style= del elemento: el atajo
+   `background` en linea le pone background-image:none y le gana a esta regla. */
+.eqlogo{background-color:var(--wood);background-image:url(/bda-isotipo.png);background-repeat:no-repeat;background-position:center;background-size:auto 66%}
 .gmav .ico{width:20px;height:20px;color:var(--on-person)}
 #gmFotoQuitar[hidden]{display:none}
 .chathead .headav{display:inline-grid;width:22px;height:22px;border-radius:50%;vertical-align:-5px;margin-right:2px}

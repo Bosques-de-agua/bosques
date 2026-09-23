@@ -7,7 +7,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
 // aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -453,7 +453,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return {version:5,seq,nodes,roots,theme:null,edgeMeta:{},members:["Nico","Juampi","Lucas","Juanso"],me:"",events,chat,tab:"panel",estProj:P1,estFocus:"",weekGoals:"",privTasks:{},_seedfix:true,_layout3:true};
   }
 
-  function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";
+  function normalize(d){ if(!d.edgeMeta)d.edgeMeta={}; if(!d.members)d.members=[]; if(d.me==null)d.me=""; if(!d.events)d.events=[]; if(d.weekGoals==null)d.weekGoals=""; if(d.estFocus==null)d.estFocus=""; if(!d.chat)d.chat={team:[],dm:{}}; if(!d.chat.dm)d.chat.dm={}; if(!d.chat.groups||typeof d.chat.groups!=="object")d.chat.groups={}; Object.keys(d.chat.groups).forEach(gid=>{ const g=d.chat.groups[gid]; if(!g||!g.name){ delete d.chat.groups[gid]; return; } if(!Array.isArray(g.members))g.members=[]; if(!Array.isArray(g.msgs))g.msgs=[]; g.id=gid; }); if(d.teamFoto!=null&&!fotoOk(d.teamFoto))delete d.teamFoto; if(!d.myNotes)d.myNotes={}; if(!d.avatars)d.avatars={}; if(!d.userColors)d.userColors={}; if(!d.tasksSeen)d.tasksSeen={}; if(!d.chatSeen)d.chatSeen={}; if(d.taskTemaFilter==null)d.taskTemaFilter="";
     // Hasta qué mensaje leyó cada uno, por canal. Es COMPARTIDO: de acá salen
     // las tildes. Un número por persona y por canal, nada por mensaje.
     if(!d.chatRead||typeof d.chatRead!=="object")d.chatRead={};
@@ -1620,7 +1620,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const fotoValida=fotoOk;
   function grupoAv(g,cls){ if(g&&fotoValida(g.foto))return `<span class="${cls} hasimg" style="background-image:url('${g.foto}')"></span>`;
     return `<span class="${cls}" style="background:var(--accent-priv)">${ICO.grupo}</span>`; }
-  function chanTitle(chan){ if(chan==="team")return ICO.equipo+" Equipo"; const g=groupOf(chan); if(g)return (fotoValida(g.foto)?grupoAv(g,"av headav"):ICO.grupo)+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
+  // El Equipo es un canal más: tiene foto como los grupos y se le puede
+  // cambiar desde "editar". Sin foto propia lleva el isotipo de Bosques de
+  // Agua, así que "Quitar" no lo deja pelado: lo devuelve al logo. La foto
+  // vive en el estado compartido (`teamFoto`), como la de cualquier grupo:
+  // la elige uno y la ven todos.
+  const fotoEquipo=()=>fotoValida(state&&state.teamFoto)?state.teamFoto:"";
+  const logoAv=cls=>`<span class="${cls} eqlogo"></span>`;
+  function equipoAv(cls){ const f=fotoEquipo();
+    return f?`<span class="${cls} hasimg" style="background-image:url('${f}')"></span>`:logoAv(cls); }
+  function chanTitle(chan){ if(chan==="team")return equipoAv("av headav")+" Equipo"; const g=groupOf(chan); if(g)return (fotoValida(g.foto)?grupoAv(g,"av headav"):ICO.grupo)+" "+esc(g.name); return ICO.persona+" "+esc(chan.slice(3)); }
 
   // ---------- EMOJIS, RESPUESTAS Y TILDES ----------
   // Emojis a mano. No es un teclado completo a propósito: una grilla corta se
@@ -1744,25 +1753,36 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     msgsOf(chatChan).forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       const pie=row.querySelector(".msgpie");
       if(pie)pie.innerHTML=`${m.ts?`<span class="hora">${esc(horaDe(m.ts))}</span>`:""}${tildes(m,chatChan,me)}`; }); }
+  // En qué chat estabas es TUYO y de este navegador: está en LOCAL_KEYS, así
+  // que no viaja al equipo ni te lo mueve nadie. Antes volvía a Equipo en cada
+  // recarga y cada vez que ibas a otra solapa, y era fácil escribirle al canal
+  // equivocado. Al volver se comprueba que el canal siga existiendo: un grupo
+  // del que te sacaron, o alguien que ya no está en el equipo, vuelve a Equipo.
+  function chanValido(c){ if(typeof c!=="string"||!c)return false;
+    if(c==="team")return true;
+    if(c.startsWith("grp:"))return myGroups().some(g=>"grp:"+g.id===c);
+    if(c.startsWith("dm:")){ const p=c.slice(3); return !!p&&p!==state.me&&allPeople().includes(p); }
+    return false; }
+  function setChan(c){ chatChan=c; state.chatChan=c; saveLocalPrefs(state); }
   function renderChat(){ const me=state.me;
-    if(chatChan.startsWith("grp:")&&!groupOf(chatChan))chatChan="team";
+    if(!chanValido(chatChan))setChan("team");
     const list=document.getElementById("chanList");
     // El canal que estás mirando no lleva aviso: al dibujarlo ya queda leído.
     const aviso=chan=>{ const n=chan===chatChan?0:sinLeerDe(chan);
       return n?`<span class="channuevo" title="${n===1?"1 mensaje sin leer":n+" mensajes sin leer"}">${n>9?"9+":n}</span>`:""; };
     const cls=chan=>`chanitem ${chan===chatChan?"on":""}${(chan!==chatChan&&sinLeerDe(chan))?" nuevo":""}`;
-    list.innerHTML=`<div class="chsec">Canales</div><div class="${cls("team")}" data-ch="team"><span class="av" style="background:var(--wood)">${ICO.equipo}</span><span class="chname">Equipo</span>${aviso("team")}</div>`+
+    list.innerHTML=`<div class="chsec">Canales</div><div class="${cls("team")}" data-ch="team">${equipoAv("av")}<span class="chname">Equipo</span>${aviso("team")}</div>`+
       myGroups().map(g=>`<div class="${cls("grp:"+g.id)}" data-ch="grp:${g.id}">${grupoAv(g,"av")}<span class="chname">${esc(g.name)}</span>${aviso("grp:"+g.id)}</div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
       allPeople().filter(p=>p&&p!==me).map(p=>`<div class="${cls("dm:"+p)}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span>${aviso("dm:"+p)}</div>`).join("");
-    list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ chatChan=el.dataset.ch; renderChat(); }));
+    list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ setChan(el.dataset.ch); renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
     // chanTitle ya devuelve HTML (icono + nombre escapado): volver a escapar
     // acá imprimía el SVG como texto.
-    head.innerHTML=`<span>${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:""}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
-      <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro. Con <b>editar</b> le cambiás nombre, gente y foto.</li>
+    head.innerHTML=`<span>${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:(chatChan==="team"?`<button class="rowbtn" id="editGroup" title="Cambiarle la foto al Equipo">editar</button>`:"")}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
+      <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro. Con <b>editar</b> le cambiás nombre, gente y foto. En <b>Equipo</b>, <b>editar</b> le cambia la foto.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión con <b>Voy / No voy</b>. Arranca invitando a la gente de este chat; aparece en el calendario de los invitados.</li>
       <li>Escribí <b>@</b> para nombrar a alguien del canal. Los links se pueden tocar. <b>Shift+Enter</b> baja de renglón.</li>
@@ -1772,7 +1792,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <li>En el Equipo y en los grupos, cada mensaje lleva un <b>tono del color de quien escribe</b>, para no tener que leer el nombre.</li>
       <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span><button class="btn" id="newEv" title="${chatChan==="team"?"Evento para todo el equipo":"Evento solo para los de este chat"}">＋ Evento</button>`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",()=>openEvNew(null,chatChan));
-    const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g.id));
+    const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g?g.id:CANAL_EQUIPO));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
     if(!me){ box.innerHTML=`<div class="ph"><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
     inp.disabled=false; const msgs=msgsOf(chatChan);
@@ -2223,36 +2243,54 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return u; }
   // ---------- grupos de chat ----------
   let grpEditId=null, grpMembers=[], grpFoto="";
+  // El mismo modal sirve para el Equipo, con el nombre y la lista de gente
+  // escondidos: ninguna de las dos cosas se elige ahí.
+  const CANAL_EQUIPO="__team";
+  const editandoEquipo=()=>grpEditId===CANAL_EQUIPO;
   function pintarGrpFoto(){ const p=document.getElementById("gmFotoPrev"); if(!p)return;
-    p.outerHTML=grupoAv({foto:grpFoto},"gmav").replace("<span ",'<span id="gmFotoPrev" ');
+    // equipoAv() mira la foto YA guardada; acá manda grpFoto, la copia que se
+    // está editando. Sin esto, "Volver al logo" seguía mostrando la vieja.
+    const av=(editandoEquipo()&&!grpFoto)?logoAv("gmav"):grupoAv({foto:grpFoto},"gmav");
+    p.outerHTML=av.replace("<span ",'<span id="gmFotoPrev" ');
     document.getElementById("gmFotoBtn").textContent=grpFoto?"Cambiar foto":"Elegir foto";
-    document.getElementById("gmFotoQuitar").hidden=!grpFoto; }
+    const q=document.getElementById("gmFotoQuitar");
+    q.textContent=editandoEquipo()?"Volver al logo":"Quitar";
+    q.hidden=!grpFoto; }
   function openGroupModal(gid){ const me=state.me;
     if(!me){ note("No pudimos identificarte para armar un grupo."); return; }
-    grpEditId=gid; const g=gid?groupsAll()[gid]:null;
+    grpEditId=gid; const eq=editandoEquipo(); const g=(gid&&!eq)?groupsAll()[gid]:null;
     grpMembers=g?(g.members||[]).slice():[me];
-    document.getElementById("gmTitle").textContent=g?"Editar grupo":"Nuevo grupo";
+    document.getElementById("gmTitle").textContent=eq?"Foto del Equipo":(g?"Editar grupo":"Nuevo grupo");
+    document.getElementById("gmIntro").textContent=eq
+      ?"El Equipo los tiene a todos adentro: no se le cambia el nombre ni quiénes están. La foto sí, y la ven todos."
+      :"Un canal aparte con solo algunas personas del equipo. Los que no estén adentro no lo ven.";
+    document.getElementById("gmNameRow").hidden=eq;
+    document.getElementById("gmMembersRow").hidden=eq;
     document.getElementById("gmName").value=g?g.name:"";
-    document.getElementById("gmDel").style.display=g?"":"none";
-    grpFoto=(g&&fotoValida(g.foto))?g.foto:""; pintarGrpFoto();
+    document.getElementById("gmDel").style.display=(g&&!eq)?"":"none";
+    grpFoto=eq?(fotoValida(state.teamFoto)?state.teamFoto:""):((g&&fotoValida(g.foto))?g.foto:""); pintarGrpFoto();
     renderGrpMembers();
-    document.getElementById("groupModal").classList.add("on"); setTimeout(()=>document.getElementById("gmName").focus(),40); }
+    document.getElementById("groupModal").classList.add("on");
+    if(!eq)setTimeout(()=>document.getElementById("gmName").focus(),40); }
   function renderGrpMembers(){ const me=state.me;
     document.getElementById("gmMembers").innerHTML=allPeople().map(p=>`<label class="fopt"><input type="checkbox" data-m="${esc(p)}" ${grpMembers.includes(p)?"checked":""} ${p===me?"disabled":""}><span class="sd" style="background:${avColor(p)}"></span><span class="lbl">${esc(p)}${p===me?" (vos)":""}</span></label>`).join("");
     document.getElementById("gmMembers").querySelectorAll("[data-m]").forEach(cb=>cb.addEventListener("change",()=>{ const p=cb.dataset.m; const i=grpMembers.indexOf(p);
       if(cb.checked){ if(i<0)grpMembers.push(p); } else if(i>=0)grpMembers.splice(i,1); })); }
   function closeGM(){ document.getElementById("groupModal").classList.remove("on"); grpEditId=null; }
-  function saveGM(){ const name=document.getElementById("gmName").value.trim();
+  function saveGM(){
+    if(editandoEquipo()){ if(grpFoto)state.teamFoto=grpFoto; else delete state.teamFoto;
+      save(); closeGM(); renderChat(); return; }
+    const name=document.getElementById("gmName").value.trim();
     if(!name){ note("Ponele un nombre al grupo."); return; }
     if(grpMembers.length<2){ note("Un grupo necesita al menos dos personas."); return; }
     const gs=groupsAll();
     let g;
     if(grpEditId&&gs[grpEditId]){ g=gs[grpEditId]; g.name=name; g.members=grpMembers.slice(); }
-    else { const id="g"+uid(); g=gs[id]={id,name,members:grpMembers.slice(),msgs:[],by:state.me||""}; chatChan="grp:"+id; }
+    else { const id="g"+uid(); g=gs[id]={id,name,members:grpMembers.slice(),msgs:[],by:state.me||""}; setChan("grp:"+id); }
     if(grpFoto)g.foto=grpFoto; else delete g.foto;
     save(); closeGM(); renderChat(); }
   function delGM(){ const gid=grpEditId, gs=groupsAll(), g=gs[gid]; if(!g)return; closeGM();
-    confirmar(`Se borra el grupo "${g.name}" y todos sus mensajes, para todos los que están adentro.`,()=>{ delete gs[gid]; if(chatChan==="grp:"+gid)chatChan="team"; save(); renderChat(); },{title:"Eliminar grupo",yes:"Eliminar",danger:true}); }
+    confirmar(`Se borra el grupo "${g.name}" y todos sus mensajes, para todos los que están adentro.`,()=>{ delete gs[gid]; if(chatChan==="grp:"+gid)setChan("team"); save(); renderChat(); },{title:"Eliminar grupo",yes:"Eliminar",danger:true}); }
   function updateChatBadge(){ const b=document.getElementById("chatBadge"); if(!b)return; const u=chatUnread(); if(u>0){ b.textContent=u>9?"9+":u; b.hidden=false; } else b.hidden=true; }
 
   // ---------- PANEL personal ----------
@@ -3129,6 +3167,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(!state.theme){ state.theme=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light"; saveLocalPrefs(state); }
   applyTheme(state.theme); applyPalette(state.palette||"carbon");
   sweepArchive(); loadTreeOpen(); syncPeopleList();
+  // El chat donde estabas la última vez. Si ya no existe, renderChat() lo
+  // devuelve a Equipo cuando dibuje.
+  if(typeof state.chatChan==="string"&&state.chatChan)chatChan=state.chatChan;
   lastPushed=JSON.stringify(stripShared(state));   // no escribir de arranque
   // Lo que vino de la base ya está guardado, por definición: sin esto, los
   // mensajes viejos no mostrarían ninguna tilde hasta el primer guardado.
