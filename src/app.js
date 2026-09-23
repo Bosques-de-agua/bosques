@@ -665,9 +665,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
 
   // ---------- NOTAS AL PASAR EL MOUSE ----------
   // Parado sobre una tarea (en Tareas, en Estructura o en Mi panel: listas,
-  // Mi foco y calendario), a los ~0,4 s aparece un
-  // recuadro con sus notas: una vista rápida de en qué está, sin abrir la ficha.
-  // Sin notas no aparece nada. Solo con mouse: en pantallas táctiles no hay
+  // Mi foco y calendario), a los ~0,4 s aparece un recuadro con su último avance
+  // —o con sus notas, si todavía no tiene avances—: una vista rápida de en qué
+  // está, sin abrir la ficha. Sin avances y sin notas no aparece nada.
+  // En los renglones vale cualquier punto del renglón, y ningún trozo lleva
+  // title propio: el globo del navegador taparía este recuadro. Solo con mouse: en pantallas táctiles no hay
   // "pasar por encima", y un toque abre la ficha como siempre.
   const conMouse=!!(window.matchMedia&&matchMedia("(hover: hover) and (pointer: fine)").matches);
   const tipNotas=document.createElement("div"); tipNotas.className="tipnotas"; tipNotas.setAttribute("role","tooltip"); document.body.appendChild(tipNotas);
@@ -677,10 +679,15 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function ocultarNotas(){ clearTimeout(tipTimer); tipTimer=null; tipSobre=null; tipNotas.classList.remove("on"); }
   // Cada vista marca la tarea con su propio atributo; el id es el mismo.
   const idTip=el=>el.dataset.item||el.dataset.task||el.dataset.priv||el.dataset.tipitem;
-  // Muestra el último avance: en qué está la tarea. Sin avances, no aparece nada.
+  // Muestra el último avance: en qué está la tarea. Si todavía no tiene ninguno
+  // —hay muchas así— muestra las notas, que es lo otro que dice en qué anda. Sin
+  // avances y sin notas, no aparece nada.
   function mostrarNotas(el){ const k=tareaPorId(idTip(el)); const u=k?ultimoAvance(k):null;
-    if(!u){ ocultarNotas(); return; }
-    tipNotas.innerHTML=`<div class="tiplab">Último avance · ${esc(u.by||"")} · ${esc(haceTxt(u.ts))}</div><div class="tiptxt">${esc(u.text)}</div>`;
+    const notas=(!u&&k)?String(k.notas||"").trim():"";
+    if(!u&&!notas){ ocultarNotas(); return; }
+    tipNotas.innerHTML=u
+      ?`<div class="tiplab">Último avance · ${esc(u.by||"")} · ${esc(haceTxt(u.ts))}</div><div class="tiptxt">${esc(u.text)}</div>`
+      :`<div class="tiplab">Notas</div><div class="tiptxt">${esc(notas)}</div>`;
     tipNotas.style.left="0px"; tipNotas.style.top="0px"; tipNotas.classList.add("on");
     const r=el.getBoundingClientRect(), tw=tipNotas.offsetWidth, th=tipNotas.offsetHeight;
     let top=r.bottom+6; if(top+th>innerHeight-8)top=Math.max(8,r.top-th-6);
@@ -2645,7 +2652,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function lineaTema(node){ if(!node)return "";
     const p=pathOf(node.id).map(z=>z.name);
     const corto=p.slice(1).join(" › ")||p[0]||"";
-    return corto?`<span class="ltema" title="${esc(p.join(" › "))}">${esc(corto)}</span>`:""; }
+    return corto?`<span class="ltema">${esc(corto)}</span>`:""; }
   // La hora, cuando la tiene. Sin hora no se muestra nada: la fecha sola ya
   // vive en el calendario y en la tarjeta.
   function cuandoTag(k){ return k&&k.dueTime?`<span class="lhora" title="${esc(k.due||"")}">${esc(k.dueTime)}</span>`:""; }
