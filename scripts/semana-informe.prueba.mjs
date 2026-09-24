@@ -1,10 +1,10 @@
 // PRUEBA DEL INFORME SEMANAL — sin base, sin claves, sin red.
 //   node scripts/semana-informe.prueba.mjs
 //
-// Arma dos fotos del equipo a mano (el lunes pasado y hoy) y comprueba que el
-// informe encuentre exactamente lo que pasó entre una y otra. Es la parte que
-// no se puede mirar a ojo: una tarea que se creó y se terminó dentro de la
-// misma semana, o una que alguien reabrió, no se ven en el estado actual.
+// Arma las dos puntas de la semana a mano —el lunes y el domingo— y comprueba
+// que el informe encuentre exactamente lo que pasó entre una y otra. Es la
+// parte que no se puede mirar a ojo: una tarea que se creó y se terminó dentro
+// de la misma semana, o una que alguien reabrió.
 
 import { informeSemanal, semanaPasada, ymd } from "./semana-informe.mjs";
 
@@ -32,7 +32,7 @@ const antes = foto([
   tarea("c", { title: "Estaba terminada y la reabren", status: "listo", done: true, doneAt: ANTES }),
   tarea("d", { title: "Quieta hace mucho", status: "curso", owners: ["Lucas"], prio: "alta" }),
 ]);
-const hoy = foto([
+const cierre = foto([
   tarea("a", { title: "Ya estaba y sigue abierta", status: "espera", avances: [{ id: "x", by: "Nico", ts: ANTES, text: "vieja" }, { id: "y", by: "Nico", ts: EN, text: "avance de la semana" }] }),
   tarea("b", { title: "Se termina esta semana", status: "listo", done: true, doneAt: EN, owners: ["Juampi"] }),
   tarea("c", { title: "Estaba terminada y la reabren", status: "curso" }),
@@ -40,11 +40,11 @@ const hoy = foto([
   tarea("e", { title: "Nueva y terminada en la misma semana", status: "listo", done: true, doneAt: EN, owners: ["Nico"] }),
   Object.assign(tarea("f", { title: "Nueva, vencida y sin dueño", due: "2026-09-25" }), { _n: "n2" }),
 ]);
-hoy.chat.team = [{ from: "Nico", ts: EN, text: "Mensaje de la semana" }, { from: "Lucas", ts: ANTES, text: "Mensaje viejo" }];
-hoy.chat.dm = { "Lucas ~ Nico": [{ from: "Nico", ts: EN, text: "ESTO NO TIENE QUE APARECER" }] };
-hoy.events = [{ id: "e1", title: "Reunión de equipo", date: ymd(new Date(EN)), time: "10:00", rsvp: { Nico: "yes", Lucas: "yes" } }];
+cierre.chat.team = [{ from: "Nico", ts: EN, text: "Mensaje de la semana" }, { from: "Lucas", ts: ANTES, text: "Mensaje viejo" }];
+cierre.chat.dm = { "Lucas ~ Nico": [{ from: "Nico", ts: EN, text: "ESTO NO TIENE QUE APARECER" }] };
+cierre.events = [{ id: "e1", title: "Reunión de equipo", date: ymd(new Date(EN)), time: "10:00", rsvp: { Nico: "yes", Lucas: "yes" } }];
 
-const { texto, cuentas } = informeSemanal({ hoy, antes, antesDe: "2026-09-21T00:00:00Z", inicio, fin, ahoraMs: AHORA });
+const { texto, cuentas } = informeSemanal({ despues: cierre, antes, antesDe: "2026-09-21T00:00:00Z", despuesDe: "2026-09-27T23:00:00Z", inicio, fin });
 
 let fallas = 0;
 const ok = (cond, que, detalle = "") => {
@@ -66,8 +66,35 @@ ok(cuentas.eventos === 1 && texto.includes("Reunión de equipo"), "toma el event
 ok(cuentas.mensajes === 1, "cuenta solo el mensaje de la semana", "mensajes: " + cuentas.mensajes);
 ok(!texto.includes("ESTO NO TIENE QUE APARECER"), "los chats personales NO entran en el informe");
 
+// EL ERROR QUE APARECIÓ LA PRIMERA VEZ QUE SE CORRIÓ DE VERDAD: se comparaba
+// el lunes contra "hoy" en vez de contra el domingo, así que todo lo que pasaba
+// después se contaba como de la semana (dio 71 tareas nuevas cuando habían sido
+// 48). El arreglo está en `semana-datos.mjs`, que ahora pide las DOS puntas de
+// la semana: informeSemanal() compara fielmente las dos fotos que le den, no
+// puede saber si son las correctas —una tarea no guarda cuándo se creó—.
+// Lo que SÍ se puede probar acá es el borde: hasta dónde llega la semana.
+const justo = foto([
+  tarea("t1", { title: "Terminada en el último segundo", status: "listo", done: true, doneAt: fin.getTime() }),
+  tarea("t2", { title: "Terminada un segundo después", status: "listo", done: true, doneAt: fin.getTime() + 1000 }),
+]);
+const borde = informeSemanal({ despues: justo, antes: foto([]), antesDe: "x", despuesDe: "y", inicio, fin });
+ok(borde.texto.includes("Terminada en el último segundo"), "lo del último segundo del domingo entra");
+// Ojo: las dos aparecen en "Tareas nuevas" (el lunes no existían), así que
+// hay que mirar el bloque de completadas y no el texto entero.
+const bloqueCompletadas = borde.texto.split("## Tareas completadas")[1].split("##")[0];
+ok(borde.cuentas.completadas === 1 && !bloqueCompletadas.includes("un segundo después"),
+  "lo terminado un segundo DESPUÉS del domingo no cuenta como completado", "completadas: " + borde.cuentas.completadas);
+const bordeAvances = informeSemanal({
+  despues: foto([tarea("t3", { avances: [
+    { id: "i", by: "Nico", ts: fin.getTime(), text: "justo a tiempo" },
+    { id: "j", by: "Nico", ts: fin.getTime() + 1000, text: "ya es la otra semana" },
+  ] })]), antes: foto([]), antesDe: "x", despuesDe: "y", inicio, fin });
+ok(bordeAvances.cuentas.avances === 1 && bordeAvances.texto.includes("justo a tiempo")
+   && !bordeAvances.texto.includes("ya es la otra semana"),
+  "un avance del lunes siguiente NO entra en la semana", "avances: " + bordeAvances.cuentas.avances);
+
 // Sin respaldo anterior: tiene que avisarlo, no inventar.
-const sinAntes = informeSemanal({ hoy, antes: null, antesDe: null, inicio, fin, ahoraMs: AHORA });
+const sinAntes = informeSemanal({ despues: cierre, antes: null, antesDe: null, inicio, fin });
 ok(sinAntes.texto.includes("SIN copia de respaldo"), "sin respaldo previo, lo dice en la primera línea");
 ok(sinAntes.cuentas.nuevas === 0, "sin respaldo previo no inventa tareas nuevas");
 

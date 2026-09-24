@@ -50,21 +50,38 @@ if (arg) {
   ({ inicio, fin } = semanaPasada());
 }
 
-const { data: actual, error: e1 } = await sb.from("app_state").select("data").eq("id", 1).single();
-if (e1) { console.error("No pude leer app_state:", e1.message); process.exit(1); }
+// Las DOS puntas de la semana. Los respaldos se guardan solo cuando el
+// contenido cambió, así que "el último de antes del lunes" y "el último de
+// antes del lunes siguiente" son exactamente el estado al abrir y al cerrar.
+async function copiaAntesDe(fecha) {
+  const { data, error } = await sb
+    .from("app_state_backup").select("taken_at,data")
+    .eq("kind", "app_state").lt("taken_at", fecha.toISOString())
+    .order("taken_at", { ascending: false }).limit(1);
+  if (error) { console.error("No pude leer app_state_backup:", error.message); process.exit(1); }
+  return (data && data[0]) ? data[0] : null;
+}
+const abre = await copiaAntesDe(inicio);
+let cierra = await copiaAntesDe(new Date(fin.getTime() + 1));
 
-// La copia más nueva de ANTES del lunes: el equipo tal como estaba al empezar.
-const { data: copias, error: e2 } = await sb
-  .from("app_state_backup").select("taken_at,data")
-  .eq("kind", "app_state").lt("taken_at", inicio.toISOString())
-  .order("taken_at", { ascending: false }).limit(1);
-if (e2) { console.error("No pude leer app_state_backup:", e2.message); process.exit(1); }
+// Si no hay ningún respaldo dentro de la semana, la única foto del cierre es el
+// estado actual. Con la tarea corriendo el lunes temprano la diferencia son
+// horas; si la máquina estuvo apagada varios días, se avisa.
+let nota = "";
+if (!cierra || cierra.taken_at <= (abre ? abre.taken_at : "")) {
+  const { data: actual, error } = await sb.from("app_state").select("data").eq("id", 1).single();
+  if (error) { console.error("No pude leer app_state:", error.message); process.exit(1); }
+  cierra = { taken_at: "el estado de HOY (no hubo respaldos dentro de la semana)", data: actual.data };
+  nota = "AVISO: no hay respaldo del cierre de la semana; se usó el estado actual, así que puede incluir cambios posteriores al domingo.";
+}
 
 const { texto, cuentas } = informeSemanal({
-  hoy: actual.data,
-  antes: copias && copias[0] ? copias[0].data : null,
-  antesDe: copias && copias[0] ? copias[0].taken_at : null,
+  antes: abre ? abre.data : null,
+  antesDe: abre ? abre.taken_at : null,
+  despues: cierra.data,
+  despuesDe: cierra.taken_at,
   inicio, fin,
 });
+if (nota) console.log(nota + "\n");
 console.log(texto);
 console.error(`\n[${ymd(inicio)} → ${ymd(fin)}] ` + Object.entries(cuentas).map(([k, v]) => `${k}:${v}`).join(" "));

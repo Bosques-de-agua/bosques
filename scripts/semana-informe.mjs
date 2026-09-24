@@ -1,9 +1,16 @@
 // EL INFORME CRUDO DE LA SEMANA — la parte que piensa, sin red.
 //
-// Recibe dos fotos del estado del equipo —la de hoy y la del lunes pasado— y
-// devuelve un texto con los hechos: qué se completó, qué avances se
-// escribieron, qué se creó, qué cambió de estado, qué está quieto. No
-// interpreta: eso lo hace después la IA leyendo esto.
+// Recibe DOS fotos del estado del equipo, las dos puntas de la semana —la del
+// lunes a la mañana y la del domingo a la noche— y devuelve un texto con los
+// hechos: qué se completó, qué avances se escribieron, qué se creó, qué cambió
+// de estado, qué está quieto. No interpreta: eso lo hace después la IA.
+//
+// LAS DOS PUNTAS TIENEN QUE SER DE LA SEMANA, no "el lunes contra hoy". Con
+// "contra hoy", todo lo que pasa DESPUÉS del domingo se cuenta como si hubiera
+// pasado esa semana. Corriendo la tarea un lunes a las 9:30 la diferencia son
+// nueve horas y casi no se nota; pero si la máquina estuvo apagada y la tarea
+// corre un jueves, se le cuelan tres días ajenos. Pasó la primera vez que se
+// corrió de verdad: 71 tareas nuevas, cuando en la semana se habían creado 48.
 //
 // Está separado de `semana-datos.mjs` (que es el que habla con Supabase) para
 // poder probarlo sin base ni claves: `node scripts/semana-informe.prueba.mjs`.
@@ -45,10 +52,15 @@ const ESTADOS = { sin: "sin empezar", curso: "en curso", espera: "en espera", li
 const est = (s) => ESTADOS[s] || s || "?";
 const duenos = (k) => (Array.isArray(k.owners) && k.owners.length) ? k.owners.join(", ") : "sin responsable";
 
-export function informeSemanal({ hoy, antes, antesDe, inicio, fin, ahoraMs = Date.now() }) {
+// `despues` es el estado al CERRAR la semana (el último respaldo del domingo o
+// anterior); `antes`, el del lunes temprano. Lo que está quieto y lo que está
+// vencido se mide contra el final de la semana, no contra hoy: el informe
+// entero cuenta cómo estaban las cosas ese domingo.
+export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin, corte }) {
   const DESDE = inicio.getTime(), HASTA = fin.getTime();
+  const ahoraMs = corte || HASTA;
   const enRango = (ts) => typeof ts === "number" && ts >= DESDE && ts <= HASTA;
-  const ahora = tareasDe(hoy), previo = antes ? tareasDe(antes) : new Map();
+  const ahora = tareasDe(despues), previo = antes ? tareasDe(antes) : new Map();
 
   const completadas = [], nuevas = [], cambios = [], avances = [], reabiertas = [];
   const quietas = [], vencidas = [];
@@ -74,28 +86,29 @@ export function informeSemanal({ hoy, antes, antesDe, inicio, fin, ahoraMs = Dat
     }
   }
 
-  const eventos = ((hoy && hoy.events) || []).filter((ev) => {
+  const eventos = ((despues && despues.events) || []).filter((ev) => {
     const d = ev && ev.date ? new Date(ev.date + "T12:00:00").getTime() : 0;
     return d >= DESDE && d <= HASTA;
   }).map((ev) => ({ t: ev.title, dia: ev.date, hora: ev.time || "", van: Object.values(ev.rsvp || {}).filter((v) => v === "yes").length }));
 
   // Conversación: Equipo y grupos. Los chats personales (uno a uno) NO se
   // miran: son entre dos personas.
-  const chatEquipo = (((hoy && hoy.chat) || {}).team || []).filter((m) => enRango(m.ts) && m.text).map((m) => ({ por: m.from, texto: m.text }));
+  const chatEquipo = (((despues && despues.chat) || {}).team || []).filter((m) => enRango(m.ts) && m.text).map((m) => ({ por: m.from, texto: m.text }));
   const chatGrupos = {};
-  for (const g of Object.values(((hoy && hoy.chat) || {}).groups || {})) {
+  for (const g of Object.values(((despues && despues.chat) || {}).groups || {})) {
     const ms = (g.msgs || []).filter((m) => enRango(m.ts) && m.text).map((m) => ({ por: m.from, texto: m.text }));
     if (ms.length) chatGrupos[g.name] = ms;
   }
-  const objetivos = String((hoy && hoy.weekGoals) || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const objetivos = String((despues && despues.weekGoals) || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
   // ---------- armar el texto ----------
   const fecha = (ts) => { const d = new Date(ts); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
   const L = [];
   L.push(`SEMANA DEL ${ymd(inicio)} AL ${ymd(fin)}`);
   L.push(antes
-    ? `Comparada contra la copia del equipo del ${antesDe}.`
+    ? `Las dos puntas de la semana: la copia del ${antesDe} contra la del ${despuesDe || "cierre"}.`
     : `SIN copia de respaldo anterior al ${ymd(inicio)}: de esta semana solo se ve lo que quedó fechado. No se puede saber qué se creó ni qué cambió de estado.`);
+  L.push("Lo quieto y lo vencido se miden al cerrar la semana, no a hoy.");
   L.push("");
   if (objetivos) { L.push("## Objetivos que se puso el equipo"); L.push(objetivos); L.push(""); }
 
@@ -111,7 +124,7 @@ export function informeSemanal({ hoy, antes, antesDe, inicio, fin, ahoraMs = Dat
   bloque("Cambios de estado", cambios, (x) => `${x.t} (${x.ruta}): ${x.de} → ${x.a}`, "ninguno");
   bloque("Tareas reabiertas", reabiertas, (x) => `${x.t} · ${x.ruta}`);
   bloque("Eventos", eventos, (x) => `${x.dia}${x.hora ? " " + x.hora : ""} · ${x.t} · ${x.van} confirmados`, "ninguno");
-  bloque("Abiertas y quietas hace 14 días o más", quietas.sort((a, b) => (b.dias === null ? 1e9 : b.dias) - (a.dias === null ? 1e9 : a.dias)),
+  bloque("Abiertas y quietas hace 14 días o más al cerrar la semana", quietas.sort((a, b) => (b.dias === null ? 1e9 : b.dias) - (a.dias === null ? 1e9 : a.dias)),
     (x) => `${x.t} · ${x.ruta} · ${x.quien} · ${x.dias === null ? "nunca tuvo un avance" : x.dias + " días sin novedades"} · prioridad ${x.prio}`);
   bloque("Vencidas y sin terminar", vencidas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · vencía ${x.vencio}`);
 
