@@ -66,7 +66,7 @@ const RESUMENES_EJEMPLO = [
     texto: [
       "Semana corta y sin cierres: se completaron 2 tareas, las dos administrativas.",
       "",
-      "La conversación del equipo estuvo casi toda en el grupo de **Siembra directa**, donde se discutió el criterio de las parcelas de prueba. Esa discusión no quedó anotada en ninguna tarea: vive solo en el chat.",
+      "Hubo una reunión de **Siembra directa** el miércoles, pero la tarea del tema sigue en espera y sin un solo avance: de lo que se habló ahí no quedó nada anotado.",
     ].join("\n"),
   },
 ];

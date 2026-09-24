@@ -2355,6 +2355,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       cerrarLista(); parr.push(neg(l)); }
     cerrarParr(); cerrarLista();
     return out||"<p>"+esc(String(txt||""))+"</p>"; }
+  // "claude-opus-5" se lee mal al pie de un texto; "Claude Opus 5", bien. Si
+  // mañana el resumen lo escribe otro modelo, el nombre sale igual sin tocar
+  // nada: las partes que son número se juntan con punto (haiku-4-5 → 4.5).
+  function nombreModelo(m){ const s=String(m||"").trim();
+    if(!s)return "inteligencia artificial";
+    const p=s.split("-").filter(Boolean); const out=[]; let num=[];
+    for(const x of p){ if(/^\d+$/.test(x)){ num.push(x); continue; }
+      if(num.length){ out.push(num.join(".")); num=[]; }
+      out.push(x.charAt(0).toUpperCase()+x.slice(1)); }
+    if(num.length)out.push(num.join("."));
+    return out.join(" "); }
   function renderResumen(){ const box=document.getElementById("resumenBoard"); if(!box)return;
     if(!resumenPedido){ resumenPedido=true;
       box.innerHTML='<div class="ph">Buscando el último resumen…</div>';
@@ -2384,8 +2395,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +'<div class="resmeta">'+esc(rangoSemana(r.desde,r.hasta))
       +(escrito?" · escrito el "+esc(DOWLARGO[(escrito.getDay()+6)%7])+" "+escrito.getDate()+" de "+esc(MES[escrito.getMonth()]):"")
       +"</div></div>"+elegir+"</div>"
-      +'<div class="resia">'+ICO.chispa+"<span>Lo escribió <b>inteligencia artificial</b> leyendo lo que quedó registrado en la app durante la semana. Puede equivocarse, entender de más o dejarse algo afuera: si algo no cierra, la fuente son las tareas."+(r.modelo?" <span class=\"resmod\">"+esc(r.modelo)+"</span>":"")+"</span></div>"
-      +'<div class="restxt">'+resumenTextoHTML(r.texto)+"</div></div>";
+      +'<div class="restxt">'+resumenTextoHTML(r.texto)+"</div>"
+      +'<div class="resia">'+ICO.chispa+"<span>Escrito por "+esc(nombreModelo(r.modelo))+"</span></div></div>";
     const sel=document.getElementById("resSemana");
     if(sel)sel.addEventListener("change",()=>{ resumenVer=Number(sel.value)||0; pintarResumen(); }); }
 

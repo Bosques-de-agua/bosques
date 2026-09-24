@@ -65,6 +65,10 @@ ok(texto.includes("Informes") && texto.includes("Área Natural › Informes"), "
 ok(cuentas.eventos === 1 && texto.includes("Reunión de equipo"), "toma el evento de la semana");
 ok(cuentas.mensajes === 1, "cuenta solo el mensaje de la semana", "mensajes: " + cuentas.mensajes);
 ok(!texto.includes("ESTO NO TIENE QUE APARECER"), "los chats personales NO entran en el informe");
+// Del chat sale el número y NADA del contenido (pedido de Nico, 24/09).
+ok(!texto.includes("Mensaje de la semana") && !texto.includes("Nico:") && !texto.includes("Lucas:"),
+  "del chat del Equipo no sale ni el texto ni quién escribió");
+ok(texto.includes("Equipo: 1 mensaje"), "pero sí sale cuántos mensajes hubo");
 
 // EL ERROR QUE APARECIÓ LA PRIMERA VEZ QUE SE CORRIÓ DE VERDAD: se comparaba
 // el lunes contra "hoy" en vez de contra el domingo, así que todo lo que pasaba

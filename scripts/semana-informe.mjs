@@ -91,13 +91,19 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
     return d >= DESDE && d <= HASTA;
   }).map((ev) => ({ t: ev.title, dia: ev.date, hora: ev.time || "", van: Object.values(ev.rsvp || {}).filter((v) => v === "yes").length }));
 
-  // Conversación: Equipo y grupos. Los chats personales (uno a uno) NO se
-  // miran: son entre dos personas.
-  const chatEquipo = (((despues && despues.chat) || {}).team || []).filter((m) => enRango(m.ts) && m.text).map((m) => ({ por: m.from, texto: m.text }));
+  // Del chat sale UN NÚMERO y nada más: cuántos mensajes hubo en cada canal.
+  // Ni el texto ni quién escribió cada cosa. Pedido de Nico el 24/09: el
+  // resumen es de cómo va el TRABAJO, no de lo que dijo cada uno. Antes se le
+  // pasaban los mensajes enteros y el primer resumen terminó contando que
+  // alguien había anunciado que dejaba WhatsApp — exactamente lo que no va.
+  // La garantía es que acá no se junta el texto, no que después no se cuente.
+  // Los chats personales (uno a uno) no se miran ni para contarlos.
+  const cuantos = (arr) => (arr || []).filter((m) => enRango(m.ts) && (m.text || m.audio || m.file)).length;
+  const chatEquipo = cuantos(((despues && despues.chat) || {}).team);
   const chatGrupos = {};
   for (const g of Object.values(((despues && despues.chat) || {}).groups || {})) {
-    const ms = (g.msgs || []).filter((m) => enRango(m.ts) && m.text).map((m) => ({ por: m.from, texto: m.text }));
-    if (ms.length) chatGrupos[g.name] = ms;
+    const n = cuantos(g.msgs);
+    if (n) chatGrupos[g.name] = n;
   }
   const objetivos = String((despues && despues.weekGoals) || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -129,21 +135,17 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
   bloque("Vencidas y sin terminar", vencidas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · vencía ${x.vencio}`);
 
   const plural = (n) => n === 1 ? "1 mensaje" : n + " mensajes";
-  L.push(`## Conversación del Equipo (${plural(chatEquipo.length)})`);
-  if (!chatEquipo.length) L.push("— nada.");
-  else chatEquipo.forEach((m) => L.push(`- ${m.por}: ${m.texto}`));
+  L.push("## Cuánto se habló");
+  L.push(`- Equipo: ${plural(chatEquipo)}`);
+  for (const [nombre, n] of Object.entries(chatGrupos)) L.push(`- Grupo "${nombre}": ${plural(n)}`);
   L.push("");
-  for (const [nombre, ms] of Object.entries(chatGrupos)) {
-    L.push(`## Grupo "${nombre}" (${plural(ms.length)})`);
-    ms.forEach((m) => L.push(`- ${m.por}: ${m.texto}`));
-    L.push("");
-  }
-  L.push("(Los chats personales, uno a uno, no se incluyen a propósito.)");
+  L.push("SOLO el número, a propósito: el contenido de los chats no entra en el");
+  L.push("informe ni en el resumen, y los personales no se miran ni para contar.");
 
   return { texto: L.join("\n"), cuentas: {
     completadas: completadas.length, avances: avances.length, nuevas: nuevas.length,
     cambios: cambios.length, reabiertas: reabiertas.length, quietas: quietas.length,
     vencidas: vencidas.length, eventos: eventos.length,
-    mensajes: chatEquipo.length + Object.values(chatGrupos).reduce((n, m) => n + m.length, 0),
+    mensajes: chatEquipo + Object.values(chatGrupos).reduce((n, x) => n + x, 0),
   } };
 }
