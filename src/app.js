@@ -32,7 +32,7 @@ function stripShared(state){ const o=stripLocal(state); const me=state.me;
     if(Object.keys(resto).length)o[k]=resto; else delete o[k]; });
   return o; }
 
-export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto }){
+export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto, cargarResumenes }){
   // Los documentos arman su botón y su sección antes que nada: más abajo se
   // enlazan todos los .navtab de una, y uno que llegue tarde no respondería.
   montarDocs();
@@ -142,6 +142,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // no puede tomar el cobre ni el oliva del tema. Estos son monocromáticos y
   // heredan el color del texto que tienen al lado.
   const ICO={
+    chispa:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M10 3l1.5 4.2L15.7 8.7 11.5 10.2 10 14.4 8.5 10.2 4.3 8.7 8.5 7.2z\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><path d=\"M15.2 13.2l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z\" stroke=\"currentColor\" stroke-width=\"1.1\" stroke-linejoin=\"round\"/></svg>",
     doc:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><path d=\"M6 3h5l3 3v11H6z\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><path d=\"M11 3v3h3M8 10h4M8 13h4\" stroke=\"currentColor\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg>",
     sheet:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"4\" y=\"4\" width=\"12\" height=\"12\" rx=\"1.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M4 8.5h12M8.5 8.5V16M4 12.3h12\" stroke=\"currentColor\" stroke-width=\"1.2\"/></svg>",
     slides:"<svg class=\"ico\" viewBox=\"0 0 20 20\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"13\" height=\"9\" rx=\"1.4\" stroke=\"currentColor\" stroke-width=\"1.4\"/><path d=\"M10 13.5v2.5M7.5 16h5\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\"/></svg>",
@@ -1199,7 +1200,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.addEventListener("click",()=>{ if(!openFdrop)return; document.querySelectorAll(".fmenu.on").forEach(m=>m.classList.remove("on")); openFdrop=null; });
   // La pestaña tiene dos lecturas del mismo trabajo: las tareas sueltas y los
   // temas con su encargado, que es un piso más arriba.
-  const tareasVista=()=>(state.tareasVista==="temas"||state.tareasVista==="semana")?state.tareasVista:"tareas";
+  const VISTAS_TAREAS=["temas","semana","resumen"];
+  const tareasVista=()=>VISTAS_TAREAS.includes(state.tareasVista)?state.tareasVista:"tareas";
   function renderTareas(){ const wg=document.getElementById("weekGoals"); if(wg&&document.activeElement!==wg&&!wg.contains(document.activeElement))wg.innerHTML=objetivosHTML(state.weekGoals);
     const v=tareasVista();
     const seg=document.getElementById("tareasViewSeg");
@@ -1207,10 +1209,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const tb=document.querySelector("#tab-tareas .tbar"), tb2=document.querySelector("#tab-tareas .tbar2");
     if(tb)tb.hidden=v!=="tareas"; if(tb2)tb2.hidden=v!=="tareas";
     const bar=document.getElementById("temasBar"), board=document.getElementById("temasBoard"), sem=document.getElementById("semanaBoard");
+    const res=document.getElementById("resumenBoard");
     if(bar)bar.hidden=v!=="temas"; if(board)board.hidden=v!=="temas"; if(sem)sem.hidden=v!=="semana";
+    if(res)res.hidden=v!=="resumen";
     kanban.hidden=v!=="tareas";
     if(v==="temas"){ renderTemasBoard(); return; }
     if(v==="semana"){ renderSemana(); return; }
+    if(v==="resumen"){ renderResumen(); return; }
     renderFilterBar(); const f=tfil(); const items=filteredItems(); kanban.innerHTML="";
     document.getElementById("taskCount").textContent=items.length+(items.length===1?" tarea":" tareas");
     // Agrupar por tema se sacó: generaba una columna por cada tema con tareas
@@ -1834,13 +1839,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     msgs.forEach(m=>{ const row=box.querySelector(`[data-msg="${m.id}"]`); if(!row)return;
       if(m.ev){ row.querySelectorAll("[data-rsvp]").forEach(b=>b.addEventListener("click",()=>setRsvp(m.ev,b.dataset.rsvp))); const t=row.querySelector(".evtitle"); if(t)t.addEventListener("click",()=>openEvView(m.ev)); }
       const dl=row.querySelector("[data-dl]"); if(dl)dl.addEventListener("click",()=>downloadMsgFile(m.id));
+      const pv=row.querySelector("[data-pvm]"); if(pv)pv.addEventListener("click",()=>verAdjunto(m.id));
+      const im=row.querySelector(".msgimg"); if(im)im.addEventListener("click",()=>verAdjunto(m.id));
       const ap=row.querySelector("[data-audio] .aplay"); if(ap)ap.addEventListener("click",()=>tocarAudio(m));
       const av=row.querySelector("[data-audio] .avel"); if(av)av.addEventListener("click",cambiarVel);
       const ab=row.querySelector("[data-audio] .abar"); if(ab)ab.addEventListener("click",e=>adelantarAudio(m,ab,e));
       const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id));
       const rp=row.querySelector("[data-responder]"); if(rp)rp.addEventListener("click",()=>responderA(m.id));
-      const pv=row.querySelector("[data-pvm]"); if(pv)pv.addEventListener("click",()=>verAdjunto(m.id));
-      const im=row.querySelector(".msgimg"); if(im)im.addEventListener("click",()=>verAdjunto(m.id));
       const rc=row.querySelector("[data-reacc]"); if(rc)rc.addEventListener("click",e=>{ e.stopPropagation(); abrirReacciones(rc,m.id); });
       const q=row.querySelector("[data-ira]"); if(q)q.addEventListener("click",()=>irAlMensaje(q.dataset.ira));
       if(m.audio&&sonando===m.id)requestAnimationFrame(pintarReproductor);
@@ -2319,6 +2324,70 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function delGM(){ const gid=grpEditId, gs=groupsAll(), g=gs[gid]; if(!g)return; closeGM();
     confirmar(`Se borra el grupo "${g.name}" y todos sus mensajes, para todos los que están adentro.`,()=>{ delete gs[gid]; if(chatChan==="grp:"+gid)setChan("team"); save(); renderChat(); },{title:"Eliminar grupo",yes:"Eliminar",danger:true}); }
   function updateChatBadge(){ const b=document.getElementById("chatBadge"); if(!b)return; const u=chatUnread(); if(u>0){ b.textContent=u>9?"9+":u; b.hidden=false; } else b.hidden=true; }
+
+  // ---------- RESUMEN DE LA SEMANA ----------
+  // Lo escribe una tarea programada de Claude Code en la máquina de Nico, los
+  // lunes: mira qué pasó en la semana que terminó y lo cuenta en palabras. La
+  // app solo LEE (src/resumen.js; la tabla no tiene políticas de escritura).
+  // Por eso la pantalla no tiene ningún botón de "generar": acá no se genera
+  // nada, se muestra lo último que quedó escrito.
+  let resumenes=null, resumenPedido=false, resumenVer=0;
+  function fechaYMD(s){ const p=String(s||"").split("-").map(Number);
+    return (p.length===3&&p.every(n=>isFinite(n)))?new Date(p[0],p[1]-1,p[2]):null; }
+  // "Del 15 al 21 de septiembre" — el mes se repite solo si la semana lo cruza.
+  function rangoSemana(desde,hasta){ const d=fechaYMD(desde), h=fechaYMD(hasta); if(!d||!h)return "";
+    const mismoMes=d.getMonth()===h.getMonth()&&d.getFullYear()===h.getFullYear();
+    return "Del "+d.getDate()+(mismoMes?"":" de "+MES[d.getMonth()])+" al "+h.getDate()+" de "+MES[h.getMonth()]; }
+  // El texto lo escribió un modelo, así que se trata como texto de afuera: se
+  // escapa TODO y recién después se agregan las cuatro etiquetas que aceptamos
+  // (título, lista, negrita, párrafo). Nada de meter el markdown crudo al DOM.
+  function resumenTextoHTML(txt){
+    const neg=s=>esc(s).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+    let out="", enLista=false, parr=[];
+    const cerrarParr=()=>{ if(parr.length){ out+="<p>"+parr.join("<br>")+"</p>"; parr=[]; } };
+    const cerrarLista=()=>{ if(enLista){ out+="</ul>"; enLista=false; } };
+    for(const cruda of String(txt||"").replace(/\r/g,"").split("\n")){ const l=cruda.trim();
+      if(!l){ cerrarParr(); cerrarLista(); continue; }
+      const tit=l.match(/^#{1,6}\s+(.*)$/);
+      if(tit){ cerrarParr(); cerrarLista(); out+="<h4>"+neg(tit[1])+"</h4>"; continue; }
+      const item=l.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+      if(item){ cerrarParr(); if(!enLista){ out+="<ul>"; enLista=true; } out+="<li>"+neg(item[1])+"</li>"; continue; }
+      cerrarLista(); parr.push(neg(l)); }
+    cerrarParr(); cerrarLista();
+    return out||"<p>"+esc(String(txt||""))+"</p>"; }
+  function renderResumen(){ const box=document.getElementById("resumenBoard"); if(!box)return;
+    if(!resumenPedido){ resumenPedido=true;
+      box.innerHTML='<div class="ph">Buscando el último resumen…</div>';
+      Promise.resolve(cargarResumenes?cargarResumenes():null)
+        .then(r=>{ resumenes=r; })
+        .catch(()=>{ resumenes=null; })
+        .then(()=>{ if(tareasVista()==="resumen")pintarResumen(); });
+      return; }
+    pintarResumen(); }
+  function pintarResumen(){ const box=document.getElementById("resumenBoard"); if(!box)return;
+    if(resumenes===null){
+      box.innerHTML='<div class="ph"><b>No pudimos leer los resúmenes</b><div style="margin-top:6px;font-size:13px">Probá de nuevo en un rato.</div><div style="margin-top:10px"><button class="btn" id="resReintentar">Volver a buscar</button></div></div>';
+      const b=document.getElementById("resReintentar");
+      if(b)b.addEventListener("click",()=>{ resumenPedido=false; renderResumen(); });
+      return; }
+    if(!resumenes.length){
+      box.innerHTML='<div class="ph"><b>Todavía no hay ningún resumen</b><div style="margin-top:6px;font-size:13px">Se escribe uno por semana, los lunes, mirando lo que pasó en los siete días anteriores.</div></div>';
+      return; }
+    if(resumenVer>=resumenes.length)resumenVer=0;
+    const r=resumenes[resumenVer];
+    const escrito=r.creado_at?new Date(r.creado_at):null;
+    const elegir=resumenes.length>1
+      ? '<select class="pick" id="resSemana">'+resumenes.map((x,i)=>'<option value="'+i+'"'+(i===resumenVer?" selected":"")+'>'+esc(rangoSemana(x.desde,x.hasta)||x.desde)+"</option>").join("")+"</select>"
+      : "";
+    box.innerHTML='<div class="card resumencard">'
+      +'<div class="reshead"><div><h2 class="restit">Resumen de la semana</h2>'
+      +'<div class="resmeta">'+esc(rangoSemana(r.desde,r.hasta))
+      +(escrito?" · escrito el "+esc(DOWLARGO[(escrito.getDay()+6)%7])+" "+escrito.getDate()+" de "+esc(MES[escrito.getMonth()]):"")
+      +"</div></div>"+elegir+"</div>"
+      +'<div class="resia">'+ICO.chispa+"<span>Lo escribió <b>inteligencia artificial</b> leyendo lo que quedó registrado en la app durante la semana. Puede equivocarse, entender de más o dejarse algo afuera: si algo no cierra, la fuente son las tareas."+(r.modelo?" <span class=\"resmod\">"+esc(r.modelo)+"</span>":"")+"</span></div>"
+      +'<div class="restxt">'+resumenTextoHTML(r.texto)+"</div></div>";
+    const sel=document.getElementById("resSemana");
+    if(sel)sel.addEventListener("change",()=>{ resumenVer=Number(sel.value)||0; pintarResumen(); }); }
 
   // ---------- PANEL personal ----------
   const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -3085,6 +3154,34 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("recSend").addEventListener("click",enviarAudio);
   document.getElementById("attachBtn").addEventListener("click",()=>{ if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; } document.getElementById("chatFile").click(); });
   document.getElementById("chatFile").addEventListener("change",e=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)attachFile(f); });
+  // Arrastrar y soltar en el chat. Con la pestaña Chat abierta vale soltar en
+  // CUALQUIER lugar de la pantalla (antes solo sobre el panel de mensajes, y
+  // era fácil errarle). Dos cosas se pueden soltar:
+  //  · archivos de una carpeta → mismo camino que el clip (attachFile, con su tope)
+  //  · un link (por ejemplo, un archivo arrastrado desde Drive en el navegador,
+  //    que no llega como archivo sino como dirección) → queda escrito en el
+  //    cajón para agregarle algo y mandarlo; en el chat sale con su ojo.
+  // El contador es porque dragenter/dragleave saltan al pasar por cada hijo.
+  const tiposArrastre=e=>Array.from((e.dataTransfer&&e.dataTransfer.types)||[]);
+  const hayArchivos=e=>tiposArrastre(e).includes("Files");
+  const sirveAlChat=e=>active==="chat"&&(hayArchivos(e)||tiposArrastre(e).includes("text/uri-list"));
+  (function(){ const zona=document.querySelector(".chatmain"); let dentro=0;
+    const apagar=()=>{ dentro=0; if(zona)zona.classList.remove("soltando"); };
+    document.addEventListener("dragenter",e=>{ if(!sirveAlChat(e))return; e.preventDefault(); dentro++; if(zona)zona.classList.add("soltando"); });
+    document.addEventListener("dragover",e=>{ if(sirveAlChat(e)){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; return; }
+      // Fuera del chat, un archivo soltado haría que el navegador lo abra EN
+      // LUGAR de la app, y se perdería lo que estuvieras escribiendo.
+      if(hayArchivos(e)){ e.preventDefault(); e.dataTransfer.dropEffect="none"; } });
+    document.addEventListener("dragleave",e=>{ if(!sirveAlChat(e))return; dentro=Math.max(0,dentro-1); if(!dentro)apagar(); });
+    document.addEventListener("dragend",apagar);
+    document.addEventListener("drop",e=>{ const va=sirveAlChat(e); if(!va&&!hayArchivos(e))return; e.preventDefault(); apagar(); if(!va)return;
+      if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; }
+      const fs=Array.from(e.dataTransfer.files||[]);
+      if(fs.length){ fs.forEach(attachFile); return; }
+      const url=(e.dataTransfer.getData("text/uri-list")||"").split(/\r?\n/).map(s=>s.trim()).find(s=>/^https?:\/\//i.test(s));
+      if(!url)return;
+      const inp=document.getElementById("msgInput"); if(!inp)return;
+      inp.value=(inp.value.trim()?inp.value.replace(/\s*$/," "):"")+url; inp.focus(); ajustarAlto(); }); })();
   // Enter envía; Shift+Enter baja de renglón (lo hace solo el <textarea>).
   // `isComposing`: mientras el teclado arma un carácter (acentos, sugerencias
   // del celular), ese Enter es del teclado, no un "enviar".
@@ -3154,34 +3251,6 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     d.roots=d.roots.filter(r=>d.nodes[r]);
     if(!d.roots.length){ note("Ese respaldo no tiene ningún proyecto."); return; }
     confirmar("Se reemplaza el contenido de TODO el equipo por el del respaldo. No se puede deshacer.",()=>{
-  // Arrastrar y soltar en el chat. Con la pestaña Chat abierta vale soltar en
-  // CUALQUIER lugar de la pantalla (antes solo sobre el panel de mensajes, y
-  // era fácil errarle). Dos cosas se pueden soltar:
-  //  · archivos de una carpeta → mismo camino que el clip (attachFile, con su tope)
-  //  · un link (por ejemplo, un archivo arrastrado desde Drive en el navegador,
-  //    que no llega como archivo sino como dirección) → queda escrito en el
-  //    cajón para agregarle algo y mandarlo; en el chat sale con su ojo.
-  // El contador es porque dragenter/dragleave saltan al pasar por cada hijo.
-  const tiposArrastre=e=>Array.from((e.dataTransfer&&e.dataTransfer.types)||[]);
-  const hayArchivos=e=>tiposArrastre(e).includes("Files");
-  const sirveAlChat=e=>active==="chat"&&(hayArchivos(e)||tiposArrastre(e).includes("text/uri-list"));
-  (function(){ const zona=document.querySelector(".chatmain"); let dentro=0;
-    const apagar=()=>{ dentro=0; if(zona)zona.classList.remove("soltando"); };
-    document.addEventListener("dragenter",e=>{ if(!sirveAlChat(e))return; e.preventDefault(); dentro++; if(zona)zona.classList.add("soltando"); });
-    document.addEventListener("dragover",e=>{ if(sirveAlChat(e)){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; return; }
-      // Fuera del chat, un archivo soltado haría que el navegador lo abra EN
-      // LUGAR de la app, y se perdería lo que estuvieras escribiendo.
-      if(hayArchivos(e)){ e.preventDefault(); e.dataTransfer.dropEffect="none"; } });
-    document.addEventListener("dragleave",e=>{ if(!sirveAlChat(e))return; dentro=Math.max(0,dentro-1); if(!dentro)apagar(); });
-    document.addEventListener("dragend",apagar);
-    document.addEventListener("drop",e=>{ const va=sirveAlChat(e); if(!va&&!hayArchivos(e))return; e.preventDefault(); apagar(); if(!va)return;
-      if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; }
-      const fs=Array.from(e.dataTransfer.files||[]);
-      if(fs.length){ fs.forEach(attachFile); return; }
-      const url=(e.dataTransfer.getData("text/uri-list")||"").split(/\r?\n/).map(s=>s.trim()).find(s=>/^https?:\/\//i.test(s));
-      if(!url)return;
-      const inp=document.getElementById("msgInput"); if(!inp)return;
-      inp.value=(inp.value.trim()?inp.value.replace(/\s*$/," "):"")+url; inp.focus(); ajustarAlto(); }); })();
       const prefs=loadLocalPrefs();
       state=normalize(Object.assign(d,prefs));
       if(typeof state.seq!=="number")state.seq=9999;

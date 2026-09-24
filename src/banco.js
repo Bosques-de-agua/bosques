@@ -38,6 +38,39 @@ try {
 
 const nada = async () => {};
 
+// Dos semanas de ejemplo, con la misma forma que devuelve la tabla `resumenes`.
+// El texto usa los cuatro marcadores que la pantalla sabe leer: ## título,
+// - lista, **negrita** y renglón en blanco entre párrafos.
+const RESUMENES_EJEMPLO = [
+  {
+    desde: "2026-09-14", hasta: "2026-09-20", modelo: "claude-opus-5",
+    creado_at: "2026-09-21T12:04:00Z",
+    texto: [
+      "La semana se fue casi entera en **informes de dominio**, y por primera vez en un mes eso dejó de estar trabado.",
+      "",
+      "## Lo que se movió",
+      "- Juampi consiguió que la Muni de Yacanto confirme por escrito que solo entrega los del ejido. No es lo que se quería, pero cierra una pregunta que venía abierta desde julio.",
+      "- Se cerraron 4 tareas del tema Estancias, todas de relevamiento.",
+      "- Lucas escribió el primer avance en **Carta de intención** en tres semanas.",
+      "",
+      "## Lo que no se movió",
+      "Due diligence catastral sigue sin responsable y sin un solo avance desde que se creó. Es la única tarea con prioridad alta que está así.",
+      "",
+      "## Una observación",
+      "Cuatro de las seis tareas terminadas las cerró la misma persona. No es necesariamente un problema, pero si la idea era repartir el relevamiento, no está pasando.",
+    ].join("\n"),
+  },
+  {
+    desde: "2026-09-07", hasta: "2026-09-13", modelo: "claude-opus-5",
+    creado_at: "2026-09-14T12:03:00Z",
+    texto: [
+      "Semana corta y sin cierres: se completaron 2 tareas, las dos administrativas.",
+      "",
+      "La conversación del equipo estuvo casi toda en el grupo de **Siembra directa**, donde se discutió el criterio de las parcelas de prueba. Esa discusión no quedó anotada en ninguna tarea: vive solo en el chat.",
+    ].join("\n"),
+  },
+];
+
 // Para auditar: el banco guarda lo ÚLTIMO que la app quiso mandarle al equipo
 // y a la tabla privada, sin mandarlo a ningún lado. Sirve para comprobar que
 // las preferencias personales no se cuelan en el payload compartido.
@@ -73,6 +106,16 @@ const app = startApp({
   inviteEmail: nada,
   refreshTeam: async () => team,
   hayPendiente: () => false,
+  // Resúmenes de mentira para poder mirar la pantalla sin base: en la app real
+  // los escribe la tarea programada de los lunes. /banco.html?sinresumen=1 los
+  // saca (pantalla "todavía no hay ninguno") y ?resumenroto=1 simula que la
+  // lectura falló, que es un estado distinto y se ve distinto.
+  cargarResumenes: async () => {
+    const q = new URLSearchParams(location.search);
+    if (q.has("resumenroto")) return null;
+    if (q.has("sinresumen")) return [];
+    return RESUMENES_EJEMPLO;
+  },
 });
 
 // Una cinta para no confundirlo nunca con la app de verdad.

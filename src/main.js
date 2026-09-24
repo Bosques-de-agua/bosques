@@ -4,6 +4,7 @@ import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail
 import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
+import { cargarResumenes } from "./resumen.js";
 import { initPush, reengancharPush } from "./push.js";
 import { initPicker } from "./picker.js";
 import { initCalendario } from "./calendario.js";
@@ -157,6 +158,9 @@ async function launchApp(session) {
     privadoRoto: !privOk,
     pushRemoteState,
     hayPendiente: () => hayCambiosSinGuardar() || hayPrivadoSinGuardar(),
+    // El resumen de los lunes: la app solo lo lee (lo escribe la tarea
+    // programada que corre en la máquina de Nico).
+    cargarResumenes,
   });
   // El testigo de guardado: la app avisa en pantalla si algo no llegó a la base.
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));

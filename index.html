@@ -147,7 +147,8 @@
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
         <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li>
         <li><b>Semana</b> es la revisión del lunes: las tareas completadas en 7 días (el botón <b>archivar</b> las manda todas juntas al Archivo, sin esperar al archivado automático), lo vencido, lo que vence en 7 días, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
-        <li>Los <b>objetivos de la semana</b> los escribe cualquiera; arriba a la derecha tenés negrita, dos tamaños de título y lista con casilleros.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button></div></h1>
+        <li><b>Resumen</b> es lo que pasó la semana <i>anterior</i>, contado en palabras. Lo escribe una inteligencia artificial los lunes, leyendo lo que quedó registrado acá: puede equivocarse, y lo dice. Semana mira hacia adelante; Resumen, hacia atrás.</li>
+        <li>Los <b>objetivos de la semana</b> los escribe cualquiera; arriba a la derecha tenés negrita, dos tamaños de título y lista con casilleros.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button></div></h1>
       <div class="weekgoals"><div class="wghead"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><div class="wgbar" id="wgBar" role="toolbar" aria-label="Formato de los objetivos"><button data-wg="bold" title="Negrita"><b>N</b></button><button data-wg="h3" title="Título grande (otro clic lo vuelve texto)">T1</button><button data-wg="h4" title="Título chico (otro clic lo vuelve texto)">T2</button><button data-wg="check" title="Lista con casilleros">☑</button></div></div><div id="weekGoals" class="wgedit" contenteditable="true" spellcheck="true" data-ph="¿Qué queremos lograr esta semana?"></div></div>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
@@ -155,6 +156,7 @@
       <div class="tbar temasbar" id="temasBar" hidden></div>
       <div class="kanban temaboard" id="temasBoard" hidden></div>
       <div class="semana" id="semanaBoard" hidden></div>
+      <div class="resumensem" id="resumenBoard" hidden></div>
     </div></section>
 
 
