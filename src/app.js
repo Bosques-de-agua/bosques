@@ -3154,22 +3154,34 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     d.roots=d.roots.filter(r=>d.nodes[r]);
     if(!d.roots.length){ note("Ese respaldo no tiene ningún proyecto."); return; }
     confirmar("Se reemplaza el contenido de TODO el equipo por el del respaldo. No se puede deshacer.",()=>{
-  // Arrastrar archivos desde una carpeta y soltarlos en el chat: mismo camino
-  // que el clip, cada uno pasa por attachFile con su tope. El contador es
-  // porque dragenter/dragleave saltan también al pasar por cada hijo.
-  const hayArchivos=e=>!!e.dataTransfer&&Array.from(e.dataTransfer.types||[]).includes("Files");
-  (function(){ const zona=document.querySelector(".chatmain"); if(!zona)return; let dentro=0;
-    const apagar=()=>{ dentro=0; zona.classList.remove("soltando"); };
-    zona.addEventListener("dragenter",e=>{ if(!hayArchivos(e))return; e.preventDefault(); dentro++; zona.classList.add("soltando"); });
-    zona.addEventListener("dragover",e=>{ if(!hayArchivos(e))return; e.preventDefault(); e.dataTransfer.dropEffect="copy"; });
-    zona.addEventListener("dragleave",e=>{ if(!hayArchivos(e))return; dentro=Math.max(0,dentro-1); if(!dentro)apagar(); });
-    zona.addEventListener("drop",e=>{ if(!hayArchivos(e))return; e.preventDefault(); e.stopPropagation(); apagar();
+  // Arrastrar y soltar en el chat. Con la pestaña Chat abierta vale soltar en
+  // CUALQUIER lugar de la pantalla (antes solo sobre el panel de mensajes, y
+  // era fácil errarle). Dos cosas se pueden soltar:
+  //  · archivos de una carpeta → mismo camino que el clip (attachFile, con su tope)
+  //  · un link (por ejemplo, un archivo arrastrado desde Drive en el navegador,
+  //    que no llega como archivo sino como dirección) → queda escrito en el
+  //    cajón para agregarle algo y mandarlo; en el chat sale con su ojo.
+  // El contador es porque dragenter/dragleave saltan al pasar por cada hijo.
+  const tiposArrastre=e=>Array.from((e.dataTransfer&&e.dataTransfer.types)||[]);
+  const hayArchivos=e=>tiposArrastre(e).includes("Files");
+  const sirveAlChat=e=>active==="chat"&&(hayArchivos(e)||tiposArrastre(e).includes("text/uri-list"));
+  (function(){ const zona=document.querySelector(".chatmain"); let dentro=0;
+    const apagar=()=>{ dentro=0; if(zona)zona.classList.remove("soltando"); };
+    document.addEventListener("dragenter",e=>{ if(!sirveAlChat(e))return; e.preventDefault(); dentro++; if(zona)zona.classList.add("soltando"); });
+    document.addEventListener("dragover",e=>{ if(sirveAlChat(e)){ e.preventDefault(); e.dataTransfer.dropEffect="copy"; return; }
+      // Fuera del chat, un archivo soltado haría que el navegador lo abra EN
+      // LUGAR de la app, y se perdería lo que estuvieras escribiendo.
+      if(hayArchivos(e)){ e.preventDefault(); e.dataTransfer.dropEffect="none"; } });
+    document.addEventListener("dragleave",e=>{ if(!sirveAlChat(e))return; dentro=Math.max(0,dentro-1); if(!dentro)apagar(); });
+    document.addEventListener("dragend",apagar);
+    document.addEventListener("drop",e=>{ const va=sirveAlChat(e); if(!va&&!hayArchivos(e))return; e.preventDefault(); apagar(); if(!va)return;
       if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; }
-      Array.from(e.dataTransfer.files||[]).forEach(attachFile); }); })();
-  // Soltado fuera de la zona, el navegador abriría el archivo EN LUGAR de la
-  // app y se perdería lo que estuvieras escribiendo.
-  window.addEventListener("dragover",e=>{ if(hayArchivos(e)&&!e.defaultPrevented){ e.preventDefault(); e.dataTransfer.dropEffect="none"; } });
-  window.addEventListener("drop",e=>{ if(hayArchivos(e))e.preventDefault(); });
+      const fs=Array.from(e.dataTransfer.files||[]);
+      if(fs.length){ fs.forEach(attachFile); return; }
+      const url=(e.dataTransfer.getData("text/uri-list")||"").split(/\r?\n/).map(s=>s.trim()).find(s=>/^https?:\/\//i.test(s));
+      if(!url)return;
+      const inp=document.getElementById("msgInput"); if(!inp)return;
+      inp.value=(inp.value.trim()?inp.value.replace(/\s*$/," "):"")+url; inp.focus(); ajustarAlto(); }); })();
       const prefs=loadLocalPrefs();
       state=normalize(Object.assign(d,prefs));
       if(typeof state.seq!=="number")state.seq=9999;
