@@ -1438,14 +1438,39 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // La ventana de lectura. El marco se carga recién al abrirla y se vacía al
   // cerrarla: si se dejara la dirección puesta, Drive seguiría trabajando
   // detrás de una ventana que ya nadie mira.
-  function abrirPreview(src,nombre,kind,url){ const m=document.getElementById("pvModal"); if(!m)return;
+  // `adj` = es un adjunto del chat: no está en Drive, así que el botón pasa a
+  // "Descargar" y la aclaración de permisos de Google no corresponde.
+  function abrirPreview(src,nombre,kind,url,adj){ const m=document.getElementById("pvModal"); if(!m)return;
     document.getElementById("pvIco").innerHTML=(FKIND[kind]||FKIND.link).i;
     const t=document.getElementById("pvName"); t.textContent=nombre||"Archivo"; t.title=nombre||"";
-    document.getElementById("pvOpen").href=url||src;
-    document.getElementById("pvFrame").src=src;
+    const op=document.getElementById("pvOpen"); op.href=url||src; op.textContent=adj?"Descargar":"Abrir en Drive";
+    if(adj){ op.setAttribute("download",nombre||"archivo"); op.removeAttribute("target"); }
+    else{ op.removeAttribute("download"); op.target="_blank"; }
+    document.getElementById("pvFoot").hidden=!!adj;
+    // Una foto va en un <img> que la ajusta al recuadro; en el marco quedaba a
+    // tamaño real y había que andar scrolleando.
+    const esImg=!!adj&&kind==="image", img=document.getElementById("pvImg"), fr=document.getElementById("pvFrame");
+    img.hidden=!esImg; fr.hidden=esImg;
+    if(esImg){ img.src=src; img.alt=nombre||""; fr.src="about:blank"; } else fr.src=src;
     m.classList.add("on"); }
   function cerrarPreview(){ const m=document.getElementById("pvModal"); if(!m||!m.classList.contains("on"))return;
-    m.classList.remove("on"); document.getElementById("pvFrame").src="about:blank"; }
+    m.classList.remove("on"); document.getElementById("pvFrame").src="about:blank"; document.getElementById("pvImg").removeAttribute("src");
+    if(pvBlob){ URL.revokeObjectURL(pvBlob); pvBlob=null; } }
+  // ---------- VER UN ADJUNTO DEL CHAT ----------
+  // Solo lo que el navegador sabe dibujar solo: fotos, PDF y texto. Un Word o
+  // un Excel no se pueden mostrar sin mandarlos a un servicio de afuera; esos
+  // siguen con Descargar. Se arma un blob: con el data URL guardado porque
+  // Chrome no abre un PDF desde un data: dentro de un marco.
+  const sePuedeVer=f=>!!(f&&f.data&&/^(image\/|text\/|application\/pdf$|application\/json$)/.test(f.type||""));
+  let pvBlob=null;
+  async function verAdjunto(mid){ const m=msgsOf(chatChan).find(x=>x.id===mid); if(!m||!sePuedeVer(m.file))return; const f=m.file;
+    try{ let b=await (await fetch(f.data)).blob();
+      // El texto va como utf-8 explícito: si no, las tildes pueden salir rotas.
+      if(!/^(image\/|application\/pdf)/.test(f.type))b=new Blob([b],{type:"text/plain;charset=utf-8"});
+      if(pvBlob)URL.revokeObjectURL(pvBlob); pvBlob=URL.createObjectURL(b);
+      const kind=/^image\//.test(f.type)?"image":/pdf/.test(f.type)?"pdf":"file";
+      abrirPreview(pvBlob,f.name,kind,null,true); }
+    catch(e){ note("No se pudo abrir el archivo."); } }
   // A quién se le cuelga el archivo: lo elegido en "Vincularlo a" cuando el
   // modal se abrió desde la pestaña Drive, o el tema/tarea desde cuya ficha se
   // lo abrió. Lo usan los dos caminos, el link pegado y el selector de Google.
@@ -1814,6 +1839,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const ab=row.querySelector("[data-audio] .abar"); if(ab)ab.addEventListener("click",e=>adelantarAudio(m,ab,e));
       const bo=row.querySelector("[data-borrarm]"); if(bo)bo.addEventListener("click",()=>borrarMsg(m.id));
       const rp=row.querySelector("[data-responder]"); if(rp)rp.addEventListener("click",()=>responderA(m.id));
+      const pv=row.querySelector("[data-pvm]"); if(pv)pv.addEventListener("click",()=>verAdjunto(m.id));
+      const im=row.querySelector(".msgimg"); if(im)im.addEventListener("click",()=>verAdjunto(m.id));
       const rc=row.querySelector("[data-reacc]"); if(rc)rc.addEventListener("click",e=>{ e.stopPropagation(); abrirReacciones(rc,m.id); });
       const q=row.querySelector("[data-ira]"); if(q)q.addEventListener("click",()=>irAlMensaje(q.dataset.ira));
       if(m.audio&&sonando===m.id)requestAnimationFrame(pintarReproductor);
@@ -1888,8 +1915,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(m.file){ const f=m.file; const kb=f.size>=1048576?(f.size/1048576).toFixed(1)+" MB":Math.max(1,Math.round(f.size/1024))+" KB";
       const ic=/^image\//.test(f.type)?ICO.imagen:/pdf/.test(f.type)?ICO.pdf:/sheet|excel|csv/.test(f.type)?ICO.sheet:/word|document/.test(f.type)?ICO.doc:ICO.clip;
       return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}`
-        +(/^image\//.test(f.type)&&fotoOk(f.data)?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}">`:"")
-        +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span><button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
+        +(/^image\//.test(f.type)&&fotoOk(f.data)?`<img class="msgimg" src="${f.data}" alt="${esc(f.name)}" title="Ver más grande">`:"")
+        +`<div class="msgfile"><span class="fic">${ic}</span><span class="fmeta"><b>${esc(f.name)}</b><span>${kb}</span></span>${sePuedeVer(f)?`<button class="rowbtn pvbtn" data-pvm="${m.id}" title="Ver acá" aria-label="Ver acá">${ICO.ojo}</button>`:""}<button class="rowbtn" data-dl="${m.id}">Descargar</button></div>`
         +(m.text?`<div class="msgtxt" style="margin-top:6px">${conLinks(m.text)}</div>`:"")+pie+accionesMsg(m,me)+reaccionesHTML(m,me)+`</div>`; }
     return `<div class="msg ${mm?"mine":""}" data-msg="${m.id}"${tono}>${mm?"":`<div class="who">${esc(m.from)}</div>`}${citaHTML(m)}<div class="msgtxt">${conLinks(m.text)}</div>${pie}${accionesMsg(m,me)}${reaccionesHTML(m,me)}</div>`; }
   // Los botones del mensaje, arriba a la derecha. Aparecen al pasar por
@@ -3127,6 +3154,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     d.roots=d.roots.filter(r=>d.nodes[r]);
     if(!d.roots.length){ note("Ese respaldo no tiene ningún proyecto."); return; }
     confirmar("Se reemplaza el contenido de TODO el equipo por el del respaldo. No se puede deshacer.",()=>{
+  // Arrastrar archivos desde una carpeta y soltarlos en el chat: mismo camino
+  // que el clip, cada uno pasa por attachFile con su tope. El contador es
+  // porque dragenter/dragleave saltan también al pasar por cada hijo.
+  const hayArchivos=e=>!!e.dataTransfer&&Array.from(e.dataTransfer.types||[]).includes("Files");
+  (function(){ const zona=document.querySelector(".chatmain"); if(!zona)return; let dentro=0;
+    const apagar=()=>{ dentro=0; zona.classList.remove("soltando"); };
+    zona.addEventListener("dragenter",e=>{ if(!hayArchivos(e))return; e.preventDefault(); dentro++; zona.classList.add("soltando"); });
+    zona.addEventListener("dragover",e=>{ if(!hayArchivos(e))return; e.preventDefault(); e.dataTransfer.dropEffect="copy"; });
+    zona.addEventListener("dragleave",e=>{ if(!hayArchivos(e))return; dentro=Math.max(0,dentro-1); if(!dentro)apagar(); });
+    zona.addEventListener("drop",e=>{ if(!hayArchivos(e))return; e.preventDefault(); e.stopPropagation(); apagar();
+      if(!state.me){ note("No pudimos identificarte para mandar archivos."); return; }
+      Array.from(e.dataTransfer.files||[]).forEach(attachFile); }); })();
+  // Soltado fuera de la zona, el navegador abriría el archivo EN LUGAR de la
+  // app y se perdería lo que estuvieras escribiendo.
+  window.addEventListener("dragover",e=>{ if(hayArchivos(e)&&!e.defaultPrevented){ e.preventDefault(); e.dataTransfer.dropEffect="none"; } });
+  window.addEventListener("drop",e=>{ if(hayArchivos(e))e.preventDefault(); });
       const prefs=loadLocalPrefs();
       state=normalize(Object.assign(d,prefs));
       if(typeof state.seq!=="number")state.seq=9999;
