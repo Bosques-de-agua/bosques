@@ -1751,3 +1751,50 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 #tareasViewSeg,#mesaSeg{max-width:100%;overflow-x:auto;scrollbar-width:none}
 #tareasViewSeg::-webkit-scrollbar,#mesaSeg::-webkit-scrollbar{display:none}
 #tareasViewSeg button,#mesaSeg button{flex:none}
+
+/* ══════════════ TELÉFONO: el menú pasa arriba ══════════════
+   La banda de iconos de la izquierda se comía el ancho y todo quedaba
+   apretado. En pantallas angostas el menú es una fila arriba (icono y nombre,
+   se desliza de costado si no entra) y el contenido se queda con todo el
+   ancho. `dvh` y no `vh`: en Android la barra del navegador aparece y
+   desaparece, y con `vh` el pie de la app quedaba escondido abajo. */
+.chathead .chatback{display:none}
+@media (max-width:700px){
+  #app{height:100vh;height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)}
+  main{grid-row:3;grid-column:1}
+  .topbar{padding:7px 12px;gap:10px}
+  .sidebar,.sidebar.rail{grid-row:2;grid-column:1;width:auto;flex-direction:row;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+    padding:3px 6px;border-right:none;border-bottom:1px solid var(--line);scrollbar-width:none;transition:none}
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar .sbgroup{flex-direction:row;gap:1px;flex:none}
+  .sidebar .sbsep,.sidebar .sbsubs,.sidebar.rail .sbsubs,.sidebar .sbtoggle,.sidebar .sbfoot .sbtoggle,.sidebar .sbmail{display:none}
+  .sidebar .sbitem,.sidebar.rail .sbitem{flex-direction:column;justify-content:center;gap:3px;width:auto;min-width:60px;flex:none;padding:6px 6px 5px;font-size:10.5px;line-height:1.15}
+  .sidebar .sblbl,.sidebar.rail .sblbl{display:block;max-width:74px;white-space:normal;text-align:center}
+  .sidebar .sbitem svg{width:18px;height:18px}
+  :root .sbitem.on{box-shadow:inset 0 -2px 0 var(--wood)}
+  .sidebar .sbitem .navbadge,.sidebar.rail .sbitem .navbadge{position:absolute;top:2px;right:8px;margin:0}
+  .sidebar .sbfoot{margin:0 0 0 2px;padding:0 0 0 3px;border-top:none;border-left:1px solid var(--line-soft);display:flex;flex-direction:row;align-items:stretch;flex:none}
+  .sidebar .sbuser:not([hidden]){display:flex;flex-direction:row;margin:0;padding:0;border-top:none}
+
+  /* El chat, como WhatsApp: la lista de canales entera; tocando uno, la
+     conversación ocupa la pantalla y la flecha (o el "atrás" del teléfono)
+     vuelve a la lista. */
+  .chatwrap .chanlist{width:100%;padding:8px 10px;border-right:none}
+  .chatwrap.encapa .chanlist{display:none}
+  .chatwrap:not(.encapa) .chatmain{display:none}
+  .chanlist .chsec{font-size:10.5px;margin:12px 8px 6px}
+  .chanlist .chanitem{padding:10px 10px;font-size:15px;gap:12px}
+  .chanlist .chanitem .av{width:36px;height:36px;font-size:12.5px}
+  .chanlist .chanitem .enlinea{width:11px;height:11px}
+  .chanlist .chanitem .channuevo{position:static;min-width:20px;width:auto;height:20px;padding:0 6px;font-size:11px}
+  .chanlist .chadd{padding:10px 12px;font-size:13px}
+  .chathead{padding:7px 10px;gap:8px;font-size:16px;flex-wrap:nowrap;min-width:0}
+  .chathead .chatback{display:inline-flex;flex:none;padding:6px}
+  .chathead .chtit{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chathead .grpmem{display:none}
+  .chathead #newEv{padding:6px 9px;font-size:12px;flex:none}
+  .msgs{padding:12px 10px}
+  .msg{max-width:85%}
+}
+.mfechas{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mfechas .btn .ico{width:15px;height:15px}

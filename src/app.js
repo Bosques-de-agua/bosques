@@ -605,7 +605,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const s=document.getElementById("filtSos"); if(s)s.style.display="none";
     // Con las herramientas arriba, el mapa se queda con toda la página.
     const secc=document.getElementById("tab-estructura"); if(secc)secc.classList.toggle("mapafull",mapa); }
-  function showTab(name){ active=name; applyTabControls(name); acomodarMenu();
+  function showTab(name){ if(name!==active&&typeof chatEnCapa!=="undefined"&&chatEnCapa){ chatEnCapa=false; if(history.state&&history.state.chatCapa)try{ history.replaceState(null,""); }catch(e){} }
+    active=name; applyTabControls(name); acomodarMenu();
     document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
     document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
     renderActive(); save(); }
@@ -1883,24 +1884,45 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(c.startsWith("dm:")){ const p=c.slice(3); return !!p&&p!==state.me&&allPeople().includes(p); }
     return false; }
   function setChan(c){ chatChan=c; state.chatChan=c; saveLocalPrefs(state); }
+  // En el teléfono el chat va como WhatsApp: primero la lista de canales a
+  // pantalla completa; tocando uno, la conversación se abre encima, con una
+  // flecha (y el botón "atrás" del teléfono) para volver a la lista. En la
+  // compu no cambia nada: lista y conversación, lado a lado.
+  const chatMovilMQ=window.matchMedia?matchMedia("(max-width:700px)"):null;
+  const chatMovil=()=>!!(chatMovilMQ&&chatMovilMQ.matches);
+  let chatEnCapa=false;
+  // Con la lista delante no se está leyendo ninguna conversación: nada se
+  // marca como leído y todos los canales muestran lo que tienen sin leer.
+  const mirandoChat=()=>!chatMovil()||chatEnCapa;
+  function abrirCapaChat(){ if(!chatMovil()||chatEnCapa)return; chatEnCapa=true;
+    try{ history.pushState({chatCapa:true},""); }catch(e){} }
+  // Con la entrada del historial puesta, la flecha hace lo mismo que el "atrás"
+  // del teléfono: la saca, y el popstate de abajo cierra la conversación.
+  function cerrarCapaChat(){ if(!chatEnCapa)return;
+    if(history.state&&history.state.chatCapa){ try{ history.back(); return; }catch(e){} }
+    chatEnCapa=false; if(active==="chat")renderChat(); }
+  window.addEventListener("popstate",()=>{ if(chatEnCapa){ chatEnCapa=false; if(active==="chat")renderChat(); } });
+  if(chatMovilMQ&&chatMovilMQ.addEventListener)chatMovilMQ.addEventListener("change",()=>{ if(active==="chat")renderChat(); });
   function renderChat(){ const me=state.me;
     if(!chanValido(chatChan))setChan("team");
     const list=document.getElementById("chanList");
     // El canal que estás mirando no lleva aviso: al dibujarlo ya queda leído.
-    const aviso=chan=>{ const n=chan===chatChan?0:sinLeerDe(chan);
+    const viendo=chan=>chan===chatChan&&mirandoChat();
+    const wrap=document.querySelector("#tab-chat .chatwrap"); if(wrap)wrap.classList.toggle("encapa",chatMovil()&&chatEnCapa);
+    const aviso=chan=>{ const n=viendo(chan)?0:sinLeerDe(chan);
       return n?`<span class="channuevo" title="${n===1?"1 mensaje sin leer":n+" mensajes sin leer"}">${n>9?"9+":n}</span>`:""; };
-    const cls=chan=>`chanitem ${chan===chatChan?"on":""}${(chan!==chatChan&&sinLeerDe(chan))?" nuevo":""}`;
+    const cls=chan=>`chanitem ${viendo(chan)?"on":""}${(!viendo(chan)&&sinLeerDe(chan))?" nuevo":""}`;
     list.innerHTML=`<div class="chsec">Canales</div><div class="${cls("team")}" data-ch="team">${equipoAv("av")}<span class="chname">Equipo</span>${aviso("team")}</div>`+
       myGroups().map(g=>`<div class="${cls("grp:"+g.id)}" data-ch="grp:${g.id}">${grupoAv(g,"av")}<span class="chname">${esc(g.name)}</span>${aviso("grp:"+g.id)}</div>`).join("")+
       `<button class="chadd" id="newGroup">＋ nuevo grupo</button>`+
       `<div class="chsec">Personal</div>`+
       allPeople().filter(p=>p&&p!==me).map(p=>`<div class="${cls("dm:"+p)}" data-ch="dm:${esc(p)}"><span class="avwrap">${avatarMarkup(p,"av")}${enLinea.has(p)?'<span class="enlinea" title="Tiene la app abierta ahora"></span>':""}</span><span class="chname">${esc(p)}</span>${aviso("dm:"+p)}</div>`).join("");
-    list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ setChan(el.dataset.ch); renderChat(); }));
+    list.querySelectorAll("[data-ch]").forEach(el=>el.addEventListener("click",()=>{ setChan(el.dataset.ch); abrirCapaChat(); renderChat(); }));
     document.getElementById("newGroup").addEventListener("click",()=>openGroupModal(null));
     const head=document.getElementById("chatHead"); const g=groupOf(chatChan);
     // chanTitle ya devuelve HTML (icono + nombre escapado): volver a escapar
     // acá imprimía el SVG como texto.
-    head.innerHTML=`<span>${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:(chatChan==="team"?`<button class="rowbtn" id="editGroup" title="Cambiarle la foto al Equipo">editar</button>`:"")}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
+    head.innerHTML=`<button class="btn btn-icon chatback" id="chatBack" aria-label="Volver a los chats" title="Volver a los chats"><svg viewBox="0 0 20 20" fill="none"><path d="M12.5 4.5 7 10l5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="chtit">${chanTitle(chatChan)}</span>${g?`<span class="grpmem" title="${esc((g.members||[]).join(", "))}">${(g.members||[]).length} personas</span><button class="rowbtn" id="editGroup">editar</button>`:(chatChan==="team"?`<button class="rowbtn" id="editGroup" title="Cambiarle la foto al Equipo">editar</button>`:"")}<span class="infob" tabindex="0">i<span class="infopop"><b>Chat, grupos y eventos</b><ul>
       <li><b>Grupos</b>: armá uno con dos o tres personas para un tema puntual. Solo lo ven quienes estén adentro. Con <b>editar</b> le cambiás nombre, gente y foto. En <b>Equipo</b>, <b>editar</b> le cambia la foto.</li>
       <li>En <b>Personal</b> tenés un canal uno a uno con cada persona.</li>
       <li><b>＋ Evento</b> propone una reunión con <b>Voy / No voy</b>. Arranca invitando a la gente de este chat; aparece en el calendario de los invitados.</li>
@@ -1911,6 +1933,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <li>En el Equipo y en los grupos, cada mensaje lleva un <b>tono del color de quien escribe</b>, para no tener que leer el nombre.</li>
       <li>En tus mensajes, <b>✓</b> quiere decir guardado y <b>✓✓</b> que lo leyeron todos los del canal. Pasá el mouse por encima de la tilde para ver quién.</li></ul></span></span><span class="spacer"></span><button class="btn" id="newEv" title="${chatChan==="team"?"Evento para todo el equipo":"Evento solo para los de este chat"}">＋ Evento</button>`;
     const ne=document.getElementById("newEv"); if(ne)ne.addEventListener("click",()=>openEvNew(null,chatChan));
+    document.getElementById("chatBack").addEventListener("click",cerrarCapaChat);
     const eg=document.getElementById("editGroup"); if(eg)eg.addEventListener("click",()=>openGroupModal(g?g.id:CANAL_EQUIPO));
     const box=document.getElementById("msgs"); const inp=document.getElementById("msgInput");
     if(!me){ box.innerHTML=`<div class="ph"><b>No pudimos identificarte</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; inp.disabled=true; return; }
@@ -1947,10 +1970,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // Leído es que alguien lo tuvo delante: con la pestaña en segundo plano no
     // cuenta (daba ✓✓ y apagaba el aviso del celular sin que nadie lo viera).
     // Se marca al volver a la pestaña.
-    if(document.visibilityState==="visible")marcarLeido(chatChan,msgs);
+    if(document.visibilityState==="visible"&&mirandoChat())marcarLeido(chatChan,msgs);
     save(); updateChatBadge(); }
   let irAlFinal=false;
-  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible"||active!=="chat")return;
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState!=="visible"||active!=="chat"||!mirandoChat())return;
     if(marcarLeido(chatChan,msgsOf(chatChan))){ save(); updateChatBadge(); } });
   function seenMap(){ const me=state.me||"__anon"; state.chatSeen=state.chatSeen||{}; if(!state.chatSeen[me]||typeof state.chatSeen[me]!=="object")state.chatSeen[me]={}; return state.chatSeen[me]; }
   // `chatSeen` (cuántos mensajes viste, guardado en ESTE navegador) fue lo que
@@ -2190,7 +2213,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(window.claude&&window.claude.downloads){ try{ const b=await (await fetch(f.data)).blob(); await window.claude.downloads.save({filename:f.name,data:b}); return; }catch(err){ if(err&&err.code==="declined")return; } }
     try{ const a=document.createElement("a"); a.href=f.data; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); }
     catch(e){ note("No se pudo descargar el archivo."); } }
-  function closeEv(){ volverADia=null; document.getElementById("evModal").classList.remove("on"); }
+  function closeEv(){ volverADia=null; mesaEvPendiente=0; document.getElementById("evModal").classList.remove("on"); }
   // ---------- EVENTOS: para quién es cada uno ----------
   // Un evento es de todo el equipo, o solo de algunas personas (la lista "para", con
   // sus nombres). Si es de algunas, solo lo ven ellas —en el calendario, en
@@ -2317,6 +2340,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const id="ev"+uid(); const rsvp={}; if(me)rsvp[me]="yes";
       const nuevo={id,date:da,title:ti,time:ho,desc:de,rsvp,by:me}; if(ha)nuevo.hasta=ha; if(p.length)nuevo.para=p;
       state.events.push(nuevo);
+      // Creado desde "Próxima reunión" de la Mesa: queda enlazado, y su fecha pasa a ser la de la reunión.
+      if(mesaEvPendiente&&state.mesa){ state.mesa.prox.ev=id; state.mesa.prox.fecha=da; mesaEvPendiente=0; }
       avisarEvento(nuevo,destinoAviso(p,desde));
       save(); closeEv(); renderActive(); }); }
   // link a Google Calendar con el evento precargado (el recordatorio lo manda Google)
@@ -3242,6 +3267,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // Lo marcado "para la próxima reunión" arma el temario; al terminar la
   // reunión queda registrada con qué se cerró y qué siguió abierto.
   const mesaDrawer=document.getElementById("mesaDrawer");
+  let mesaEvPendiente=0;   // se está creando el evento de la próxima reunión desde la Mesa
   let mesaSel=null, mesaCerrando=false, mesaFiltro="", mesaQuery="", mesaTerminando=false, mesaApEdit=null;
   const mesaBorrador={conc:"",minuta:"",link:""};
   const MESA_VISTAS=["abiertos","reuniones","cerrados"];
@@ -3254,7 +3280,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const plural=(n,uno,varios)=>n+" "+(n===1?uno:varios);
   function normMesa(d){ let m=d.mesa; if(!m||typeof m!=="object"||Array.isArray(m))m=d.mesa={};
     if(!Array.isArray(m.items))m.items=[]; if(!Array.isArray(m.reuniones))m.reuniones=[];
-    if(!m.prox||typeof m.prox!=="object")m.prox={}; if(!/^\d{4}-\d{2}-\d{2}$/.test(m.prox.fecha||""))m.prox.fecha="";
+    if(!m.prox||typeof m.prox!=="object")m.prox={}; if(!/^\d{4}-\d{2}-\d{2}$/.test(m.prox.fecha||""))m.prox.fecha=""; if(m.prox.ev!=null&&typeof m.prox.ev!=="string")delete m.prox.ev;
     m.items=m.items.filter(it=>it&&typeof it.id==="string"&&typeof it.titulo==="string");
     m.items.forEach(it=>{ if(typeof it.texto!=="string")it.texto=""; if(typeof it.node!=="string")it.node=""; it.reu=!!it.reu;
       it.aportes=Array.isArray(it.aportes)?it.aportes.filter(a=>a&&typeof a.id==="string"&&typeof a.text==="string"):[];
@@ -3308,7 +3334,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function mesaReunionesHTML(){ const tem=mesaTemario(), f=state.mesa.prox.fecha, hoy=ymdLocal(new Date());
     const filaT=it=>`<div class="mesarow${it.cerrado?" cerr":""}" data-mesa="${esc(it.id)}"><div class="mrt">${it.cerrado?`<span class="mrok">✓</span>`:""}<span class="mrtit">${esc(it.titulo||"Sin título")}</span></div>${it.cerrado&&it.cerrado.texto?`<div class="mrconc">${esc(it.cerrado.texto)}</div>`:""}<div class="mrmeta">${esc(temaDe(it)?temaDe(it).name:"Sin tema")}${it.by?" · planteó "+esc(it.by):""}</div></div>`;
     const cerrados=tem.filter(x=>x.cerrado).length;
-    let h=`<div class="card mprox"><div class="mproxh"><div><div class="mproxt">Próxima reunión</div><div class="mproxs">${tem.length?plural(tem.length,"cosa esperando","cosas esperando"):"Nada en el temario"}${cerrados?` · ${cerrados} ya cerrada${cerrados===1?"":"s"}`:""}</div></div><label class="mfecha">Fecha <input type="date" class="txt" id="mesaFecha" value="${esc(f)}"></label></div>`;
+    let h=`<div class="card mprox"><div class="mproxh"><div><div class="mproxt">Próxima reunión</div><div class="mproxs">${tem.length?plural(tem.length,"cosa esperando","cosas esperando"):"Nada en el temario"}${cerrados?` · ${cerrados} ya cerrada${cerrados===1?"":"s"}`:""}</div></div><div class="mfechas"><label class="mfecha">Fecha <input type="date" class="txt" id="mesaFecha" value="${esc(f)}"></label>${mesaEventoBtn()}</div></div>`;
     h+=tem.length?`<div class="mtemario">${tem.map(filaT).join("")}</div>`
       :`<div class="semvacio">Marcá <b>Para la próxima reunión</b> en un pendiente y aparece acá. Sirve de temario, y el número dice si hace falta juntarse.</div>`;
     if(tem.length){ h+=mesaTerminando
@@ -3321,7 +3347,20 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         +r.puntos.map(p=>`<div class="mesarow${p.cerrado?" cerr":""}"${mesaItem(p.id)?` data-mesa="${esc(p.id)}"`:""}><div class="mrt">${p.cerrado?`<span class="mrok">✓</span>`:`<span class="mrok abierto">·</span>`}<span class="mrtit">${esc(p.titulo)}</span></div>${p.cerrado&&p.conclusion?`<div class="mrconc">${esc(p.conclusion)}</div>`:""}${p.cerrado?"":`<div class="mrmeta">siguió abierto</div>`}</div>`).join("")
         +(r.minuta?`<div class="mminuta">${conLinks(r.minuta)}</div>`:"")+`<div class="mrfoot"><button class="rowbtn" data-borrarreu="${esc(r.id)}">Borrar esta reunión</button></div></details>`; }).join(""):`<div class="semvacio">Todavía no se terminó ninguna reunión desde acá.</div>`)+`</div>`;
     return h; }
+  // El evento de la reunión: si ya se creó desde acá, se abre; si no, el
+  // botón arma uno nuevo con la fecha y el temario ya escritos.
+  function mesaEventoProx(){ const id=state.mesa.prox.ev; return id?(state.events||[]).find(e=>e.id===id)||null:null; }
+  function mesaEventoBtn(){ const ev=mesaEventoProx();
+    return ev?`<button class="btn" id="mesaEvVer">${ICO.calendario} Ver el evento${ev.date!==state.mesa.prox.fecha?" ("+esc(dmDe(ev.date))+")":""}</button>`
+      :`<button class="btn" id="mesaEvNuevo">${ICO.calendario} Crear el evento</button>`; }
   function wireReuniones(body){
+    const evN=document.getElementById("mesaEvNuevo"); if(evN)evN.addEventListener("click",()=>{
+      const tem=mesaTemario(), f=state.mesa.prox.fecha||ymdLocal(new Date());
+      openEvNew(f,"team"); mesaEvPendiente=nowMs();
+      setTimeout(()=>{ const t=document.getElementById("evTitle"), d=document.getElementById("evDesc");
+        if(t&&!t.value)t.value="Reunión de equipo";
+        if(d&&!d.value&&tem.length)d.value="Temario:\n"+tem.filter(x=>!x.cerrado).map(x=>"· "+x.titulo).join("\n"); },30); });
+    const evV=document.getElementById("mesaEvVer"); if(evV)evV.addEventListener("click",()=>{ const ev=mesaEventoProx(); if(ev)openEvView(ev.id); });
     const f=document.getElementById("mesaFecha"); if(f)f.addEventListener("change",()=>{ state.mesa.prox.fecha=/^\d{4}-\d{2}-\d{2}$/.test(f.value)?f.value:""; save(); });
     const t=document.getElementById("mesaTerm"); if(t)t.addEventListener("click",()=>{ mesaTerminando=true; renderMesa(); const m=document.getElementById("mesaMinuta"); if(m)m.focus(); });
     const mi=document.getElementById("mesaMinuta"), li=document.getElementById("mesaLink");
@@ -3337,7 +3376,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const hoy=ymdLocal(new Date());
     state.mesa.reuniones.push({id:"mr"+uid(),fecha:state.mesa.prox.fecha||hoy,ts:nowMs(),by:state.me||"",minuta:mesaBorrador.minuta.trim(),link,
       puntos:tem.map(it=>({id:it.id,titulo:it.titulo,cerrado:!!it.cerrado,conclusion:it.cerrado?it.cerrado.texto:""}))});
-    tem.forEach(it=>{ it.reu=false; }); state.mesa.prox.fecha=""; mesaBorrador.minuta=""; mesaBorrador.link=""; mesaTerminando=false;
+    tem.forEach(it=>{ it.reu=false; }); state.mesa.prox.fecha=""; delete state.mesa.prox.ev; mesaBorrador.minuta=""; mesaBorrador.link=""; mesaTerminando=false;
     save(); renderMesa(); refreshChrome(); }
 
   // La solapa de un pendiente: la misma forma que la de una tarea.
