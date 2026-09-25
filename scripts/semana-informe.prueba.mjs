@@ -102,6 +102,35 @@ const sinAntes = informeSemanal({ despues: cierre, antes: null, antesDe: null, i
 ok(sinAntes.texto.includes("SIN copia de respaldo"), "sin respaldo previo, lo dice en la primera línea");
 ok(sinAntes.cuentas.nuevas === 0, "sin respaldo previo no inventa tareas nuevas");
 
+// Objetivos por semana: los de ESA semana (la clave es su lunes), con cuáles se cumplieron.
+const conObj = Object.assign(foto([]), { objetivos: {
+  [ymd(inicio)]: { gen: [{ id: "o1", t: "Hoja de ruta", ok: true }, { id: "o2", t: "Presupuesto", ok: false, traido: true }],
+    p: { Lucas: [{ id: "o3", t: "Exención", ok: false }] } },
+  "2026-09-28": { gen: [{ id: "o4", t: "OBJETIVO DE LA SEMANA SIGUIENTE", ok: false }], p: {} } },
+  weekGoals: "TEXTO VIEJO QUE NO VA" });
+const rObj = informeSemanal({ despues: conObj, antes: foto([]), antesDe: "x", despuesDe: "y", inicio, fin });
+ok(rObj.cuentas.objetivos === 3 && rObj.cuentas.objetivosCumplidos === 1, "cuenta los objetivos de la semana y cuáles se cumplieron",
+  `objetivos: ${rObj.cuentas.objetivos}, cumplidos: ${rObj.cuentas.objetivosCumplidos}`);
+ok(rObj.texto.includes("[cumplido] Hoja de ruta") && rObj.texto.includes("[no cumplido] Exención") && rObj.texto.includes("### Lucas")
+   && rObj.texto.includes("pasó a la semana siguiente"), "los objetivos salen por persona y con su resultado");
+ok(!rObj.texto.includes("SEMANA SIGUIENTE") && !rObj.texto.includes("TEXTO VIEJO"), "no se cuelan los de otra semana ni el texto viejo");
+const soloViejo = informeSemanal({ despues: Object.assign(foto([]), { weekGoals: "<b>Cerrar</b> la carpeta" }), antes: foto([]), antesDe: "x", despuesDe: "y", inicio, fin });
+ok(soloViejo.texto.includes("Cerrar la carpeta"), "sin objetivos nuevos, todavía lee el cuadro de texto viejo");
+
+// Mesa de trabajo: lo cerrado con su conclusión, lo nuevo y los aportes, solo de la semana.
+const conMesa = Object.assign(foto([]), { mesa: { items: [
+  { id: "m1", titulo: "¿Wyss antes o después?", node: "n2", by: "Juampi", ts: ANTES, aportes: [{ id: "a", by: "Lucas", ts: EN, text: "aporte de la semana" }, { id: "b", by: "Lucas", ts: ANTES, text: "APORTE VIEJO" }], cerrado: { texto: "En octubre", by: "Nico", ts: EN } },
+  { id: "m2", titulo: "Criterio de dueños", node: "", by: "Juanso", ts: EN, aportes: [], cerrado: null },
+  { id: "m3", titulo: "PENDIENTE VIEJO", node: "", by: "Nico", ts: ANTES, aportes: [], cerrado: null }],
+  reuniones: [{ id: "r", fecha: ymd(new Date(EN)), ts: EN, puntos: [{ titulo: "x", cerrado: true }, { titulo: "y", cerrado: false }], minuta: "algo", link: "" }] } });
+const rMesa = informeSemanal({ despues: conMesa, antes: foto([]), antesDe: "x", despuesDe: "y", inicio, fin });
+ok(rMesa.cuentas.mesaCerrados === 1 && rMesa.texto.includes("cerró Nico: En octubre") && rMesa.texto.includes("Área Natural › Informes"),
+  "el pendiente cerrado sale con su conclusión y su tema");
+ok(rMesa.cuentas.mesaNuevos === 1 && rMesa.cuentas.mesaAportes === 1 && !rMesa.texto.includes("APORTE VIEJO") && !rMesa.texto.includes("PENDIENTE VIEJO"),
+  "de la mesa entra solo lo de la semana", `nuevos: ${rMesa.cuentas.mesaNuevos}, aportes: ${rMesa.cuentas.mesaAportes}`);
+ok(rMesa.texto.includes("2 puntos · 1 cerrados · con minuta") && rMesa.texto.includes("Pendientes abiertos en la mesa al cerrar la semana: 2."),
+  "cuenta la reunión y lo que sigue abierto");
+
 console.log("\n" + "=".repeat(46));
 console.log(fallas ? `${fallas} FALLA(S)` : "TODO BIEN — sin fallas");
 process.exit(fallas ? 1 : 0);

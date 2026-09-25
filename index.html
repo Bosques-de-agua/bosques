@@ -77,6 +77,7 @@
       <span class="sbsep"></span>
       <button class="navtab sbitem" data-tab="estructura" title="Estructura"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5h12M7 10h9M10 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="sblbl">Estructura</span></button>
       <button class="navtab sbitem" data-tab="tareas" title="Tareas"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="4.5" height="14" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="4.5" height="9" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="3" width="2" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Tareas</span></button>
+      <button class="navtab sbitem" data-tab="mesa" title="Mesa de trabajo"><svg viewBox="0 0 20 20" fill="none"><path d="M3 7.5h14M5 7.5V16M15 7.5V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 4.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="sblbl">Mesa de trabajo</span></button>
       <span class="sbsep"></span>
       <button class="navtab sbitem" data-tab="chat" title="Chat"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6A1.5 1.5 0 0 1 14.5 13H8l-3.5 3v-3H5.5A1.5 1.5 0 0 1 4 11.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="sblbl">Chat</span><span class="navbadge" id="chatBadge" hidden></span></button>
       <button class="navtab sbitem" data-tab="drive" title="Drive"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 3h5l5 8.5h-5zM7.5 3l-5 8.5L5 16l5-8.5zM5 16h10l2.5-4.5H7.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="sblbl">Drive</span></button>
@@ -97,6 +98,7 @@
         <li>Un evento puede llevar hora <b>hasta</b>; sin ella se cuenta una hora. En <b>Próximos eventos</b> se queda una hora después de terminar y después sale.</li>
         <li>Si conectaste tu <b>Google Calendar</b> (en Configuración), tus eventos personales aparecen con <b>borde punteado</b> y en su propio bloque. Solo los ves vos.</li>
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
+        <li>Arriba de todo en tu foco, <b>tus objetivos de la semana</b>: los tildás o sumás desde ahí, y abajo, plegados, los generales del equipo. <b>Ver todos</b> te lleva a los de todo el equipo, en Tareas.</li>
         <li><b>Tu foco</b> tiene tres pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas); <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama; y <b>Tu semana</b>, la revisión de la pestaña Tareas pero solo con lo tuyo: tus tareas completadas (con un botón para archivarlas todas juntas), lo vencido, lo que vence y lo que no se mueve.</li>
         <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
@@ -148,8 +150,7 @@
         <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li>
         <li><b>Semana</b> es la revisión del lunes: las tareas completadas en 7 días (el botón <b>archivar</b> las manda todas juntas al Archivo, sin esperar al archivado automático), lo vencido, lo que vence en 7 días, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
         <li><b>Resumen</b> es lo que pasó la semana <i>anterior</i>, contado en palabras. Lo escribe una inteligencia artificial los lunes, leyendo lo que quedó registrado acá — al pie dice con qué modelo. Puede equivocarse: la fuente son las tareas. Del chat solo mira cuántos mensajes hubo, nunca qué se dijo. Semana mira hacia adelante; Resumen, hacia atrás.</li>
-        <li>Los <b>objetivos de la semana</b> los escribe cualquiera; arriba a la derecha tenés negrita, dos tamaños de título y lista con casilleros.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button></div></h1>
-      <div class="weekgoals"><div class="wghead"><div class="wglab" title="Lo escriben entre todos y lo ve todo el equipo">Objetivos de la semana</div><div class="wgbar" id="wgBar" role="toolbar" aria-label="Formato de los objetivos"><button data-wg="bold" title="Negrita"><b>N</b></button><button data-wg="h3" title="Título grande (otro clic lo vuelve texto)">T1</button><button data-wg="h4" title="Título chico (otro clic lo vuelve texto)">T2</button><button data-wg="check" title="Lista con casilleros">☑</button></div></div><div id="weekGoals" class="wgedit" contenteditable="true" spellcheck="true" data-ph="¿Qué queremos lograr esta semana?"></div></div>
+        <li><b>Objetivos</b>: los de la semana, los generales del equipo y un cuadro por persona. Cualquiera escribe en cualquier cuadro. Con las flechas vas a la semana pasada (queda quieta, como registro de qué se cumplió) o a la que viene (para adelantar). Lo que no se tildó se trae a la semana nueva con un botón; con → pasás uno a la semana siguiente. Tus objetivos también aparecen arriba de todo en Mi foco.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="temas">Temas</button><button data-v="semana">Semana</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button><button data-v="objetivos">Objetivos</button></div></h1>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
@@ -157,8 +158,22 @@
       <div class="kanban temaboard" id="temasBoard" hidden></div>
       <div class="semana" id="semanaBoard" hidden></div>
       <div class="resumensem" id="resumenBoard" hidden></div>
+      <div class="objetivos" id="objBoard" hidden></div>
     </div></section>
 
+
+    <section class="tab" id="tab-mesa"><div class="wrap">
+      <h1 class="h1">Mesa de trabajo<span class="infob" tabindex="0">i<span class="infopop"><b>Lo que está en maceración</b><ul>
+        <li>Acá van las <b>dudas, las decisiones por tomar y lo que quedó en el aire</b>: lo que no es una tarea porque nadie lo "hace", pero no se puede perder.</li>
+        <li>Cada pendiente tiene un <b>título</b>, un <b>desarrollo</b> con el contexto, el <b>tema</b> al que pertenece (si pertenece a alguno) y quién lo planteó.</li>
+        <li><b>Aportes</b>: cualquiera suma lo que sabe o piensa, y queda con su nombre y la fecha. Así se ve cómo fue madurando.</li>
+        <li><b>Desprender tarea</b>: si de ahí sale algo para hacer, se crea una tarea enlazada. El pendiente sigue abierto, y desde la tarea se vuelve a él.</li>
+        <li><b>Cerrar con conclusión</b>: se escribe qué se decidió y pasa a <b>Cerrados</b>, que es el registro de las decisiones del equipo. Se puede reabrir.</li>
+        <li>Marcá <b>Para la próxima reunión</b> y aparece en <b>Reuniones</b>, que arma el temario. Al terminar la reunión queda registrada con lo que se cerró, lo que siguió abierto y la minuta.</li>
+        <li>En la ficha de cada tema, un renglón dice cuántos pendientes tiene y te trae acá filtrado.</li></ul></span></span><div class="seg2 estviews" id="mesaSeg"></div></h1>
+      <div class="srchbar" id="mesaBar"><input class="srch" id="mesaSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar en la mesa…"><select class="pick drivetema" id="mesaTema" title="Ver solo los de un tema"></select><button class="rowbtn" id="mesaTemaClear" hidden>✕ todos los temas</button><div style="flex:1"></div><button class="btn btn-primary" id="mesaNuevo"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nuevo pendiente</button></div>
+      <div id="mesaBody"></div>
+    </div></section>
 
     <section class="tab" id="tab-config"><div class="wrap" style="max-width:820px">
       <h1 class="h1">Configuración<span class="infob" tabindex="0">i<span class="infopop"><b>Todo lo que se ajusta, en un solo lugar</b><ul>
@@ -222,6 +237,7 @@
     <div class="sec"><div class="sh"><h3>Objetivo</h3></div><textarea class="txt" id="pObj" autocapitalize="sentences" autocorrect="on" rows="2" placeholder="¿Qué busca este tema?"></textarea></div>
     <div class="sec"><div class="sh"><h3>Estado actual</h3></div><textarea class="txt" id="pCtx" autocapitalize="sentences" autocorrect="on" rows="3" placeholder="¿En qué se está trabajando ahora?"></textarea></div>
     <div class="sec" id="pTasksSec"><div class="sh"><h3>Tareas</h3><button class="mini-add" id="addTaskBtn">＋ tarea</button></div><div id="itemList"></div></div>
+    <div class="sec" id="pMesaSec" hidden><div class="subrow" id="pMesaGo"><span class="orb" style="background:var(--accent-week)"></span><span class="t"><b>En la mesa de trabajo</b><span id="pMesaTxt"></span></span><span class="go">↗</span></div></div>
     <div class="sec"><div class="sh"><h3>Sub-temas</h3><button class="mini-add" id="addSub">＋ sub-tema</button></div><div id="subList"></div></div>
     <div class="sec" id="pBelongSec"><div class="sh"><h3>Pertenece a</h3></div><div id="pBelong"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="pAddFile">＋ archivo de Drive</button></div><div id="pFiles"></div></div>
@@ -263,6 +279,23 @@
   <div class="pfoot" style="display:flex;align-items:center;gap:8px"><button class="btn" id="tArch"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="13" height="3.4" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7.4v7.1A1.5 1.5 0 0 0 6.5 16h7a1.5 1.5 0 0 0 1.5-1.5V7.4" stroke="currentColor" stroke-width="1.4"/><path d="M8.4 10.4h3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Archivar</button><div style="flex:1"></div><button class="btn danger" id="tDel">Eliminar</button></div>
 </aside>
 
+
+<aside class="drawer" id="mesaDrawer" aria-hidden="true">
+  <div class="phead">
+    <button class="btn btn-icon close" id="closeMesa" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="ey"><span id="mKind">Pendiente</span></div>
+    <input class="title" id="mTitulo" autocapitalize="sentences" autocorrect="on" aria-label="Título del pendiente" placeholder="Título">
+    <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Tema</label><select class="pick" id="mTema"></select></div></div>
+    <div class="mmeta"><span class="mplanteo" id="mPlanteo"></span><label class="mreu"><input type="checkbox" id="mReu"> Para la próxima reunión</label></div>
+  </div>
+  <div class="pbody">
+    <div class="sec mconcsec" id="mConcSec" hidden><div class="sh"><h3>Conclusión</h3></div><div class="mconcmeta" id="mConcMeta"></div><textarea class="txt autoalto" id="mConc" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Ej: presentamos en octubre con el catastro parcial"></textarea><div class="mconcerr" id="mConcErr" role="alert"></div><div class="avedbtns" id="mConcBtns" hidden><button class="btn btn-primary" id="mConcOk">Cerrar y pasar a Cerrados</button><button class="btn" id="mConcNo">Cancelar</button></div></div>
+    <div class="sec"><div class="sh"><h3>Desarrollo</h3></div><textarea class="txt autoalto" id="mTexto" rows="3" autocapitalize="sentences" autocorrect="on" placeholder="El contexto, las opciones, lo que se sabe hasta ahora…"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Aportes</h3></div><div class="avadd"><textarea class="txt" id="mApIn" rows="1" autocapitalize="sentences" autocorrect="on" placeholder="Sumá lo que sepas o pienses" title="Enter agrega · Shift+Enter baja de renglón"></textarea><button class="btn" id="mApAdd">Agregar</button></div><div id="mAportes" class="avlist"></div></div>
+    <div class="sec"><div class="sh"><h3>Tareas que salieron de acá</h3><button class="mini-add" id="mDesp">＋ desprender tarea</button></div><div id="mTareas"></div></div>
+  </div>
+  <div class="pfoot" id="mFoot" style="display:flex;align-items:center;gap:8px"></div>
+</aside>
 
 <div class="modal" id="evModal"><div class="box" id="evBox"></div></div>
 

@@ -105,7 +105,32 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
     const n = cuantos(g.msgs);
     if (n) chatGrupos[g.name] = n;
   }
-  const objetivos = String((despues && despues.weekGoals) || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  // Los objetivos de ESA semana (la clave es su lunes): los generales y los de
+  // cada uno, con cuáles se tildaron. Es lo que permite decir qué se cumplió.
+  // Los viejos (un solo texto, antes de 2026-09-25) se leen como antes.
+  const semObj = ((despues && despues.objetivos) || {})[ymd(inicio)] || null;
+  const listaObj = (arr) => (Array.isArray(arr) ? arr : []).filter((o) => o && typeof o.t === "string")
+    .map((o) => `${o.ok ? "[cumplido]" : "[no cumplido]"} ${o.t}${o.traido ? " (pasó a la semana siguiente)" : ""}${o.de ? " (venía de la semana anterior)" : ""}`);
+  const objGrupos = [];
+  if (semObj) {
+    const g = listaObj(semObj.gen); if (g.length) objGrupos.push(["Generales del equipo", g]);
+    for (const [quien, arr] of Object.entries(semObj.p || {})) { const l = listaObj(arr); if (l.length) objGrupos.push([quien, l]); }
+  }
+  const objetivosViejos = objGrupos.length ? "" : String((despues && despues.weekGoals) || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+  // La mesa de trabajo: lo que se planteó, se discutió y se decidió. A
+  // diferencia del chat, esto es registro deliberado del equipo, así que sí
+  // entra con su texto (título, aportes, conclusión).
+  const mesa = (despues && despues.mesa) || {};
+  const temaDe = (it) => it.node && nodos(despues)[it.node] ? rutaDe(despues, it.node) : "sin tema";
+  const mesaItems = Array.isArray(mesa.items) ? mesa.items.filter((it) => it && typeof it.titulo === "string") : [];
+  const mesaNuevos = mesaItems.filter((it) => enRango(it.ts)).map((it) => ({ t: it.titulo, tema: temaDe(it), por: it.by || "?" }));
+  const mesaCerrados = mesaItems.filter((it) => it.cerrado && enRango(it.cerrado.ts)).map((it) => ({ t: it.titulo, tema: temaDe(it), conclusion: it.cerrado.texto, por: it.cerrado.by || "?" }));
+  const mesaAportes = [];
+  for (const it of mesaItems) for (const a of (it.aportes || [])) if (enRango(a.ts)) mesaAportes.push({ t: it.titulo, por: a.by || "?", texto: a.text, ts: a.ts });
+  const mesaAbiertos = mesaItems.filter((it) => !it.cerrado).length;
+  const reuniones = (Array.isArray(mesa.reuniones) ? mesa.reuniones : []).filter((r) => r && (enRango(r.ts) || (r.fecha && enRango(new Date(r.fecha + "T12:00:00").getTime()))))
+    .map((r) => ({ dia: r.fecha || "", puntos: (r.puntos || []).length, cerrados: (r.puntos || []).filter((p) => p.cerrado).length, minuta: !!(r.minuta || r.link) }));
 
   // ---------- armar el texto ----------
   const fecha = (ts) => { const d = new Date(ts); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
@@ -116,7 +141,11 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
     : `SIN copia de respaldo anterior al ${ymd(inicio)}: de esta semana solo se ve lo que quedó fechado. No se puede saber qué se creó ni qué cambió de estado.`);
   L.push("Lo quieto y lo vencido se miden al cerrar la semana, no a hoy.");
   L.push("");
-  if (objetivos) { L.push("## Objetivos que se puso el equipo"); L.push(objetivos); L.push(""); }
+  if (objGrupos.length) {
+    L.push("## Objetivos que se puso el equipo para esta semana");
+    for (const [quien, l] of objGrupos) { L.push(`### ${quien}`); l.forEach((x) => L.push("- " + x)); }
+    L.push("");
+  } else if (objetivosViejos) { L.push("## Objetivos que se puso el equipo"); L.push(objetivosViejos); L.push(""); }
 
   const bloque = (titulo, arr, fmt, vacio = "ninguna") => {
     L.push(`## ${titulo} (${arr.length})`);
@@ -133,6 +162,12 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
   bloque("Abiertas y quietas hace 14 días o más al cerrar la semana", quietas.sort((a, b) => (b.dias === null ? 1e9 : b.dias) - (a.dias === null ? 1e9 : a.dias)),
     (x) => `${x.t} · ${x.ruta} · ${x.quien} · ${x.dias === null ? "nunca tuvo un avance" : x.dias + " días sin novedades"} · prioridad ${x.prio}`);
   bloque("Vencidas y sin terminar", vencidas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · vencía ${x.vencio}`);
+  bloque("Mesa de trabajo: pendientes cerrados con su conclusión", mesaCerrados, (x) => `${x.t} · ${x.tema} · cerró ${x.por}: ${x.conclusion}`, "ninguno");
+  bloque("Mesa de trabajo: pendientes nuevos", mesaNuevos, (x) => `${x.t} · ${x.tema} · lo planteó ${x.por}`, "ninguno");
+  bloque("Mesa de trabajo: aportes escritos", mesaAportes.sort((a, b) => a.ts - b.ts), (x) => `[${fecha(x.ts)}] ${x.por} en "${x.t}": ${x.texto}`, "ninguno");
+  bloque("Reuniones registradas", reuniones, (x) => `${x.dia} · ${x.puntos} puntos · ${x.cerrados} cerrados${x.minuta ? " · con minuta" : ""}`, "ninguna");
+  L.push(`Pendientes abiertos en la mesa al cerrar la semana: ${mesaAbiertos}.`);
+  L.push("");
 
   const plural = (n) => n === 1 ? "1 mensaje" : n + " mensajes";
   L.push("## Cuánto se habló");
@@ -146,6 +181,9 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
     completadas: completadas.length, avances: avances.length, nuevas: nuevas.length,
     cambios: cambios.length, reabiertas: reabiertas.length, quietas: quietas.length,
     vencidas: vencidas.length, eventos: eventos.length,
+    objetivos: objGrupos.reduce((n, [, l]) => n + l.length, 0),
+    objetivosCumplidos: objGrupos.reduce((n, [, l]) => n + l.filter((x) => x.startsWith("[cumplido]")).length, 0),
+    mesaCerrados: mesaCerrados.length, mesaNuevos: mesaNuevos.length, mesaAportes: mesaAportes.length,
     mensajes: chatEquipo + Object.values(chatGrupos).reduce((n, x) => n + x, 0),
   } };
 }

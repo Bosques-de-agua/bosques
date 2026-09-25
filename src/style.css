@@ -1576,7 +1576,10 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .wgedit li input{margin:0;flex:none;transform:translateY(1px);cursor:pointer}
 /* Semana: la revisión del lunes. */
 #semanaBoard[hidden]{display:none}
-.semgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;align-items:start}
+/* Todos los bloques en una sola fila: si no entran, se desliza de costado
+   (antes "Sin responsable" bajaba a una segunda fila y se perdía). */
+.semgrid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:14px;align-items:start;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.semgrid>.semblk{scroll-snap-align:start}
 .semblk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px}
 .semblk h3{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px;margin:0 0 6px;color:var(--ink)}
 .semn{font-size:11.5px;font-weight:600;color:var(--ink-faint);font-family:var(--font-mono)}
@@ -1649,3 +1652,102 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .tsep{border:none;border-top:1px solid color-mix(in srgb,var(--ink-faint) 45%,transparent);margin:24px 0 4px}
 #tPrivSec[hidden]{display:none}
 #tPrivSec{margin-top:12px}
+
+/* ── Objetivos de la semana: generales arriba, un cuadro por persona abajo.
+   Texto con casillero y nada más: no son tareas. ── */
+#objBoard[hidden]{display:none}
+.objnav{display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 14px;flex-wrap:wrap}
+.objsem{display:flex;flex-direction:column;align-items:center;min-width:190px;text-align:center}
+.objsem b{font-size:15px;color:var(--ink)}
+.objsem span{font-size:12px;color:var(--ink-faint)}
+.objnav .btn-icon[disabled]{opacity:.35;cursor:default}
+.objgen{margin-bottom:14px}
+.objgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;align-items:start}
+.objlab{display:flex;align-items:center;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin-bottom:6px}
+.objper .objlab{font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:600}
+.objlab .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--on-person);flex:none}
+.objrow{display:flex;align-items:flex-start;gap:9px;padding:6px 0;border-top:1px solid var(--line-soft);font-size:13.5px;line-height:1.45}
+.objrow:first-child,.objtraer+.objrow{border-top:none}
+.objchk{margin:3px 0 0;flex:none;cursor:pointer;accent-color:var(--s-listo)}
+.objchk[disabled]{cursor:default}
+.objt{flex:1;min-width:0;color:var(--ink);overflow-wrap:anywhere}
+.objrow.ok .objt{color:var(--ink-faint);text-decoration:line-through}
+.objtag{display:inline-block;margin-left:7px;font-size:10.5px;color:var(--ink-faint);text-decoration:none;font-style:italic}
+.objrow .objacts{display:flex;gap:2px;opacity:0;transition:opacity .12s;flex:none}
+.objrow:hover .objacts,.objacts:focus-within{opacity:1}
+@media (hover:none){ .objrow .objacts{opacity:.6} }
+.objrow.ed{padding:4px 0}
+.objrow.ed .objin{width:100%}
+.objadd{width:100%;margin-top:6px;font-size:13px}
+.objvacio{font-size:12.5px;color:var(--ink-faint);padding:4px 0}
+.objtraer{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-soft);background:color-mix(in srgb,var(--accent-week) 10%,transparent);border-radius:var(--r-sm);padding:5px 8px;margin-bottom:6px}
+.objfoco{border-left:3px solid var(--accent-week);margin-bottom:14px}
+.objfhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.objfhead .objlab{margin-bottom:0}
+.objfgen{margin-top:8px;border-top:1px solid var(--line-soft);padding-top:6px}
+.objfgen summary{cursor:pointer;font-size:12px;color:var(--ink-faint)}
+.objfgen[open] summary{margin-bottom:4px}
+
+/* ── Mesa de trabajo ── */
+#tab-mesa .srchbar[hidden],#pMesaSec[hidden],#mConcSec[hidden],#mConcBtns[hidden],.mreu[hidden]{display:none}
+.mesagrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:6px 14px 4px;margin-bottom:12px}
+.mesagh{display:flex;align-items:center;gap:8px;padding:6px 0 4px;font-size:13px;color:var(--ink)}
+.mesagh .orb{width:9px;height:9px;border-radius:50%;flex:none}
+.mesagh span:last-child:not(.orb){font-size:11.5px;color:var(--ink-faint)}
+.mesarow{padding:9px 0;border-top:1px solid var(--line-soft);cursor:pointer}
+.mesarow:hover .mrtit{color:var(--wood-deep)}
+.mesarow.sel{background:color-mix(in srgb,var(--wood) 8%,transparent);margin:0 -14px;padding-left:14px;padding-right:14px}
+.mrt{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mrtit{flex:1;min-width:0;font-size:13.5px;color:var(--ink);overflow-wrap:anywhere}
+.mreutag{flex:none;font-size:10.5px;padding:1px 8px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--accent-week) 18%,transparent);color:var(--ink-soft)}
+.mrmeta{font-size:11.5px;color:var(--ink-faint);margin-top:2px}
+.mrconc{font-size:13px;line-height:1.45;color:var(--ink-soft);margin-top:3px;padding-left:9px;border-left:2px solid var(--s-listo);white-space:pre-wrap;overflow-wrap:anywhere}
+.mesarow.cerr .mrtit{color:var(--ink-soft)}
+.mrok{flex:none;color:var(--s-listo);font-weight:700;margin-right:6px}
+.mrok.abierto{color:var(--ink-faint)}
+.mrt .mrok+.mrtit{flex:1}
+.mprox{margin-bottom:18px;border-left:3px solid var(--accent-week)}
+.mproxh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.mproxt{font-size:15px;font-weight:600;color:var(--ink)}
+.mproxs{font-size:12px;color:var(--ink-faint)}
+.mfecha{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-faint)}
+.mfecha .txt{width:auto}
+.mtemario .mesarow:first-child{border-top:none}
+.mproxf{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--ink-faint)}
+.mterm{margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft);display:flex;flex-direction:column;gap:10px}
+.mtermt{font-size:13.5px;font-weight:600;color:var(--ink)}
+.mterm p{margin:0;font-size:12.5px;color:var(--ink-soft)}
+.mterm label{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint)}
+.mterm label small{text-transform:none;letter-spacing:0}
+.mtermb{display:flex;justify-content:flex-end;gap:8px}
+.mpasadas{margin-top:6px}
+.mreunion{margin-top:10px;padding:10px 15px}
+.mreunion summary{cursor:pointer;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--ink)}
+.mreunion summary span{font-size:12px;color:var(--ink-faint)}
+.mreunion summary .mlink{margin-left:auto;font-size:12px;color:var(--wood-deep)}
+.mreunion[open] summary{margin-bottom:6px}
+.mminuta{margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft);font-size:13px;line-height:1.5;color:var(--ink-soft);white-space:pre-wrap;overflow-wrap:anywhere}
+.mrfoot{display:flex;justify-content:flex-end;margin-top:8px}
+/* La solapa de un pendiente */
+.mmeta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-faint)}
+.mplanteo{display:flex;align-items:center;gap:7px}
+.mplanteo .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:8.5px;font-weight:700;color:var(--on-person);flex:none}
+.mreu{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink-soft)}
+.mconcsec{background:color-mix(in srgb,var(--s-listo) 8%,transparent);border-radius:var(--r-card);padding:10px 12px}
+.mconcmeta{font-size:11.5px;color:var(--ink-faint);margin:-2px 0 6px}
+.mconcerr{font-size:12.5px;color:#b0452d;min-height:0}
+[data-theme="dark"] .mconcerr{color:#ff9c85}
+
+/* ── Solapas que se estiran: el borde izquierdo se arrastra. ── */
+.drawer{width:min(var(--dw,440px),94vw)}
+.drawer.estirando{transition:none;user-select:none}
+.dwhandle{position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:3}
+.dwhandle::after{content:"";position:absolute;left:2px;top:50%;width:3px;height:44px;margin-top:-22px;border-radius:3px;background:var(--line);opacity:0;transition:opacity .15s}
+.dwhandle:hover::after,.drawer.estirando .dwhandle::after{opacity:1;background:var(--wood)}
+@media (hover:none),(max-width:700px){ .dwhandle{display:none} }
+#mesaSeg .segn{margin-left:6px;font-size:10.5px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:var(--r-pill);padding:1px 6px}
+#mesaSeg button.on .segn{color:var(--ink-soft)}
+/* Cinco vistas en Tareas: en pantallas angostas la barra se desliza de costado. */
+#tareasViewSeg,#mesaSeg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+#tareasViewSeg::-webkit-scrollbar,#mesaSeg::-webkit-scrollbar{display:none}
+#tareasViewSeg button,#mesaSeg button{flex:none}
