@@ -7,7 +7,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
 // aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -103,7 +103,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     (node.children||[]).forEach(cid=>{ const c=N(cid); if(!c)return; nc++; const a=agg(c); nc+=a.nc; ic+=a.ic; dc+=a.dc; a.owners.forEach(o=>owners.add(o)); a.st.forEach(s=>st.add(s)); });
     return {nc,ic,dc,owners,st}; }
   // diálogos propios: en el visor de artifacts confirm/alert/prompt están bloqueados
-  let askCb=null;
+  let askCb=null, askNoCb=null;
   function dialog(o){ const m=document.getElementById("askModal");
     document.getElementById("askTitle").textContent=o.title||"Confirmar";
     document.getElementById("askMsg").textContent=o.msg||"";
@@ -118,8 +118,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     } else selEl.style.display="none";
     const no=document.getElementById("askNo"); no.style.display=o.onlyOk?"none":""; no.textContent=o.no||"Cancelar";
     const yes=document.getElementById("askYes"); yes.textContent=o.yes||(o.onlyOk?"Entendido":"Sí"); yes.classList.toggle("danger",!!o.danger);
-    askCb=o.cb||null; m.classList.add("on"); if(o.input)setTimeout(()=>inp.focus(),40); else setTimeout(()=>yes.focus(),40); }
-  function closeAsk(){ document.getElementById("askModal").classList.remove("on"); askCb=null; }
+    askCb=o.cb||null; askNoCb=o.onNo||null; m.classList.add("on"); if(o.input)setTimeout(()=>inp.focus(),40); else setTimeout(()=>yes.focus(),40); }
+  function closeAsk(ok){ document.getElementById("askModal").classList.remove("on"); askCb=null;
+    const no=askNoCb; askNoCb=null; if(ok!==true&&no)no(); }
   function note(msg,title){ dialog({title:title||"Aviso",msg,onlyOk:true}); }
   // Deshacer un borrado. A propósito NO guarda una copia del estado entero:
   // restaurarla pisaría lo que otra persona hizo mientras tanto. Guarda solo
@@ -470,7 +471,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       // para: nombres de los invitados. Sin lista (o vacía) = todo el equipo.
       if(Array.isArray(ev.para)){ ev.para=[...new Set(ev.para.map(String).filter(Boolean))]; if(!ev.para.length)delete ev.para; } else if(ev.para!=null)delete ev.para; });
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
-    normObjetivos(d); normMesa(d);
+    normObjetivos(d); normMesa(d); normRocas(d);
     // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
     if(!d._dmpair){ const viejo=d.chat.dm||{}, nuevo={};
       Object.keys(viejo).forEach(k=>{ const arr=viejo[k]||[]; if(k.includes(" ~ ")){ nuevo[k]=(nuevo[k]||[]).concat(arr); return; }
@@ -534,6 +535,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(selId&&!N(selId))closePanel();
     if(taskOpen&&!curTask())closeTask();
     if(panelOpen&&N(selId))renderPanelBody(N(selId));
+    if(rocSel){ if(!rocItem(rocSel)){ rocOcultar(); scrim.classList.remove("on"); } else syncRoca(false); }
     if(mesaSel){ if(!mesaItem(mesaSel)){ mesaOcultar(); scrim.classList.remove("on"); } else syncMesaDrawer(false); }
     if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); syncTaskDone(curTask()); }
     loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
@@ -741,6 +743,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     {id:"tObj",    set:v=>{ const k=curTask(); if(k)k.objetivo=v; }},
     {id:"tNotas",  set:v=>{ const k=curTask(); if(k)k.notas=v; }},
     {id:"tEsperaDe", set:v=>{ const k=curTask(); if(k&&k.status==="espera")k.esperaDe=v; }},
+    {id:"rTitulo", set:v=>{ const o=rocItem(rocSel); if(o)o.titulo=v; }},
+    {id:"rExito",  set:v=>{ const o=rocItem(rocSel); if(o)o.exito=v; }},
+    {id:"rPorque", set:v=>{ const o=rocItem(rocSel); if(o)o.porque=v; }},
     {id:"mTitulo", set:v=>{ const it=mesaItem(mesaSel); if(it)it.titulo=v; }},
     {id:"mTexto",  set:v=>{ const it=mesaItem(mesaSel); if(it)it.texto=v; }},
     {id:"mConc",   set:v=>{ const it=mesaItem(mesaSel); if(it&&it.cerrado&&!mesaCerrando)it.cerrado.texto=v; }},
@@ -807,7 +812,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(estadoGuardado==="error"||(hayPendiente&&hayPendiente())){ e.preventDefault(); e.returnValue=""; } });
 
   function renderActive(){ refreshChrome();
-    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="mesa")renderMesa(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); else if(docPorId(active))renderDoc(active); }
+    if(active==="estructura")renderEstructuraTab(); else if(active==="tareas")renderTareas(); else if(active==="panel")renderPanel(); else if(active==="archivo")renderArchivo(); else if(active==="mesa")renderMesa(); else if(active==="rocas")renderRocas(); else if(active==="drive")renderDrive(); else if(active==="chat")renderChat(); else if(active==="config")renderConfigTab(); else if(docPorId(active))renderDoc(active); }
   // Un documento se baja una sola vez por visita: si ya está pintado, no se
   // vuelve a pedir cada vez que volvés a la pestaña.
   const docsPintados=new Set();
@@ -3040,7 +3045,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       confirmar("La tarea sale del tema y pasa a tu panel privado: nadie más la va a ver y queda solo a tu nombre.",()=>{
         const n=N(selTaskNode); const i=(n.items||[]).findIndex(x=>x.id===selTaskId); if(i<0)return; const [it]=n.items.splice(i,1); it.priv=true; it.owners=[me];
         privList(me).push(it); selTaskNode="__priv"; save(); refreshChrome(); renderActive(); renderTBelong(); renderTOwners(); },{title:"Convertir en privada",yes:"Hacerla privada"}); }); }
-  function openTask(nodeId,taskId){ let k=null; mesaOcultar();
+  function openTask(nodeId,taskId){ let k=null; mesaOcultar(); rocOcultar();
     if(nodeId==="__priv"){ k=privL().find(x=>x.id===taskId); } else { const node=N(nodeId); k=node&&(node.items||[]).find(x=>x.id===taskId); }
     if(!k)return; selTaskNode=nodeId; selTaskId=taskId; taskOpen=true;
     // al abrirla deja de contar como "nueva" para vos
@@ -3064,7 +3069,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const pd=document.getElementById("tPrioDot"); if(!pd)return; const pr=prioOf(k);
     pd.classList.toggle("none",!pr); pd.style.background=pr?cssv(pr.v):"";
     pd.title=pr?"Prioridad "+pr.l.toLowerCase():"Sin prioridad"; }
-  function openPanel(id){ const n=N(id); if(!n)return; mesaOcultar(); taskDrawer.classList.remove("on"); taskOpen=false; selId=id; panelOpen=true;
+  function openPanel(id){ const n=N(id); if(!n)return; mesaOcultar(); rocOcultar(); taskDrawer.classList.remove("on"); taskOpen=false; selId=id; panelOpen=true;
     pTitle.value=n.name; pObj.value=n.objetivo||""; pCtx.value=n.contexto||""; renderPEncs();
     const depth=depthOf(n); pKind.textContent=n.kind==="project"?"Proyecto":(depth<=2?"Macro-tema":"Sub-tema · nivel "+depth); pDot.style.background=accentOf(n);
     renderPanelBody(n); renderActive(); drawer.classList.add("on"); scrim.classList.add("on"); drawer.setAttribute("aria-hidden","false"); }
@@ -3125,7 +3130,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       });
     },{title:"Eliminar tema",yes:"Eliminar",danger:true}); });
   document.getElementById("closePanel").addEventListener("click",closePanel);
-  scrim.addEventListener("click",()=>{ closePanel(); closeTask(); if(mesaSel)closeMesa(); });
+  scrim.addEventListener("click",()=>{ closePanel(); closeTask(); if(mesaSel)closeMesa(); if(rocSel)closeRoca(); });
   document.getElementById("closeTask").addEventListener("click",closeTask);
   tTitle.addEventListener("input",()=>{ const k=curTask(); if(k){k.title=tTitle.value;save();} });
   tTitle.addEventListener("change",renderActive);
@@ -3243,8 +3248,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   document.getElementById("askYes").addEventListener("click",()=>{ const cb=askCb;
     const sel=document.getElementById("askSelect");
     const v=sel.style.display!=="none"?sel.value:document.getElementById("askInput").value;
-    closeAsk(); if(cb)cb(v); });
-  document.getElementById("askNo").addEventListener("click",closeAsk);
+    closeAsk(true); if(cb)cb(v); });
+  document.getElementById("askNo").addEventListener("click",()=>closeAsk());
   document.getElementById("askModal").addEventListener("click",e=>{ if(e.target.id==="askModal")closeAsk(); });
   document.getElementById("askInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("askYes").click(); } });
   document.getElementById("taskSearch").addEventListener("input",e=>{ taskQuery=e.target.value; renderTareas(); });
@@ -3382,7 +3387,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // La solapa de un pendiente: la misma forma que la de una tarea.
   function mesaOcultar(){ if(!mesaDrawer)return; mesaDrawer.classList.remove("on"); mesaDrawer.setAttribute("aria-hidden","true"); mesaSel=null; mesaCerrando=false; mesaApEdit=null; }
   function openMesa(id){ const it=mesaItem(id); if(!it)return;
-    closePanel(); if(taskOpen){ taskOpen=false; taskDrawer.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); }
+    closePanel(); rocOcultar(); if(taskOpen){ taskOpen=false; taskDrawer.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); }
     mesaSel=id; mesaCerrando=false; mesaApEdit=null; mesaBorrador.conc="";
     const inp=document.getElementById("mApIn"); if(inp){ inp.value=""; autoAlto(inp); }
     syncMesaDrawer(true);
@@ -3496,6 +3501,183 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       const up=()=>{ h.removeEventListener("pointermove",mv); h.removeEventListener("pointerup",up); h.removeEventListener("pointercancel",up); dw.classList.remove("estirando"); save(); };
       h.addEventListener("pointermove",mv); h.addEventListener("pointerup",up); h.addEventListener("pointercancel",up); });
     h.addEventListener("dblclick",()=>{ state.anchoSolapa=0; aplicarAnchoSolapa(); save(); }); });
+
+  // ---------- OBJETIVOS (metas del año y objetivos del trimestre) ----------
+  // Al estilo de Tracción: pocas metas grandes por año y, colgando de ellas,
+  // los objetivos de cada trimestre ("rocas"), cada uno con un responsable,
+  // una fecha límite y una frase que diga cómo sabemos que está logrado. No
+  // son tareas ni temas: son lo que el equipo se comprometió a lograr.
+  // Se ven en una línea de tiempo de tres trimestres (se corre con flechas) o
+  // en una lista. Las barras se arrastran para moverlas o se estiran desde el
+  // borde, pero siempre con una pregunta antes: la idea es que estén quietas.
+  // Editar la ficha, en cambio, es libre.
+  const rocaDrawer=document.getElementById("rocaDrawer");
+  const ROC_ESTADOS={camino:"En camino",desviado:"Desviado",logrado:"Logrado",nologrado:"No logrado"};
+  const ROC_ORDEN=["camino","desviado","logrado","nologrado"];
+  let rocOff=0, rocSel=null, rocDrag=null;
+  const rocVista=()=>state.rocasVista==="lista"||chatMovil()?"lista":"linea";
+  const rocas=()=>state.rocas.items;
+  const rocMetas=()=>state.rocas.metas;
+  const rocItem=id=>rocas().find(x=>x.id===id)||rocMetas().find(x=>x.id===id)||null;
+  const esMeta=it=>!!it&&rocMetas().includes(it);
+  const ymdOk=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||"");
+  const aFecha=ymd=>{ const [y,m,d]=ymd.split("-").map(Number); return new Date(y,m-1,d,12); };
+  const dmCorto=ymd=>ymdOk(ymd)?aFecha(ymd).toLocaleDateString("es-AR",{day:"numeric",month:"short"}).replace(".",""):"—";
+  // Trimestres calendario: 1.º ene–mar, 2.º abr–jun, 3.º jul–sep, 4.º oct–dic.
+  function trimInicio(off){ const h=new Date(); const q=Math.floor(h.getMonth()/3)+(off||0); return new Date(h.getFullYear(),q*3,1,12); }
+  const trimNombre=d=>`${Math.floor(d.getMonth()/3)+1}.º trimestre ${d.getFullYear()}`;
+  function trimDe(ymd){ const d=aFecha(ymd); return new Date(d.getFullYear(),Math.floor(d.getMonth()/3)*3,1,12); }
+  function rocRango(){ const a=trimInicio(rocOff), b=new Date(a.getFullYear(),a.getMonth()+9,1,12); return {a,b,ms:b-a}; }
+  function normRocas(d){ let r=d.rocas; if(!r||typeof r!=="object"||Array.isArray(r))r=d.rocas={};
+    ["items","metas"].forEach(k=>{ if(!Array.isArray(r[k]))r[k]=[]; r[k]=r[k].filter(x=>x&&typeof x.id==="string"&&typeof x.titulo==="string"); });
+    const txt=(o,k)=>{ if(typeof o[k]!=="string")o[k]=""; };
+    const comun=o=>{ ["proyecto","resp","exito","porque"].forEach(k=>txt(o,k)); if(!ROC_ESTADOS[o.estado])o.estado="camino";
+      o.avances=Array.isArray(o.avances)?o.avances.filter(a=>a&&typeof a.id==="string"&&typeof a.text==="string"):[]; };
+    r.metas.forEach(m=>{ comun(m); m.anio=Number.isInteger(+m.anio)&&+m.anio>2000?+m.anio:new Date().getFullYear(); });
+    r.items.forEach(o=>{ comun(o); txt(o,"meta"); if(!ymdOk(o.ini))o.ini=ymdLocal(trimInicio(0)); if(!ymdOk(o.fin)||o.fin<o.ini)o.fin=o.ini;
+      if(o.ultimo&&(typeof o.ultimo!=="object"||!ymdOk(o.ultimo.ini)||!ymdOk(o.ultimo.fin)))delete o.ultimo; }); }
+  const rocProyectos=()=>state.roots.map(N).filter(Boolean);
+  const rocProyNombre=id=>{ const n=id&&N(id); return n?n.name:"Sin proyecto"; };
+  function rocOpciones(lista,sel,vacio){ return `<option value="">${esc(vacio)}</option>`+lista.map(o=>`<option value="${esc(o.v)}"${o.v===sel?" selected":""}>${esc(o.l)}</option>`).join(""); }
+  const rocEstadoTag=o=>`<span class="rocest ${o.estado}">${o.estado==="logrado"?"✓ ":o.estado==="nologrado"?"✕ ":""}${ROC_ESTADOS[o.estado]}</span>`;
+  // Las metas de los años que se ven, arriba de todo. Cada una dice cuántos
+  // objetivos del trimestre salen de ella y cómo vienen.
+  function rocMetasHTML(anios){ const ms=rocMetas().filter(m=>anios.includes(m.anio)).sort((a,b)=>a.anio-b.anio||a.titulo.localeCompare(b.titulo));
+    return `<div class="rocmetas"><div class="rochead"><span class="objlab">Metas del año · ${anios.join(" y ")}</span><button class="rowbtn" data-rocnueva="meta">＋ meta del año</button></div>`
+      +(ms.length?`<div class="rocmgrid">${ms.map(m=>{ const hijos=rocas().filter(o=>o.meta===m.id), des=hijos.filter(o=>o.estado==="desviado").length, lo=hijos.filter(o=>o.estado==="logrado").length;
+        return `<div class="rocmeta${rocSel===m.id?" sel":""}" data-roc="${esc(m.id)}"><div class="rmt"><b>${esc(m.titulo||"Sin título")}</b>${rocEstadoTag(m)}</div><div class="rmm">${m.anio} · ${esc(rocProyNombre(m.proyecto))}${m.resp?" · "+esc(m.resp):""}</div><div class="rmm">${hijos.length?`${plural(hijos.length,"objetivo","objetivos")} del trimestre${lo?` · ${lo} logrado${lo===1?"":"s"}`:""}${des?` · ${des} desviado${des===1?"":"s"}`:""}`:"Todavía sin objetivos del trimestre"}</div></div>`; }).join("")}</div>`
+        :`<div class="semvacio">Las metas del año son pocas y grandes: lo que queremos haber logrado al cerrar el año. De cada una salen los objetivos de cada trimestre.</div>`)+`</div>`; }
+  // Filas de la línea de tiempo: una por proyecto, y adentro las barras se
+  // acomodan en renglones para no pisarse.
+  function rocRenglones(lista){ const filas=[]; lista.slice().sort((a,b)=>a.ini.localeCompare(b.ini)).forEach(o=>{
+      let i=filas.findIndex(f=>f[f.length-1].fin<o.ini); if(i<0){ filas.push([]); i=filas.length-1; } filas[i].push(o); });
+    return filas; }
+  function rocLineaHTML(){ const {a,b,ms}=rocRango(), pct=ymd=>(aFecha(ymd)-a)/ms*100;
+    const meses=[...Array(9)].map((_,i)=>new Date(a.getFullYear(),a.getMonth()+i,1,12));
+    const trims=[0,3,6].map(i=>meses[i]);
+    const hoy=ymdLocal(new Date()), hoyP=pct(hoy);
+    const visibles=rocas().filter(o=>o.fin>=ymdLocal(a)&&o.ini<ymdLocal(b));
+    const carriles=rocProyectos().map(n=>({id:n.id,nombre:n.name})); if(visibles.some(o=>!o.proyecto||!N(o.proyecto)))carriles.push({id:"",nombre:"Sin proyecto"});
+    const col=d=>`style="left:${(d-a)/ms*100}%;width:${(new Date(d.getFullYear(),d.getMonth()+1,1,12)-d)/ms*100}%"`;
+    let h=`<div class="rocline"><div class="rlhead"><div class="rllab"></div><div class="rlscale">${trims.map(t=>`<div class="rlq" style="left:${(t-a)/ms*100}%;width:${(new Date(t.getFullYear(),t.getMonth()+3,1,12)-t)/ms*100}%">${esc(trimNombre(t))}</div>`).join("")}${meses.map(m=>`<div class="rlm" ${col(m)}>${esc(m.toLocaleDateString("es-AR",{month:"short"}).replace(".",""))}</div>`).join("")}</div></div>`;
+    carriles.forEach(c=>{ const suyos=visibles.filter(o=>c.id?o.proyecto===c.id:(!o.proyecto||!N(o.proyecto)));
+      const filas=rocRenglones(suyos);
+      h+=`<div class="rllane"><div class="rllab">${esc(c.nombre)}<button class="rowbtn" data-rocnueva="roca" data-proy="${esc(c.id)}" title="Nuevo objetivo del trimestre en ${esc(c.nombre)}">＋</button></div><div class="rltrack" style="height:${Math.max(1,filas.length)*36+12}px">`
+        +meses.map(m=>`<div class="rlgrid" ${col(m)}></div>`).join("")
+        +(hoyP>=0&&hoyP<=100?`<div class="rlhoy" style="left:${hoyP}%" title="Hoy"></div>`:"")
+        +filas.map((f,i)=>f.map(o=>{ const l=Math.max(0,pct(o.ini)), r=Math.min(100,pct(o.fin)+100/(ms/DAY)); const meta=o.meta&&rocItem(o.meta);
+          return `<div class="rlbar ${o.estado}${rocSel===o.id?" sel":""}" data-roc="${esc(o.id)}" style="left:${l}%;width:${Math.max(1.2,r-l)}%;top:${6+i*36}px" title="${esc(o.titulo)}${meta?" · de: "+esc(meta.titulo):""}\n${esc(dmCorto(o.ini))} → ${esc(dmCorto(o.fin))}${o.resp?" · "+esc(o.resp):""}"><span class="rlh l"></span><span class="rlt">${o.estado==="logrado"?"✓ ":o.estado==="nologrado"?"✕ ":""}${esc(o.titulo||"Sin título")}</span>${o.resp?`<span class="rlr">${avatarMarkup(o.resp,"av")}</span>`:""}<span class="rlh r"></span></div>`; }).join("")).join("")
+        +(suyos.length?"":`<div class="rlvacio">Sin objetivos en estos trimestres</div>`)+`</div></div>`; });
+    return h+`</div>`; }
+  function rocListaHTML(){ const {a,b}=rocRango(), desde=ymdLocal(a), hasta=ymdLocal(b);
+    const lista=rocas().filter(o=>o.fin>=desde&&o.fin<hasta);
+    const trims=[0,3,6].map(i=>new Date(a.getFullYear(),a.getMonth()+i,1,12));
+    return trims.map(t=>{ const k=ymdLocal(t), suyos=lista.filter(o=>ymdLocal(trimDe(o.fin))===k).sort((x,y)=>ROC_ORDEN.indexOf(x.estado)-ROC_ORDEN.indexOf(y.estado)||x.fin.localeCompare(y.fin));
+      return `<div class="card roclist"><div class="rochead"><span class="objlab">${esc(trimNombre(t))}</span><button class="rowbtn" data-rocnueva="roca" data-trim="${k}">＋ objetivo</button></div>`
+        +(suyos.length?suyos.map(o=>{ const meta=o.meta&&rocItem(o.meta);
+          return `<div class="rocrow${rocSel===o.id?" sel":""}" data-roc="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><div class="rrb"><div class="rrt">${esc(o.titulo||"Sin título")}</div><div class="rrm">${esc(rocProyNombre(o.proyecto))}${o.resp?" · "+esc(o.resp):""} · vence ${esc(dmCorto(o.fin))}${meta?" · de: "+esc(meta.titulo):""}</div></div>${rocEstadoTag(o)}</div>`; }).join("")
+          :`<div class="semvacio">Sin objetivos que venzan en este trimestre.</div>`)+`</div>`; }).join(""); }
+  function renderRocas(){ const body=document.getElementById("rocasBody"); if(!body)return;
+    const {a}=rocRango(), v=rocVista();
+    const seg=document.getElementById("rocasSeg"); if(seg)seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.rv===v));
+    const fin=new Date(a.getFullYear(),a.getMonth()+8,1,12), anios=[...new Set([a.getFullYear(),fin.getFullYear()])];
+    body.innerHTML=`<div class="objnav"><button class="btn btn-icon" data-rocoff="-1" aria-label="Trimestre anterior">‹</button><div class="objsem"><b>${esc(trimNombre(a))} → ${esc(trimNombre(fin))}</b><span>${rocOff===0?"desde el trimestre en curso":"se corre de a un trimestre"}</span></div><button class="btn btn-icon" data-rocoff="1" aria-label="Trimestre siguiente">›</button>${rocOff!==0?`<button class="rowbtn" data-rocoff="0">Volver a hoy</button>`:""}</div>`
+      +rocMetasHTML(anios)+(v==="linea"?rocLineaHTML():rocListaHTML())
+      +`<p class="semayuda">${v==="linea"?"Arrastrá una barra para moverla o su borde para cambiarle la fecha: siempre pregunta antes. Tocala para abrir su ficha. ":""}Cada objetivo del trimestre tiene un responsable, una fecha límite y una frase que dice cómo sabemos que está logrado.</p>`; }
+  // --- arrastrar: mover o estirar, con pregunta antes de guardar ---
+  const SEMANA_MS=7*DAY;
+  function rocMoverFechas(ymd,dias){ const d=aFecha(ymd); d.setDate(d.getDate()+dias); return ymdLocal(d); }
+  { const body=document.getElementById("rocasBody"); if(body){
+    body.addEventListener("pointerdown",e=>{ const bar=e.target.closest(".rlbar"); if(!bar||e.button!==0)return; const o=rocItem(bar.dataset.roc); if(!o)return;
+      const W=bar.parentElement.getBoundingClientRect().width; const {ms}=rocRango();
+      rocDrag={o,bar,x0:e.clientX,modo:e.target.classList.contains("l")?"l":e.target.classList.contains("r")?"r":"m",dias:0,W,msTotal:ms,l0:parseFloat(bar.style.left),w0:parseFloat(bar.style.width)};
+      bar.setPointerCapture(e.pointerId); });
+    body.addEventListener("pointermove",e=>{ if(!rocDrag)return; const d=rocDrag, px=e.clientX-d.x0;
+      // de a semanas: un arrastre torpe no lo descuadra
+      const semanas=Math.round(px/d.W*d.msTotal/SEMANA_MS); d.dias=semanas*7; if(semanas)d.bar.classList.add("arrastrando");
+      const dp=semanas*SEMANA_MS/d.msTotal*100;
+      if(d.modo==="m")d.bar.style.left=(d.l0+dp)+"%";
+      else if(d.modo==="l"){ d.bar.style.left=(d.l0+dp)+"%"; d.bar.style.width=Math.max(1.2,d.w0-dp)+"%"; }
+      else d.bar.style.width=Math.max(1.2,d.w0+dp)+"%"; });
+    const soltar=()=>{ if(!rocDrag)return; const d=rocDrag; rocDrag=null; d.bar.classList.remove("arrastrando");
+      if(!d.dias){ openRoca(d.o.id); return; }
+      let ini=d.o.ini, fin=d.o.fin;
+      if(d.modo!=="r")ini=rocMoverFechas(ini,d.dias); if(d.modo!=="l")fin=rocMoverFechas(fin,d.dias);
+      if(fin<ini){ renderRocas(); return; }
+      const que=d.modo==="m"?"Mover":"Cambiar la fecha de";
+      confirmar(`${que} "${d.o.titulo||"este objetivo"}": ${dmCorto(d.o.ini)} → ${dmCorto(d.o.fin)} pasa a ${dmCorto(ini)} → ${dmCorto(fin)}.`,()=>{
+        const o=rocItem(d.o.id); if(!o)return; o.ultimo={ini:o.ini,fin:o.fin,by:state.me||"",ts:nowMs()}; o.ini=ini; o.fin=fin; save(); renderRocas(); if(rocSel===o.id)syncRoca(true); },
+        {title:d.modo==="m"?"Mover objetivo":"Cambiar fecha",yes:d.modo==="m"?"Mover":"Cambiar",onNo:renderRocas}); };
+    body.addEventListener("pointerup",soltar); body.addEventListener("pointercancel",()=>{ rocDrag=null; renderRocas(); });
+    body.addEventListener("click",e=>{ const t=e.target;
+      const off=t.closest("[data-rocoff]"); if(off){ const v=+off.dataset.rocoff; rocOff=v===0?0:rocOff+v; renderRocas(); return; }
+      const nv=t.closest("[data-rocnueva]"); if(nv){ rocNueva(nv.dataset.rocnueva,nv.dataset.proy,nv.dataset.trim); return; }
+      if(t.closest(".rlbar"))return;   // lo maneja el soltar
+      const r=t.closest("[data-roc]"); if(r)openRoca(r.dataset.roc); }); } }
+  { const seg=document.getElementById("rocasSeg"); if(seg)seg.addEventListener("click",e=>{ const b=e.target.closest("[data-rv]"); if(!b)return; state.rocasVista=b.dataset.rv; save(); renderRocas(); }); }
+  function rocNueva(tipo,proy,trim){ const meta=tipo==="meta";
+    pedirTexto(meta?"Nueva meta del año":"Nuevo objetivo del trimestre",meta?"Ej: Asegurar el corredor de 3 parcelas":"Ej: Boletos firmados de las 3 parcelas",t=>{
+      const base={id:(meta?"rm":"ro")+uid(),titulo:t,proyecto:proy&&N(proy)?proy:(rocProyectos()[0]?rocProyectos()[0].id:""),resp:"",estado:"camino",exito:"",porque:"",avances:[],by:state.me||"",ts:nowMs()};
+      if(meta){ base.anio=trimInicio(rocOff).getFullYear(); rocMetas().push(base); }
+      else { let q=trim&&ymdOk(trim)?aFecha(trim):trimInicio(Math.max(0,rocOff));
+        // A menos de un mes del cierre del trimestre, lo nuevo es para el que viene.
+        if(!trim&&rocOff<=0&&new Date(q.getFullYear(),q.getMonth()+3,1,12)-new Date()<30*DAY)q=trimInicio(1);
+        base.meta=""; base.ini=ymdLocal(q);
+        const f=new Date(q.getFullYear(),q.getMonth()+3,0,12); base.fin=ymdLocal(f); rocas().push(base); }
+      save(); renderRocas(); openRoca(base.id); }); }
+  // --- la ficha ---
+  function openRoca(id){ const it=rocItem(id); if(!it)return;
+    closePanel(); mesaOcultar(); if(taskOpen){ taskOpen=false; taskDrawer.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); }
+    rocSel=id; const inp=document.getElementById("rAvIn"); if(inp){ inp.value=""; autoAlto(inp); }
+    syncRoca(true); rocaDrawer.classList.add("on"); rocaDrawer.setAttribute("aria-hidden","false"); scrim.classList.add("on"); if(active==="rocas")renderRocas(); }
+  function rocOcultar(){ if(!rocaDrawer)return; rocaDrawer.classList.remove("on"); rocaDrawer.setAttribute("aria-hidden","true"); rocSel=null; }
+  function closeRoca(){ rocOcultar(); scrim.classList.remove("on"); renderActive(); }
+  function syncRoca(todo){ const it=rocItem(rocSel); if(!it)return; const a=document.activeElement, meta=esMeta(it);
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.value=v; if(el.classList.contains("autoalto"))requestAnimationFrame(()=>autoAlto(el,400)); } };
+    document.getElementById("rKind").textContent=meta?"Meta del año":"Objetivo del trimestre";
+    set("rTitulo",it.titulo); set("rExito",it.exito); set("rPorque",it.porque);
+    const selSet=(id,html,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.innerHTML=html; el.value=v; } };
+    selSet("rProy",rocOpciones(rocProyectos().map(n=>({v:n.id,l:n.name})),it.proyecto,"— Sin proyecto —"),it.proyecto&&N(it.proyecto)?it.proyecto:"");
+    selSet("rResp",rocOpciones(allPeople().filter(Boolean).map(p=>({v:p,l:p})),it.resp,"— Sin responsable —"),it.resp);
+    selSet("rEstado",ROC_ORDEN.map(k=>`<option value="${k}">${ROC_ESTADOS[k]}</option>`).join(""),it.estado);
+    document.querySelectorAll("#rocaDrawer [data-solo]").forEach(el=>{ el.hidden=el.dataset.solo!==(meta?"meta":"roca"); });
+    if(meta){ set("rAnio",String(it.anio));
+      const hijos=rocas().filter(o=>o.meta===it.id).sort((x,y)=>x.fin.localeCompare(y.fin));
+      document.getElementById("rHijos").innerHTML=hijos.length?hijos.map(o=>`<div class="taskrow2" data-rochijo="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><span class="tt">${esc(o.titulo||"Sin título")}</span><span class="who">${esc(trimNombre(trimDe(o.fin)))}</span><span class="go">↗</span></div>`).join("")
+        :`<div class="empty">Todavía ninguno. En la ficha de cada objetivo del trimestre se elige de qué meta sale.</div>`; }
+    else { selSet("rMeta",rocOpciones(rocMetas().slice().sort((x,y)=>x.anio-y.anio).map(m=>({v:m.id,l:m.anio+" · "+m.titulo})),it.meta,"— Ninguna —"),it.meta&&rocItem(it.meta)?it.meta:"");
+      set("rIni",it.ini); set("rFin",it.fin);
+      const u=it.ultimo; document.getElementById("rUltimo").textContent=u?`Último cambio de fecha: antes era ${dmCorto(u.ini)} → ${dmCorto(u.fin)} (${u.by||"alguien"}, ${fechaCorta(u.ts)}).`:""; }
+    renderRAvances(); }
+  function renderRAvances(){ const box=document.getElementById("rAvances"), it=rocItem(rocSel); if(!box||!it)return;
+    const lista=it.avances.slice().sort((x,y)=>(y.ts||0)-(x.ts||0));
+    box.innerHTML=lista.length?lista.map(a=>`<div class="avrow" data-rav="${esc(a.id)}">${avatarMarkup(a.by||"?","av")}<div class="avbody"><div class="avwho">${esc(a.by||"")} · ${esc(haceTxt(a.ts))} · ${esc(fechaCorta(a.ts))}</div><div class="avtxt">${conLinks(a.text)}</div></div><div class="avacts"><button class="avb" data-ravdel title="Borrar">✕</button></div></div>`).join("")
+      :`<div class="avvacio">Todavía no hay avances. En cada revisión, una línea de en qué está.</div>`;
+    box.querySelectorAll("[data-ravdel]").forEach(b=>b.addEventListener("click",()=>{ const id=b.closest("[data-rav]").dataset.rav;
+      confirmar("Se borra este avance, para todos.",()=>{ const i2=rocItem(rocSel); if(!i2)return; i2.avances=i2.avances.filter(x=>x.id!==id); save(); renderRAvances(); },{title:"Borrar avance",yes:"Borrar"}); })); }
+  function agregarRAvance(){ const inp=document.getElementById("rAvIn"), it=rocItem(rocSel); if(!inp||!it)return; const t=inp.value.trim(); if(!t){ inp.focus(); return; }
+    it.avances.push({id:"ra"+uid(),by:state.me||"",ts:nowMs(),text:t}); inp.value=""; autoAlto(inp); save(); renderRAvances(); }
+  if(rocaDrawer){ const $=id=>document.getElementById(id), it=()=>rocItem(rocSel);
+    $("closeRoca").addEventListener("click",closeRoca);
+    [["rTitulo","titulo"],["rExito","exito"],["rPorque","porque"]].forEach(([id,k])=>{
+      $(id).addEventListener("input",e=>{ const o=it(); if(!o)return; o[k]=e.target.value; if(e.target.classList.contains("autoalto"))autoAlto(e.target,400); save(); });
+      $(id).addEventListener("change",()=>renderActive()); });
+    [["rProy","proyecto"],["rResp","resp"],["rEstado","estado"],["rMeta","meta"]].forEach(([id,k])=>$(id).addEventListener("change",e=>{ const o=it(); if(!o)return; o[k]=e.target.value; save(); renderActive(); }));
+    $("rAnio").addEventListener("change",e=>{ const o=it(), v=parseInt(e.target.value,10); if(!o||!(v>2000&&v<2100)){ syncRoca(true); return; } o.anio=v; save(); renderActive(); });
+    // En la ficha, cambiar las fechas es editar: no pregunta (solo el arrastre lo hace).
+    ["rIni","rFin"].forEach(id=>$(id).addEventListener("change",()=>{ const o=it(); if(!o)return; const ini=$("rIni").value, fin=$("rFin").value;
+      if(!ymdOk(ini)||!ymdOk(fin)||fin<ini){ note("La fecha límite tiene que ser igual o posterior al inicio."); syncRoca(true); return; }
+      o.ini=ini; o.fin=fin; save(); renderActive(); }));
+    $("rAvAdd").addEventListener("click",agregarRAvance);
+    $("rAvIn").addEventListener("input",e=>autoAlto(e.target));
+    $("rAvIn").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); agregarRAvance(); } });
+    $("rHijos").addEventListener("click",e=>{ const r=e.target.closest("[data-rochijo]"); if(r)openRoca(r.dataset.rochijo); });
+    $("rDel").addEventListener("click",()=>{ const o=it(); if(!o)return; const meta=esMeta(o), lista=meta?rocMetas():rocas(), i=lista.indexOf(o);
+      const hijos=meta?rocas().filter(x=>x.meta===o.id):[];
+      confirmar(`Se elimina "${o.titulo||"este objetivo"}"${hijos.length?`. Los ${hijos.length} objetivos del trimestre que salen de ella se quedan, sin meta`:""}. Vas a poder deshacerlo por unos segundos.`,()=>{
+        lista.splice(i,1); hijos.forEach(x=>{ x.meta=""; }); rocOcultar(); scrim.classList.remove("on"); save(); renderActive();
+        ofrecerDeshacer(`Se eliminó <b>${esc(o.titulo||"el objetivo")}</b>`,()=>{ (meta?state.rocas.metas:state.rocas.items).splice(i,0,o); hijos.forEach(h=>{ const x=state.rocas.items.find(y=>y.id===h.id); if(x)x.meta=o.id; }); }); },
+        {title:meta?"Eliminar meta del año":"Eliminar objetivo",yes:"Eliminar",danger:true}); }); }
 
   fPerson.addEventListener("change",renderActive);
   objWire(document.getElementById("objBoard")); objWire(document.getElementById("myTasks"));

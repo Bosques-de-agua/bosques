@@ -1798,3 +1798,63 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 }
 .mfechas{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mfechas .btn .ico{width:15px;height:15px}
+
+/* ══════════════ OBJETIVOS: metas del año y objetivos del trimestre ══════════════ */
+#tab-rocas [data-solo][hidden],#rocaDrawer [data-solo][hidden]{display:none}
+#rocasSeg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+#rocasSeg button{flex:none}
+.rochead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.rochead .objlab{margin-bottom:0}
+.rocmetas{margin-bottom:16px}
+.rocmgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.rocmeta{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--wood);border-radius:var(--r-card);padding:10px 12px;cursor:pointer}
+.rocmeta:hover,.rocmeta.sel{border-color:var(--wood)}
+.rmt{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;font-size:14px;color:var(--ink)}
+.rmt b{font-weight:600;overflow-wrap:anywhere}
+.rmm{font-size:11.5px;color:var(--ink-faint);margin-top:3px}
+/* Los cuatro estados: el semáforo de cada revisión. */
+.rocest{flex:none;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:var(--r-pill);white-space:nowrap}
+.rocest.camino,.rlbar.camino{--rc:var(--s-listo)}
+.rocest.desviado,.rlbar.desviado{--rc:var(--s-espera)}
+.rocest.logrado,.rlbar.logrado{--rc:var(--s-listo)}
+.rocest.nologrado,.rlbar.nologrado{--rc:var(--ink-faint)}
+.rocest{background:color-mix(in srgb,var(--rc) 18%,transparent);color:color-mix(in srgb,var(--rc) 70%,var(--ink))}
+.rrdot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--rc)}
+.rrdot.camino{--rc:var(--s-listo)} .rrdot.desviado{--rc:var(--s-espera)} .rrdot.logrado{--rc:var(--s-listo)} .rrdot.nologrado{--rc:var(--ink-faint)}
+/* Línea de tiempo */
+.rocline{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;margin-bottom:10px}
+.rlhead,.rllane{display:grid;grid-template-columns:150px minmax(0,1fr)}
+.rlhead{border-bottom:1px solid var(--line)}
+.rllab{padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--ink);border-right:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.rllab .rowbtn{padding:1px 7px}
+.rlscale{position:relative;height:44px}
+.rlq{position:absolute;top:0;height:22px;padding:4px 8px;font-size:11.5px;font-weight:600;color:var(--ink-soft);border-left:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.rlm{position:absolute;top:22px;height:22px;padding:4px 6px;font-size:11px;color:var(--ink-faint);border-left:1px solid var(--line-soft);border-top:1px solid var(--line-soft)}
+.rllane{border-bottom:1px solid var(--line-soft)}
+.rllane:last-child{border-bottom:none}
+.rltrack{position:relative;min-height:48px}
+.rlgrid{position:absolute;top:0;bottom:0;border-left:1px solid var(--line-soft);pointer-events:none}
+.rlhoy{position:absolute;top:0;bottom:0;border-left:2px dashed var(--clay,#c0674a);pointer-events:none;z-index:1}
+.rlbar{position:absolute;height:28px;border-radius:7px;display:flex;align-items:center;gap:6px;padding:0 9px;font-size:12.5px;cursor:grab;touch-action:none;user-select:none;z-index:2;
+  background:color-mix(in srgb,var(--rc) 20%,var(--surface));border:1px solid color-mix(in srgb,var(--rc) 55%,transparent);color:var(--ink);overflow:hidden}
+.rlbar.logrado{background:color-mix(in srgb,var(--rc) 42%,var(--surface))}
+.rlbar.nologrado .rlt{text-decoration:line-through;color:var(--ink-faint)}
+.rlbar:hover,.rlbar.sel{border-color:var(--wood);box-shadow:0 0 0 1px var(--wood)}
+.rlbar.arrastrando{cursor:grabbing;opacity:.85;box-shadow:0 0 0 2px var(--wood)}
+.rlbar .rlt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rlbar .rlr .av{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:8px;font-weight:700;color:var(--on-person)}
+.rlh{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:1}
+.rlh.l{left:0} .rlh.r{right:0}
+.rlvacio{position:absolute;left:10px;top:14px;font-size:12px;color:var(--ink-faint);font-style:italic}
+/* Lista */
+.roclist{margin-bottom:12px}
+.rocrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line-soft);cursor:pointer}
+.rocrow:hover .rrt{color:var(--wood-deep)}
+.rocrow.sel{background:color-mix(in srgb,var(--wood) 8%,transparent)}
+.rrb{flex:1;min-width:0}
+.rrt{font-size:13.5px;color:var(--ink);overflow-wrap:anywhere}
+.rrm{font-size:11.5px;color:var(--ink-faint);margin-top:2px}
+.rultimo{font-size:11.5px;color:var(--ink-faint);margin-top:8px}
+.rultimo:empty{display:none}
+#rHijos .taskrow2 .rrdot{margin-right:2px}
+@media (max-width:700px){ #rocasSeg{display:none} .rocmgrid{grid-template-columns:1fr} }

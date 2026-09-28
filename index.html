@@ -78,6 +78,7 @@
       <button class="navtab sbitem" data-tab="estructura" title="Estructura"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5h12M7 10h9M10 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span class="sblbl">Estructura</span></button>
       <button class="navtab sbitem" data-tab="tareas" title="Tareas"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="4.5" height="14" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="4.5" height="9" rx="1.4" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="3" width="2" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg><span class="sblbl">Tareas</span></button>
       <button class="navtab sbitem" data-tab="mesa" title="Mesa de trabajo"><svg viewBox="0 0 20 20" fill="none"><path d="M3 7.5h14M5 7.5V16M15 7.5V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 4.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="sblbl">Mesa de trabajo</span></button>
+      <button class="navtab sbitem" data-tab="rocas" title="Objetivos"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="3.2" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r=".9" fill="currentColor"/></svg><span class="sblbl">Objetivos</span></button>
       <span class="sbsep"></span>
       <button class="navtab sbitem" data-tab="chat" title="Chat"><svg viewBox="0 0 20 20" fill="none"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6A1.5 1.5 0 0 1 14.5 13H8l-3.5 3v-3H5.5A1.5 1.5 0 0 1 4 11.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="sblbl">Chat</span><span class="navbadge" id="chatBadge" hidden></span></button>
       <button class="navtab sbitem" data-tab="drive" title="Drive"><svg viewBox="0 0 20 20" fill="none"><path d="M7.5 3h5l5 8.5h-5zM7.5 3l-5 8.5L5 16l5-8.5zM5 16h10l2.5-4.5H7.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="sblbl">Drive</span></button>
@@ -150,7 +151,7 @@
         <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li>
         <li><b>Semana</b> es la revisión del lunes: las tareas completadas en 7 días (el botón <b>archivar</b> las manda todas juntas al Archivo, sin esperar al archivado automático), lo vencido, lo que vence en 7 días, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
         <li><b>Resumen</b> es lo que pasó la semana <i>anterior</i>, contado en palabras. Lo escribe una inteligencia artificial los lunes, leyendo lo que quedó registrado acá — al pie dice con qué modelo. Puede equivocarse: la fuente son las tareas. Del chat solo mira cuántos mensajes hubo, nunca qué se dijo. Semana mira hacia adelante; Resumen, hacia atrás.</li>
-        <li><b>Objetivos</b>: los de la semana, los generales del equipo y un cuadro por persona. Cualquiera escribe en cualquier cuadro. Con las flechas vas a la semana pasada (queda quieta, como registro de qué se cumplió) o a la que viene (para adelantar). Lo que no se tildó se trae a la semana nueva con un botón; con → pasás uno a la semana siguiente. Tus objetivos también aparecen arriba de todo en Mi foco.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="objetivos">Objetivos</button><button data-v="semana">Semana</button><button data-v="temas">Temas</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button></div></h1>
+        <li><b>Foco semanal</b>: los objetivos de la semana, los generales del equipo y un cuadro por persona. Cualquiera escribe en cualquier cuadro. Con las flechas vas a la semana pasada (queda quieta, como registro de qué se cumplió) o a la que viene (para adelantar). Lo que no se tildó se trae a la semana nueva con un botón; con → pasás uno a la semana siguiente. Tus objetivos también aparecen arriba de todo en Mi foco.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="objetivos" title="Los objetivos de cada semana, del equipo y de cada uno">Foco semanal</button><button data-v="semana">Semana</button><button data-v="temas">Temas</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button></div></h1>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
       <div class="tbar2"><div class="filtwrap" id="taskFilters"></div><input class="srch" id="taskSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar tarea…"></div>
       <div class="kanban" id="kanban"></div>
@@ -173,6 +174,17 @@
         <li>En la ficha de cada tema, un renglón dice cuántos pendientes tiene y te trae acá filtrado.</li></ul></span></span><div class="seg2 estviews" id="mesaSeg"></div></h1>
       <div class="srchbar" id="mesaBar"><input class="srch" id="mesaSearch" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar en la mesa…"><select class="pick drivetema" id="mesaTema" title="Ver solo los de un tema"></select><button class="rowbtn" id="mesaTemaClear" hidden>✕ todos los temas</button><div style="flex:1"></div><button class="btn btn-primary" id="mesaNuevo"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nuevo pendiente</button></div>
       <div id="mesaBody"></div>
+    </div></section>
+
+    <section class="tab" id="tab-rocas"><div class="wrap">
+      <h1 class="h1">Objetivos<span class="infob" tabindex="0">i<span class="infopop"><b>Lo que nos comprometimos a lograr</b><ul>
+        <li>Dos niveles, como en el método Tracción: arriba, las <b>metas del año</b>, pocas y grandes; abajo, los <b>objetivos de cada trimestre</b> (las "rocas"), que salen de esas metas.</li>
+        <li>Cada objetivo tiene <b>un responsable</b> (aunque trabajen varios), una <b>fecha límite</b> y una frase que dice <b>cómo sabemos que está logrado</b>. Sin esa frase, es una intención y no un objetivo.</li>
+        <li>El <b>estado</b> es el semáforo de cada revisión: en camino, desviado, logrado o no logrado.</li>
+        <li>En la <b>línea de tiempo</b> se ven tres trimestres; con las flechas se corre de a uno. Arrastrá una barra para moverla, o su borde para cambiarle la fecha: siempre pregunta antes. Tocala para abrir su ficha, donde todo se edita libremente.</li>
+        <li><b>Lista</b> muestra lo mismo agrupado por trimestre. En el teléfono se ve siempre así.</li>
+        <li>No son tareas ni temas: son lo que queremos haber logrado. Las tareas del día a día siguen en Tareas.</li></ul></span></span><div class="seg2 estviews" id="rocasSeg"><button data-rv="linea" class="on">Línea de tiempo</button><button data-rv="lista">Lista</button></div></h1>
+      <div id="rocasBody"></div>
     </div></section>
 
     <section class="tab" id="tab-config"><div class="wrap" style="max-width:820px">
@@ -279,6 +291,33 @@
   <div class="pfoot" style="display:flex;align-items:center;gap:8px"><button class="btn" id="tArch"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="13" height="3.4" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7.4v7.1A1.5 1.5 0 0 0 6.5 16h7a1.5 1.5 0 0 0 1.5-1.5V7.4" stroke="currentColor" stroke-width="1.4"/><path d="M8.4 10.4h3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Archivar</button><div style="flex:1"></div><button class="btn danger" id="tDel">Eliminar</button></div>
 </aside>
 
+
+<aside class="drawer" id="rocaDrawer" aria-hidden="true">
+  <div class="phead">
+    <button class="btn btn-icon close" id="closeRoca" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <div class="ey"><span id="rKind">Objetivo del trimestre</span></div>
+    <input class="title" id="rTitulo" autocapitalize="sentences" autocorrect="on" aria-label="Título del objetivo" placeholder="Título">
+    <div class="pctl">
+      <div class="c"><label>Proyecto</label><select class="pick" id="rProy"></select></div>
+      <div class="c"><label>Responsable</label><select class="pick" id="rResp"></select></div>
+      <div class="c"><label>Estado</label><select class="pick" id="rEstado"></select></div>
+    </div>
+    <div class="pctl" data-solo="roca">
+      <div class="c" style="flex:1 1 100%"><label>Sale de la meta del año</label><select class="pick" id="rMeta"></select></div>
+      <div class="c"><label>Inicio</label><input type="date" class="txt" id="rIni"></div>
+      <div class="c"><label>Fecha límite</label><input type="date" class="txt" id="rFin"></div>
+    </div>
+    <div class="pctl" data-solo="meta"><div class="c"><label>Año</label><input type="number" class="txt" id="rAnio" min="2020" max="2099" step="1"></div></div>
+    <div class="rultimo" id="rUltimo" data-solo="roca"></div>
+  </div>
+  <div class="pbody">
+    <div class="sec"><div class="sh"><h3>Cómo sabemos que está logrado</h3></div><textarea class="txt autoalto" id="rExito" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Algo que se pueda comprobar. Ej: boletos firmados de las 3 parcelas"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Por qué importa</h3></div><textarea class="txt autoalto" id="rPorque" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Para qué lo hacemos, qué destraba"></textarea></div>
+    <div class="sec" data-solo="roca"><div class="sh"><h3>Avances</h3></div><div class="avadd"><textarea class="txt" id="rAvIn" rows="1" autocapitalize="sentences" autocorrect="on" placeholder="¿En qué está? Una línea por revisión" title="Enter agrega · Shift+Enter baja de renglón"></textarea><button class="btn" id="rAvAdd">Agregar</button></div><div id="rAvances" class="avlist"></div></div>
+    <div class="sec" data-solo="meta"><div class="sh"><h3>Objetivos del trimestre que salen de acá</h3></div><div id="rHijos"></div></div>
+  </div>
+  <div class="pfoot" style="display:flex;align-items:center;gap:8px"><div style="flex:1"></div><button class="btn danger" id="rDel">Eliminar</button></div>
+</aside>
 
 <aside class="drawer" id="mesaDrawer" aria-hidden="true">
   <div class="phead">
