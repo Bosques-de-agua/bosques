@@ -3519,7 +3519,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const ROC_ESTADOS={pend:"Pendiente",curso:"En curso",bloq:"Bloqueada",cumplida:"Cumplida",nocumplida:"No cumplida"};
   const ROC_ORDEN=["curso","bloq","pend","cumplida","nocumplida"];
   const ROC_VIEJOS={camino:"curso",desviado:"bloq",logrado:"cumplida",nologrado:"nocumplida"};
-  let rocOff=null, rocSel=null, rocDrag=null;
+  let rocOff=null, rocSel=null, rocDrag=null, rocFoco=null;   // rocFoco: el objetivo del año que se está mirando
   const rocVista=()=>state.rocasVista==="lista"||chatMovil()?"lista":"linea";
   const rocas=()=>state.rocas.items;
   const rocMetas=()=>state.rocas.metas;
@@ -3570,11 +3570,31 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function rocMetasHTML(desde){ const ms=rocMetas().filter(m=>!m.fin||m.fin>=desde||m.sigue).sort((a,b)=>(a.n||99)-(b.n||99)||a.titulo.localeCompare(b.titulo));
     return `<div class="rocmetas"><div class="rochead"><span class="objlab">Objetivos del año${state.rocas.periodo&&state.rocas.periodo.nombre?" · "+esc(state.rocas.periodo.nombre):""}</span><span class="rochbtns">${!rocMetas().length&&!rocas().length?`<button class="rowbtn" id="rocImportar" title="Cargar una hoja de ruta desde un archivo .json">Importar</button>`:""}<button class="rowbtn" data-rocnueva="meta">＋ objetivo del año</button></span></div>`
       +(ms.length?`<div class="rocmgrid">${ms.map(m=>{ const hijos=rocas().filter(o=>o.meta===m.id), bl=hijos.filter(o=>o.estado==="bloq").length, cu=hijos.filter(o=>o.estado==="cumplida").length;
-        return `<div class="rocmeta${rocSel===m.id?" sel":""}" data-roc="${esc(m.id)}" style="--pc:${m.proyecto&&N(m.proyecto)?accentOf(N(m.proyecto)):"var(--wood)"}"><div class="rmt">${m.n?`<span class="rmn">${m.n}</span>`:""}<b>${esc(m.titulo||"Sin título")}</b></div><div class="rmm">${esc(rocProyNombre(m.proyecto))} · vence ${esc(mesAnio(m.fin))}${m.sigue?" →":""}</div><div class="rmm">${hijos.length?`${plural(hijos.length,"roca","rocas")}${cu?` · ${cu} cumplida${cu===1?"":"s"}`:""}${bl?` · ${bl} bloqueada${bl===1?"":"s"}`:""}`:"Todavía sin rocas"}</div></div>`; }).join("")}</div>`
+        return `<div class="rocmeta${rocSel===m.id?" sel":""}${rocFoco===m.id?" foco":rocFoco?" apagada":""}" data-rocfoco="${esc(m.id)}" style="--pc:${m.proyecto&&N(m.proyecto)?accentOf(N(m.proyecto)):"var(--wood)"}" title="${esc(metaEtiqueta(m))}\n${esc(rocProyNombre(m.proyecto))} · vence ${esc(mesAnio(m.fin))}${m.sigue?" y sigue":""} · ${esc(ROC_ESTADOS[m.estado])}"><span class="rmn">${m.n||"·"}</span><span class="rmb"><span class="rmt">${esc(m.titulo||"Sin título")}</span><span class="rmm"><span class="rrdot ${m.estado}"></span>${esc(mesAnio(m.fin))}${m.sigue?" →":""} · ${hijos.length?plural(hijos.length,"roca","rocas"):"sin rocas"}${cu?` · ${cu} ✓`:""}${bl?` · ${bl} bloq.`:""}</span></span></div>`; }).join("")}</div>`
         :`<div class="semvacio">El objetivo del año es lo que tiene que ser cierto al cierre del período. De cada uno salen las rocas de cada trimestre.</div>`)+`</div>`; }
+  // Con un objetivo del año tocado, sus rocas quedan resaltadas y el resto se apaga.
+  function rocFocoHTML(){ const m=rocFoco&&rocItem(rocFoco); if(!m){ rocFoco=null; return ""; }
+    const n=rocas().filter(o=>o.meta===m.id).length;
+    return `<div class="rocfoco"><span>Viendo las rocas del objetivo <b>${esc(metaEtiqueta(m))}</b> · ${plural(n,"roca","rocas")}</span><button class="rowbtn" data-rocabrir="${esc(m.id)}">Abrir su ficha</button><button class="rowbtn" data-rocfoco="">✕ ver todo</button></div>`; }
+  // El pulso del trimestre que importa ahora: cómo vienen sus rocas, cuánto
+  // falta y qué hitos están por venir. Es lo que se mira en cada revisión.
+  function rocPulsoHTML(){ const q=trimInicio(rocOffInicial()), qk=ymdLocal(q), qf=ymdLocal(new Date(q.getFullYear(),q.getMonth()+3,0,12)), p=state.rocas.periodo;
+    const fin=p&&ymdOk(p.fin)&&p.fin<qf&&p.fin>=qk?p.fin:qf, hoy=ymdLocal(new Date());
+    const suyas=rocas().filter(o=>o.fin>=qk&&o.fin<=qf);
+    if(!suyas.length)return "";
+    const cuenta=k=>suyas.filter(o=>o.estado===k).length;
+    const dias=Math.round((aFecha(hoy<qk?qk:fin)-aFecha(hoy))/DAY);
+    const cuando=hoy<qk?`empieza en ${plural(dias,"día","días")}`:`quedan ${plural(dias,"día","días")}`;
+    const mesHoy=hoy.slice(0,7);
+    const prox=rocas().flatMap(o=>o.hitos.filter(h=>h.hasta&&h.hasta>=mesHoy&&h.estado!=="cumplida").map(h=>({o,h})))
+      .sort((x,y)=>(x.h.hasta).localeCompare(y.h.hasta)||(x.h.desde||"").localeCompare(y.h.desde||"")).slice(0,3);
+    const est=["curso","bloq","pend","cumplida","nocumplida"].filter(k=>cuenta(k)).map(k=>{ const n=cuenta(k), pl={pend:["pendiente","pendientes"],curso:["en curso","en curso"],bloq:["bloqueada","bloqueadas"],cumplida:["cumplida","cumplidas"],nocumplida:["no cumplida","no cumplidas"]}[k]; return `<span class="rpest"><span class="rrdot ${k}"></span>${n} ${pl[n===1?0:1]}</span>`; }).join("");
+    return `<div class="rocpulso"><div class="rpq"><b>${esc(trimNombre(q))}</b><span>${plural(suyas.length,"roca","rocas")} · ${cuando}</span></div><div class="rpests">${est}</div>`
+      +(prox.length?`<div class="rpprox"><span class="rplab">Próximos hitos</span>${prox.map(({o,h})=>`<button class="rphito" data-rocabrir="${esc(o.id)}" title="${esc(o.titulo)}"><span class="rrdot ${h.estado}"></span><b>${esc(hitoCuando(h))}</b> ${esc(h.t)}${o.codigo?` <span class="rcod">${esc(o.codigo)}</span>`:""}</button>`).join("")}</div>`:"")+`</div>`; }
   function rocRenglones(lista){ const filas=[]; lista.slice().sort((a,b)=>a.ini.localeCompare(b.ini)||a.fin.localeCompare(b.fin)).forEach(o=>{
       let i=filas.findIndex(f=>f[f.length-1].fin<o.ini); if(i<0){ filas.push([]); i=filas.length-1; } filas[i].push(o); });
     return filas; }
+  const RL_FILA=52;   // alto de cada renglón: la barra y, debajo, sus hitos
   function rocLineaHTML(){ const {a,b,ms}=rocRango(), pct=ymd=>(aFecha(ymd)-a)/ms*100, unDia=100/(ms/DAY);
     const meses=[...Array(9)].map((_,i)=>new Date(a.getFullYear(),a.getMonth()+i,1,12));
     const trims=[0,3,6].map(i=>meses[i]);
@@ -3585,17 +3605,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     let h=`<div class="rocline"><div class="rlhead"><div class="rllab"></div><div class="rlscale">${trims.map(t=>`<div class="rlq" style="left:${(t-a)/ms*100}%;width:${(new Date(t.getFullYear(),t.getMonth()+3,1,12)-t)/ms*100}%">${esc(trimNombre(t))}</div>`).join("")}${meses.map(m=>`<div class="rlm" ${col(m)}>${esc(mesCorto(m))}</div>`).join("")}</div></div>`;
     carriles.forEach(c=>{ const suyos=visibles.filter(o=>c.id?o.proyecto===c.id:(!o.proyecto||!N(o.proyecto)));
       const filas=rocRenglones(suyos);
-      h+=`<div class="rllane"><div class="rllab" style="--pc:${c.color}">${esc(c.nombre)}<button class="rowbtn" data-rocnueva="roca" data-proy="${esc(c.id)}" title="Nueva roca en ${esc(c.nombre)}">＋</button></div><div class="rltrack" style="height:${Math.max(1,filas.length)*38+12}px">`
+      h+=`<div class="rllane"><div class="rllab" style="--pc:${c.color}">${esc(c.nombre)}<button class="rowbtn" data-rocnueva="roca" data-proy="${esc(c.id)}" title="Nueva roca en ${esc(c.nombre)}">＋</button></div><div class="rltrack" style="height:${Math.max(1,filas.length)*RL_FILA+8}px">`
         +meses.map(m=>`<div class="rlgrid" ${col(m)}></div>`).join("")
         +(hoyP>=0&&hoyP<=100?`<div class="rlhoy" style="left:${hoyP}%" title="Hoy"></div>`:"")
         +filas.map((f,i)=>f.map(o=>{ const l=Math.max(0,pct(o.ini)), r=Math.min(100,pct(o.fin)+unDia); const meta=o.meta&&rocItem(o.meta);
-          const hitos=o.hitos.filter(x=>x.hasta).map(x=>{ const p=pct(finDeMes(x.hasta)); if(p<l-0.1||p>r+0.1)return ""; const rel=(p-l)/Math.max(0.01,r-l)*100;
-            return `<span class="rlhito ${x.estado}" style="left:calc(${Math.min(100,Math.max(0,rel))}% - 4px)" title="Hito · ${esc(hitoCuando(x))}: ${esc(x.t)} (${esc(ROC_ESTADOS[x.estado])})"></span>`; }).join("");
-          return `<div class="rlbar ${o.estado}${rocSel===o.id?" sel":""}" data-roc="${esc(o.id)}" style="left:${l}%;width:${Math.max(1.2,r-l)}%;top:${6+i*38}px" title="${esc((o.codigo?o.codigo+" · ":"")+o.titulo)}${meta?"\nObjetivo "+esc(metaEtiqueta(meta)):""}\n${esc(dmCorto(o.ini))} → ${esc(dmCorto(o.fin))} · ${esc(ROC_ESTADOS[o.estado])}"><span class="rlh l"></span><span class="rlt">${o.estado==="cumplida"?"✓ ":o.estado==="nocumplida"?"✕ ":""}${esc(o.titulo||"Sin título")}</span>${o.resp?`<span class="rlr">${avatarMarkup(o.resp,"av")}</span>`:""}${hitos}<span class="rlh r"></span></div>`; }).join("")).join("")
+          const top=6+i*RL_FILA;
+          // Cada hito es un tramo desde que empieza hasta que vence, con el rombo en la fecha límite.
+          const hitos=o.hitos.filter(x=>x.desde).map(x=>{ const hl=pct(x.desde+"-01"), hr=pct(finDeMes(x.hasta||x.desde))+unDia; if(hr<0||hl>100)return "";
+            const L=Math.max(0,hl), R=Math.min(100,hr);
+            return `<span class="rlhs ${x.estado}${rocFoco&&o.meta!==rocFoco?" apagada":""}" data-roc="${esc(o.id)}" style="left:${L}%;width:${Math.max(0.6,R-L)}%;top:${top+30}px" title="${esc(o.codigo?o.codigo+" · ":"")}Hito · ${esc(hitoCuando(x))}: ${esc(x.t)} (${esc(ROC_ESTADOS[x.estado])})"></span>`; }).join("");
+          const fuera=rocFoco&&o.meta!==rocFoco?" apagada":"";
+          return `<div class="rlbar ${o.estado}${rocSel===o.id?" sel":""}${fuera}" data-roc="${esc(o.id)}" style="left:${l}%;width:${Math.max(1.2,r-l)}%;top:${top}px" title="${esc((o.codigo?o.codigo+" · ":"")+o.titulo)}${meta?"\nObjetivo "+esc(metaEtiqueta(meta)):""}\n${esc(dmCorto(o.ini))} → ${esc(dmCorto(o.fin))} · ${esc(ROC_ESTADOS[o.estado])}"><span class="rlh l"></span><span class="rlt">${o.estado==="cumplida"?"✓ ":o.estado==="nocumplida"?"✕ ":""}${esc(o.titulo||"Sin título")}</span>${o.resp?`<span class="rlr">${avatarMarkup(o.resp,"av")}</span>`:""}<span class="rlh r"></span></div>${hitos}`; }).join("")).join("")
         +(suyos.length?"":`<div class="rlvacio">Sin rocas en estos trimestres</div>`)+`</div></div>`; });
     return h+`</div>`; }
   function rocListaHTML(){ const {a,b}=rocRango(), desde=ymdLocal(a), hasta=ymdLocal(b);
-    const lista=rocas().filter(o=>o.fin>=desde&&o.fin<hasta);
+    const lista=rocas().filter(o=>o.fin>=desde&&o.fin<hasta&&(!rocFoco||o.meta===rocFoco));
     const trims=[0,3,6].map(i=>new Date(a.getFullYear(),a.getMonth()+i,1,12));
     return trims.map(t=>{ const k=ymdLocal(t), suyos=lista.filter(o=>ymdLocal(trimDe(o.fin))===k).sort((x,y)=>(x.codigo||"").localeCompare(y.codigo||"",undefined,{numeric:true})||x.fin.localeCompare(y.fin));
       return `<div class="card roclist"><div class="rochead"><span class="objlab">${esc(trimNombre(t))} · ${plural(suyos.length,"roca","rocas")}</span><button class="rowbtn" data-rocnueva="roca" data-trim="${k}">＋ roca</button></div>`
@@ -3607,8 +3631,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const seg=document.getElementById("rocasSeg"); if(seg)seg.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.rv===v));
     const fin=new Date(a.getFullYear(),a.getMonth()+6,1,12);
     body.innerHTML=`<div class="objnav"><button class="btn btn-icon" data-rocoff="-1" aria-label="Trimestre anterior">‹</button><div class="objsem"><b>${esc(trimNombre(a).split(" · ")[0])} → ${esc(trimNombre(fin).split(" · ")[0])}</b><span>${esc(mesCorto(a))} ${a.getFullYear()} – ${esc(mesCorto(new Date(fin.getFullYear(),fin.getMonth()+2,1,12)))} ${new Date(fin.getFullYear(),fin.getMonth()+2,1,12).getFullYear()}</span></div><button class="btn btn-icon" data-rocoff="1" aria-label="Trimestre siguiente">›</button>${rocOff!==rocOffInicial()?`<button class="rowbtn" data-rocoff="0">Volver a hoy</button>`:""}</div>`
-      +rocMetasHTML(ymdLocal(a))+(v==="linea"?rocLineaHTML():rocListaHTML())
-      +`<p class="semayuda">${v==="linea"?"Arrastrá una barra para moverla o su borde para cambiarle la fecha: siempre pregunta antes. Los puntitos son los hitos. Tocá una roca para abrir su ficha. ":""}Cada roca es el compromiso de un trimestre, con una respuesta de sí o no: cómo sabemos que está cumplida.</p>`; }
+      +rocMetasHTML(ymdLocal(a))+rocFocoHTML()+rocPulsoHTML()+(v==="linea"?rocLineaHTML():rocListaHTML())
+      +`<p class="semayuda">${v==="linea"?"Arrastrá una barra para moverla o su borde para cambiarle la fecha: siempre pregunta antes. Debajo de cada roca, sus hitos: el tramo va de cuando empieza a cuando vence. Tocá una roca para abrir su ficha. Tocá un objetivo del año para ver solo sus rocas. ":""}Cada roca es el compromiso de un trimestre, con una respuesta de sí o no: cómo sabemos que está cumplida.</p>`; }
   // --- arrastrar: mover o estirar, con pregunta antes de guardar ---
   const SEMANA_MS=7*DAY;
   function rocMoverFechas(ymd,dias){ const d=aFecha(ymd); d.setDate(d.getDate()+dias); return ymdLocal(d); }
@@ -3637,6 +3661,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     body.addEventListener("click",e=>{ const t=e.target;
       const off=t.closest("[data-rocoff]"); if(off){ const v=+off.dataset.rocoff; rocOff=v===0?rocOffInicial():rocOff+v; renderRocas(); return; }
       const nv=t.closest("[data-rocnueva]"); if(nv){ rocNueva(nv.dataset.rocnueva,nv.dataset.proy,nv.dataset.trim); return; }
+      const fo=t.closest("[data-rocfoco]"); if(fo){ const id=fo.dataset.rocfoco; rocFoco=id&&rocFoco!==id?id:null; renderRocas(); return; }
+      const ab=t.closest("[data-rocabrir]"); if(ab){ openRoca(ab.dataset.rocabrir); return; }
       if(t.closest("#rocImportar")){ document.getElementById("rocImportFile").click(); return; }
       if(t.closest(".rlbar"))return;   // lo maneja el soltar
       const r=t.closest("[data-roc]"); if(r)openRoca(r.dataset.roc); }); } }
