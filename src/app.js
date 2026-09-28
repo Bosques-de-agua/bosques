@@ -3536,7 +3536,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // como en ella (T1 = oct–dic 2026); afuera, por el calendario.
   function trimInicio(off){ const h=new Date(); const q=Math.floor(h.getMonth()/3)+(off||0); return new Date(h.getFullYear(),q*3,1,12); }
   function trimDe(ymd){ const d=aFecha(ymd); return new Date(d.getFullYear(),Math.floor(d.getMonth()/3)*3,1,12); }
-  function trimNombre(t){ const p=state.rocas.periodo, fin=new Date(t.getFullYear(),t.getMonth()+3,0,12);
+  function trimNombre(t){ const p=state.rocas.periodo; let fin=new Date(t.getFullYear(),t.getMonth()+3,0,12);
+    // El último trimestre del período puede ser más corto (el T4 termina en agosto).
+    if(p&&ymdOk(p.fin)&&ymdLocal(t)<=p.fin&&ymdLocal(fin)>p.fin)fin=aFecha(p.fin);
     const rango=`${mesCorto(t)}–${mesCorto(fin)} ${fin.getFullYear()}`;
     if(p&&ymdOk(p.inicio)){ const i=aFecha(p.inicio), meses=(t.getFullYear()-i.getFullYear())*12+t.getMonth()-i.getMonth();
       if(meses>=0&&meses<12&&(!ymdOk(p.fin)||ymdLocal(t)<=p.fin))return `T${Math.floor(meses/3)+1} · ${rango}`; }
