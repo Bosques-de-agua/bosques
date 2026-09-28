@@ -1930,3 +1930,31 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .rocpulso .rpprox{flex:1 1 100%;justify-content:flex-start;padding-top:7px;border-top:1px solid var(--line-soft)}
 .rphito{max-width:320px}
 @media (max-width:700px){ .rocmgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+
+/* ══ Colores de los objetivos del año ══
+   Ocho tonos apagados, de la misma familia terrosa que la app, bien
+   distintos entre sí. Cada objetivo toma uno por su número y lo heredan sus
+   rocas y hitos. El estado NO se pinta con estos: usa los --s-* de siempre. */
+:root{--ob0:#8a8478;--ob1:#2f7f6f;--ob2:#a8742a;--ob3:#3f69a8;--ob4:#8a4f86;--ob5:#5b8436;--ob6:#b0563a;--ob7:#2f8199;--ob8:#a3445f}
+[data-theme="dark"]{--ob0:#9a9488;--ob1:#5cb7a3;--ob2:#d9a55a;--ob3:#7fa6e0;--ob4:#c38bbf;--ob5:#93bd6b;--ob6:#e08b6c;--ob7:#63b8cf;--ob8:#dc7d98}
+/* Barras: el relleno y el borde son del objetivo; el estado, un puntito. */
+.rlbar{background:color-mix(in srgb,var(--oc,var(--ob0)) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--oc,var(--ob0)) 42%,transparent);box-shadow:inset 4px 0 0 var(--oc,var(--ob0));padding-left:11px}
+.rlbar.cumplida{background:color-mix(in srgb,var(--oc,var(--ob0)) 30%,var(--surface))}
+.rlbar:hover,.rlbar.sel{border-color:var(--oc,var(--wood));box-shadow:inset 4px 0 0 var(--oc,var(--ob0)),0 0 0 1px var(--oc,var(--wood))}
+.rlbar .rlest{width:8px;height:8px;flex:none;box-shadow:0 0 0 1.5px var(--surface)}
+.rlhs::before{background:color-mix(in srgb,var(--oc,var(--ob0)) 50%,transparent)}
+.rlhs.cumplida::before{background:var(--oc,var(--ob0))}
+/* Lista y fichas */
+.rocrow{box-shadow:inset 3px 0 0 var(--oc,transparent);padding-left:10px}
+#rHijos .taskrow2{box-shadow:inset 3px 0 0 var(--oc,transparent)}
+#rocaDrawer .phead{box-shadow:inset 0 3px 0 var(--oc,transparent)}
+#rocaDrawer .ey{color:var(--oc,var(--ink-faint))}
+/* Los hitos en la ficha, destacados: un recuadro suave del color del
+   objetivo, y cada hito con el borde de su estado; los cumplidos, en verde. */
+#rHitos{background:color-mix(in srgb,var(--oc,var(--ob0)) 7%,transparent);border:1px solid color-mix(in srgb,var(--oc,var(--ob0)) 22%,transparent);border-radius:var(--r-md);padding:4px 9px 6px}
+.rhito{border-left:3px solid var(--rc);padding-left:7px;margin-left:-4px;--rc:var(--s-sin)}
+.rhito.curso{--rc:var(--s-curso)} .rhito.bloq{--rc:var(--s-bloq)} .rhito.cumplida{--rc:var(--s-listo)}
+.rhito.cumplida .rht{color:var(--ink-faint);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--s-listo) 60%,transparent)}
+.rhest{background:color-mix(in srgb,var(--rc) 14%,var(--surface-2));color:color-mix(in srgb,var(--rc) 75%,var(--ink));font-weight:600}
+.rhest.pend{--rc:var(--s-sin)}
+#rHitos .mini-add{margin-top:4px}

@@ -3563,6 +3563,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   const rocProyNombre=id=>{ const n=id&&N(id); return n?n.name:"Sin proyecto"; };
   function rocOpciones(lista,sel,vacio){ return `<option value="">${esc(vacio)}</option>`+lista.map(o=>`<option value="${esc(o.v)}"${o.v===sel?" selected":""}>${esc(o.l)}</option>`).join(""); }
   const rocEstadoTag=o=>`<span class="rocest ${o.estado}">${o.estado==="cumplida"?"✓ ":o.estado==="nocumplida"?"✕ ":""}${ROC_ESTADOS[o.estado]}</span>`;
+  // Cada objetivo del año tiene su color (por su número) y lo heredan sus rocas
+  // y sus hitos. El estado va aparte, con los colores de estado de toda la app.
+  const ROC_COLORES=8;
+  function rocColor(o){ const m=o&&(esMeta(o)?o:(o.meta&&rocItem(o.meta))); return m&&Number.isInteger(m.n)?`var(--ob${((m.n-1)%ROC_COLORES)+1})`:"var(--ob0)"; }
   const rocCodigo=o=>o.codigo?`<span class="rcod">${esc(o.codigo)}</span>`:"";
   const metaEtiqueta=m=>(m.n?m.n+" · ":"")+(m.titulo||"Sin título");
   const hitoCuando=h=>{ if(!h.desde)return "a definir"; const a=mesCorto(aFecha(h.desde+"-01")), b=mesCorto(aFecha(h.hasta+"-01")); return h.hasta!==h.desde?`${a}–${b}`:a; };
@@ -3570,7 +3574,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function rocMetasHTML(desde){ const ms=rocMetas().filter(m=>!m.fin||m.fin>=desde||m.sigue).sort((a,b)=>(a.n||99)-(b.n||99)||a.titulo.localeCompare(b.titulo));
     return `<div class="rocmetas"><div class="rochead"><span class="objlab">Objetivos del año${state.rocas.periodo&&state.rocas.periodo.nombre?" · "+esc(state.rocas.periodo.nombre):""}</span><span class="rochbtns">${!rocMetas().length&&!rocas().length?`<button class="rowbtn" id="rocImportar" title="Cargar una hoja de ruta desde un archivo .json">Importar</button>`:""}<button class="rowbtn" data-rocnueva="meta">＋ objetivo del año</button></span></div>`
       +(ms.length?`<div class="rocmgrid">${ms.map(m=>{ const hijos=rocas().filter(o=>o.meta===m.id), bl=hijos.filter(o=>o.estado==="bloq").length, cu=hijos.filter(o=>o.estado==="cumplida").length;
-        return `<div class="rocmeta${rocSel===m.id?" sel":""}${rocFoco===m.id?" foco":rocFoco?" apagada":""}" data-rocfoco="${esc(m.id)}" style="--pc:${m.proyecto&&N(m.proyecto)?accentOf(N(m.proyecto)):"var(--wood)"}" title="${esc(metaEtiqueta(m))}\n${esc(rocProyNombre(m.proyecto))} · vence ${esc(mesAnio(m.fin))}${m.sigue?" y sigue":""} · ${esc(ROC_ESTADOS[m.estado])}"><span class="rmn">${m.n||"·"}</span><span class="rmb"><span class="rmt">${esc(m.titulo||"Sin título")}</span><span class="rmm"><span class="rrdot ${m.estado}"></span>${esc(mesAnio(m.fin))}${m.sigue?" →":""} · ${hijos.length?plural(hijos.length,"roca","rocas"):"sin rocas"}${cu?` · ${cu} ✓`:""}${bl?` · ${bl} bloq.`:""}</span></span></div>`; }).join("")}</div>`
+        return `<div class="rocmeta${rocSel===m.id?" sel":""}${rocFoco===m.id?" foco":rocFoco?" apagada":""}" data-rocfoco="${esc(m.id)}" style="--pc:${rocColor(m)}" title="${esc(metaEtiqueta(m))}\n${esc(rocProyNombre(m.proyecto))} · vence ${esc(mesAnio(m.fin))}${m.sigue?" y sigue":""} · ${esc(ROC_ESTADOS[m.estado])}"><span class="rmn">${m.n||"·"}</span><span class="rmb"><span class="rmt">${esc(m.titulo||"Sin título")}</span><span class="rmm"><span class="rrdot ${m.estado}"></span>${esc(mesAnio(m.fin))}${m.sigue?" →":""} · ${hijos.length?plural(hijos.length,"roca","rocas"):"sin rocas"}${cu?` · ${cu} ✓`:""}${bl?` · ${bl} bloq.`:""}</span></span></div>`; }).join("")}</div>`
         :`<div class="semvacio">El objetivo del año es lo que tiene que ser cierto al cierre del período. De cada uno salen las rocas de cada trimestre.</div>`)+`</div>`; }
   // Con un objetivo del año tocado, sus rocas quedan resaltadas y el resto se apaga.
   function rocFocoHTML(){ const m=rocFoco&&rocItem(rocFoco); if(!m){ rocFoco=null; return ""; }
@@ -3613,9 +3617,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
           // Cada hito es un tramo desde que empieza hasta que vence, con el rombo en la fecha límite.
           const hitos=o.hitos.filter(x=>x.desde).map(x=>{ const hl=pct(x.desde+"-01"), hr=pct(finDeMes(x.hasta||x.desde))+unDia; if(hr<0||hl>100)return "";
             const L=Math.max(0,hl), R=Math.min(100,hr);
-            return `<span class="rlhs ${x.estado}${rocFoco&&o.meta!==rocFoco?" apagada":""}" data-roc="${esc(o.id)}" style="left:${L}%;width:${Math.max(0.6,R-L)}%;top:${top+30}px" title="${esc(o.codigo?o.codigo+" · ":"")}Hito · ${esc(hitoCuando(x))}: ${esc(x.t)} (${esc(ROC_ESTADOS[x.estado])})"></span>`; }).join("");
+            return `<span class="rlhs ${x.estado}${rocFoco&&o.meta!==rocFoco?" apagada":""}" data-roc="${esc(o.id)}" style="--oc:${rocColor(o)};left:${L}%;width:${Math.max(0.6,R-L)}%;top:${top+30}px" title="${esc(o.codigo?o.codigo+" · ":"")}Hito · ${esc(hitoCuando(x))}: ${esc(x.t)} (${esc(ROC_ESTADOS[x.estado])})"></span>`; }).join("");
           const fuera=rocFoco&&o.meta!==rocFoco?" apagada":"";
-          return `<div class="rlbar ${o.estado}${rocSel===o.id?" sel":""}${fuera}" data-roc="${esc(o.id)}" style="left:${l}%;width:${Math.max(1.2,r-l)}%;top:${top}px" title="${esc((o.codigo?o.codigo+" · ":"")+o.titulo)}${meta?"\nObjetivo "+esc(metaEtiqueta(meta)):""}\n${esc(dmCorto(o.ini))} → ${esc(dmCorto(o.fin))} · ${esc(ROC_ESTADOS[o.estado])}"><span class="rlh l"></span><span class="rlt">${o.estado==="cumplida"?"✓ ":o.estado==="nocumplida"?"✕ ":""}${esc(o.titulo||"Sin título")}</span>${o.resp?`<span class="rlr">${avatarMarkup(o.resp,"av")}</span>`:""}<span class="rlh r"></span></div>${hitos}`; }).join("")).join("")
+          return `<div class="rlbar ${o.estado}${rocSel===o.id?" sel":""}${fuera}" data-roc="${esc(o.id)}" style="--oc:${rocColor(o)};left:${l}%;width:${Math.max(1.2,r-l)}%;top:${top}px" title="${esc((o.codigo?o.codigo+" · ":"")+o.titulo)}${meta?"\nObjetivo "+esc(metaEtiqueta(meta)):""}\n${esc(dmCorto(o.ini))} → ${esc(dmCorto(o.fin))} · ${esc(ROC_ESTADOS[o.estado])}"><span class="rlh l"></span><span class="rrdot rlest ${o.estado}" title="${esc(ROC_ESTADOS[o.estado])}"></span><span class="rlt">${o.estado==="cumplida"?"✓ ":o.estado==="nocumplida"?"✕ ":""}${esc(o.titulo||"Sin título")}</span>${o.resp?`<span class="rlr">${avatarMarkup(o.resp,"av")}</span>`:""}<span class="rlh r"></span></div>${hitos}`; }).join("")).join("")
         +(suyos.length?"":`<div class="rlvacio">Sin rocas en estos trimestres</div>`)+`</div></div>`; });
     return h+`</div>`; }
   function rocListaHTML(){ const {a,b}=rocRango(), desde=ymdLocal(a), hasta=ymdLocal(b);
@@ -3624,7 +3628,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return trims.map(t=>{ const k=ymdLocal(t), suyos=lista.filter(o=>ymdLocal(trimDe(o.fin))===k).sort((x,y)=>(x.codigo||"").localeCompare(y.codigo||"",undefined,{numeric:true})||x.fin.localeCompare(y.fin));
       return `<div class="card roclist"><div class="rochead"><span class="objlab">${esc(trimNombre(t))} · ${plural(suyos.length,"roca","rocas")}</span><button class="rowbtn" data-rocnueva="roca" data-trim="${k}">＋ roca</button></div>`
         +(suyos.length?suyos.map(o=>{ const meta=o.meta&&rocItem(o.meta), hc=o.hitos.filter(x=>x.estado==="cumplida").length;
-          return `<div class="rocrow${rocSel===o.id?" sel":""}" data-roc="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><div class="rrb"><div class="rrt">${rocCodigo(o)}${esc(o.titulo||"Sin título")}</div><div class="rrm">${esc(rocProyNombre(o.proyecto))}${meta?" · objetivo "+esc(metaEtiqueta(meta)):""}${o.hitos.length?` · hitos ${hc}/${o.hitos.length}`:""}${o.depende.length?" · depende de "+o.depende.map(x=>{ const r=rocItem(x.id); return esc(r&&r.codigo||"otra"); }).join(", "):""}</div></div>${rocEstadoTag(o)}</div>`; }).join("")
+          return `<div style="--oc:${rocColor(o)}" class="rocrow${rocSel===o.id?" sel":""}" data-roc="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><div class="rrb"><div class="rrt">${rocCodigo(o)}${esc(o.titulo||"Sin título")}</div><div class="rrm">${esc(rocProyNombre(o.proyecto))}${meta?" · objetivo "+esc(metaEtiqueta(meta)):""}${o.hitos.length?` · hitos ${hc}/${o.hitos.length}`:""}${o.depende.length?" · depende de "+o.depende.map(x=>{ const r=rocItem(x.id); return esc(r&&r.codigo||"otra"); }).join(", "):""}</div></div>${rocEstadoTag(o)}</div>`; }).join("")
           :`<div class="semvacio">Sin rocas que venzan en este trimestre.</div>`)+`</div>`; }).join(""); }
   function renderRocas(){ const body=document.getElementById("rocasBody"); if(!body)return;
     const {a}=rocRango(), v=rocVista();
@@ -3697,6 +3701,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function closeRoca(){ rocOcultar(); scrim.classList.remove("on"); renderActive(); }
   function syncRoca(todo){ const it=rocItem(rocSel); if(!it)return; const a=document.activeElement, meta=esMeta(it);
     const set=(id,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.value=v; if(el.classList.contains("autoalto"))requestAnimationFrame(()=>autoAlto(el,400)); } };
+    rocaDrawer.style.setProperty("--oc",rocColor(it));
     document.getElementById("rKind").textContent=meta?`Objetivo del año${it.n?" · "+it.n:""}`:`Roca${it.codigo?" · "+it.codigo:""}`;
     set("rTitulo",it.titulo); set("rExito",it.exito); set("rPorque",it.porque);
     const selSet=(id,html,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.innerHTML=html; el.value=v; } };
@@ -3706,7 +3711,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.querySelectorAll("#rocaDrawer [data-solo]").forEach(el=>{ el.hidden=el.dataset.solo!==(meta?"meta":"roca"); });
     if(meta){ set("rVence",it.fin); const sg=document.getElementById("rSigue"); if(sg)sg.checked=!!it.sigue; set("rPlan",it.plan);
       const hijos=rocas().filter(o=>o.meta===it.id).sort((x,y)=>x.fin.localeCompare(y.fin)||(x.codigo||"").localeCompare(y.codigo||"",undefined,{numeric:true}));
-      document.getElementById("rHijos").innerHTML=hijos.length?hijos.map(o=>`<div class="taskrow2" data-rochijo="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><span class="tt">${rocCodigo(o)}${esc(o.titulo||"Sin título")}</span><span class="who">${esc(ROC_ESTADOS[o.estado].toLowerCase())}</span><span class="go">↗</span></div>`).join("")
+      document.getElementById("rHijos").innerHTML=hijos.length?hijos.map(o=>`<div class="taskrow2" style="--oc:${rocColor(o)}" data-rochijo="${esc(o.id)}"><span class="rrdot ${o.estado}"></span><span class="tt">${rocCodigo(o)}${esc(o.titulo||"Sin título")}</span><span class="who">${esc(ROC_ESTADOS[o.estado].toLowerCase())}</span><span class="go">↗</span></div>`).join("")
         :`<div class="empty">Todavía ninguna. En la ficha de cada roca se elige de qué objetivo sale.</div>`; }
     else { selSet("rMeta",rocOpciones(rocMetas().slice().sort((x,y)=>(x.n||99)-(y.n||99)).map(m=>({v:m.id,l:metaEtiqueta(m)})),it.meta,"— Ninguno (cierre del período, u otra cosa) —"),it.meta&&rocItem(it.meta)?it.meta:"");
       set("rIni",it.ini); set("rFin",it.fin); set("rCodigo",it.codigo);
@@ -3717,7 +3722,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function renderRHitos(todo){ const box=document.getElementById("rHitos"), it=rocItem(rocSel); if(!box||!it||esMeta(it))return;
     if(!todo&&box.contains(document.activeElement))return;   // alguien está escribiendo uno
     const ord=it.hitos.slice().sort((x,y)=>(x.desde||"9999").localeCompare(y.desde||"9999"));
-    box.innerHTML=(ord.length?ord.map(h=>`<div class="rhito" data-hito="${esc(h.id)}"><select class="pick rhest ${h.estado}" data-hk="estado" title="Estado del hito">${["pend","curso","bloq","cumplida"].map(k=>`<option value="${k}"${k===h.estado?" selected":""}>${ROC_ESTADOS[k]}</option>`).join("")}</select><input class="txt rht" data-hk="t" value="${esc(h.t)}" autocapitalize="sentences" autocorrect="on" aria-label="Hito"><span class="rhmes"><input type="month" class="txt" data-hk="desde" value="${esc(h.desde)}" title="Desde"><span>–</span><input type="month" class="txt" data-hk="hasta" value="${esc(h.hasta)}" title="Hasta"></span><button class="avb" data-hdel title="Borrar hito">✕</button></div>`).join("")
+    box.innerHTML=(ord.length?ord.map(h=>`<div class="rhito ${h.estado}" data-hito="${esc(h.id)}"><select class="pick rhest ${h.estado}" data-hk="estado" title="Estado del hito">${["pend","curso","bloq","cumplida"].map(k=>`<option value="${k}"${k===h.estado?" selected":""}>${ROC_ESTADOS[k]}</option>`).join("")}</select><input class="txt rht" data-hk="t" value="${esc(h.t)}" autocapitalize="sentences" autocorrect="on" aria-label="Hito"><span class="rhmes"><input type="month" class="txt" data-hk="desde" value="${esc(h.desde)}" title="Desde"><span>–</span><input type="month" class="txt" data-hk="hasta" value="${esc(h.hasta)}" title="Hasta"></span><button class="avb" data-hdel title="Borrar hito">✕</button></div>`).join("")
       :`<div class="empty">Sin hitos. Un hito es un paso con fecha adentro de la roca.</div>`)+`<button class="mini-add" id="rHitoAdd">＋ hito</button>`; }
   function renderRDepende(){ const box=document.getElementById("rDepende"), it=rocItem(rocSel); if(!box||!it||esMeta(it))return;
     const habilita=rocas().filter(o=>o.depende.some(x=>x.id===it.id));
@@ -3753,7 +3758,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const hitoDe=el=>{ const o=it(), row=el.closest("[data-hito]"); return o&&row?o.hitos.find(h=>h.id===row.dataset.hito):null; };
     $("rHitos").addEventListener("input",e=>{ const k=e.target.dataset.hk; if(k!=="t")return; const h=hitoDe(e.target); if(!h)return; h.t=e.target.value; save(); });
     $("rHitos").addEventListener("change",e=>{ const k=e.target.dataset.hk; if(!k)return; const h=hitoDe(e.target); if(!h)return;
-      if(k==="estado"){ h.estado=e.target.value; e.target.className="pick rhest "+h.estado; }
+      if(k==="estado"){ h.estado=e.target.value; e.target.className="pick rhest "+h.estado; const row=e.target.closest(".rhito"); if(row)row.className="rhito "+h.estado; }
       else if(k==="desde"||k==="hasta"){ h[k]=ymOk(e.target.value)?e.target.value:""; if(k==="desde"&&(!h.hasta||h.hasta<h.desde))h.hasta=h.desde; if(k==="hasta"&&h.desde&&h.hasta<h.desde)h.desde=h.hasta; renderRHitos(true); }
       else if(k==="t"&&!h.t.trim()){ const o=it(); o.hitos=o.hitos.filter(x=>x!==h); renderRHitos(true); }
       save(); if(active==="rocas")renderRocas(); });
