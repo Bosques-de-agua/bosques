@@ -3574,7 +3574,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function rocMetasHTML(desde){ const ms=rocMetas().filter(m=>!m.fin||m.fin>=desde||m.sigue).sort((a,b)=>(a.n||99)-(b.n||99)||a.titulo.localeCompare(b.titulo));
     return `<div class="rocmetas"><div class="rochead"><span class="objlab">Objetivos del año${state.rocas.periodo&&state.rocas.periodo.nombre?" · "+esc(state.rocas.periodo.nombre):""}</span><span class="rochbtns">${!rocMetas().length&&!rocas().length?`<button class="rowbtn" id="rocImportar" title="Cargar una hoja de ruta desde un archivo .json">Importar</button>`:""}<button class="rowbtn" data-rocnueva="meta">＋ objetivo del año</button></span></div>`
       +(ms.length?`<div class="rocmgrid">${ms.map(m=>{ const hijos=rocas().filter(o=>o.meta===m.id), bl=hijos.filter(o=>o.estado==="bloq").length, cu=hijos.filter(o=>o.estado==="cumplida").length;
-        return `<div class="rocmeta${rocSel===m.id?" sel":""}${rocFoco===m.id?" foco":rocFoco?" apagada":""}" data-rocfoco="${esc(m.id)}" style="--pc:${rocColor(m)}" title="${esc(metaEtiqueta(m))}\n${esc(rocProyNombre(m.proyecto))} · vence ${esc(mesAnio(m.fin))}${m.sigue?" y sigue":""} · ${esc(ROC_ESTADOS[m.estado])}"><span class="rmn">${m.n||"·"}</span><span class="rmb"><span class="rmt">${esc(m.titulo||"Sin título")}</span><span class="rmm"><span class="rrdot ${m.estado}"></span>${esc(mesAnio(m.fin))}${m.sigue?" →":""} · ${hijos.length?plural(hijos.length,"roca","rocas"):"sin rocas"}${cu?` · ${cu} ✓`:""}${bl?` · ${bl} bloq.`:""}</span></span></div>`; }).join("")}</div>`
+        return `<div class="rocmeta${rocSel===m.id?" sel":""}${rocFoco===m.id?" foco":rocFoco?" apagada":""}" data-rocabrir="${esc(m.id)}" style="--pc:${rocColor(m)}" title="${esc(metaEtiqueta(m))}\n${esc(rocProyNombre(m.proyecto))} · concreción ${esc(mesAnio(m.fin))}${m.sigue?" y sigue":""}"><button class="rmn" data-rocfoco="${esc(m.id)}" title="${rocFoco===m.id?"Volver a ver todo":"Ver solo las rocas de este objetivo"}" aria-label="Ver solo las rocas del objetivo ${m.n||""}">${m.n||"·"}</button><span class="rmb"><span class="rmt">${esc(m.titulo||"Sin título")}</span><span class="rmm">${esc(mesAnio(m.fin))}${m.sigue?" →":""} · ${hijos.length?plural(hijos.length,"roca","rocas"):"sin rocas"}${cu?` · ${cu} ✓`:""}${bl?` · ${bl} bloq.`:""}</span></span></div>`; }).join("")}</div>`
         :`<div class="semvacio">El objetivo del año es lo que tiene que ser cierto al cierre del período. De cada uno salen las rocas de cada trimestre.</div>`)+`</div>`; }
   // Con un objetivo del año tocado, sus rocas quedan resaltadas y el resto se apaga.
   function rocFocoHTML(){ const m=rocFoco&&rocItem(rocFoco); if(!m){ rocFoco=null; return ""; }
@@ -3702,6 +3702,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function syncRoca(todo){ const it=rocItem(rocSel); if(!it)return; const a=document.activeElement, meta=esMeta(it);
     const set=(id,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.value=v; if(el.classList.contains("autoalto"))requestAnimationFrame(()=>autoAlto(el,400)); } };
     rocaDrawer.style.setProperty("--oc",rocColor(it));
+    const dot=document.getElementById("rEstDot"); if(dot){ dot.hidden=meta; dot.className="rrdot "+it.estado; dot.title=ROC_ESTADOS[it.estado]; }
     document.getElementById("rKind").textContent=meta?`Objetivo del año${it.n?" · "+it.n:""}`:`Roca${it.codigo?" · "+it.codigo:""}`;
     set("rTitulo",it.titulo); set("rExito",it.exito); set("rPorque",it.porque);
     const selSet=(id,html,v)=>{ const el=document.getElementById(id); if(el&&(todo||a!==el)){ el.innerHTML=html; el.value=v; } };
@@ -3743,7 +3744,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     [["rTitulo","titulo"],["rExito","exito"],["rPorque","porque"],["rPlan","plan"],["rCodigo","codigo"]].forEach(([id,k])=>{
       $(id).addEventListener("input",e=>{ const o=it(); if(!o)return; o[k]=e.target.value; if(e.target.classList.contains("autoalto"))autoAlto(e.target,400); save(); });
       $(id).addEventListener("change",()=>{ syncRoca(true); renderActive(); }); });
-    [["rProy","proyecto"],["rResp","resp"],["rEstado","estado"],["rMeta","meta"]].forEach(([id,k])=>$(id).addEventListener("change",e=>{ const o=it(); if(!o)return; o[k]=e.target.value; save(); renderActive(); }));
+    [["rProy","proyecto"],["rResp","resp"],["rEstado","estado"],["rMeta","meta"]].forEach(([id,k])=>$(id).addEventListener("change",e=>{ const o=it(); if(!o)return; o[k]=e.target.value; save(); renderActive(); if(k==="estado")syncRoca(false); }));
     $("rVence").addEventListener("change",e=>{ const o=it(); if(!o)return; o.fin=ymdOk(e.target.value)?e.target.value:""; save(); renderActive(); });
     $("rSigue").addEventListener("change",e=>{ const o=it(); if(!o)return; o.sigue=e.target.checked; save(); renderActive(); });
     // En la ficha, cambiar las fechas es editar: no pregunta (solo el arrastre lo hace).

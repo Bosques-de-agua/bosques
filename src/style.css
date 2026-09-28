@@ -1958,3 +1958,12 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 .rhest{background:color-mix(in srgb,var(--rc) 14%,var(--surface-2));color:color-mix(in srgb,var(--rc) 75%,var(--ink));font-weight:600}
 .rhest.pend{--rc:var(--s-sin)}
 #rHitos .mini-add{margin-top:4px}
+
+/* Ficha: el estado de la roca, un circulito al lado del nombre */
+.rtitrow{display:flex;align-items:center;gap:9px}
+.rtitrow .title{flex:1;min-width:0}
+.rtitrow .rrdot{width:13px;height:13px;box-shadow:0 0 0 3px color-mix(in srgb,var(--rc) 22%,transparent)}
+#rEstDot[hidden]{display:none}
+/* El número del cuadrito es el botón que prende sus rocas */
+button.rmn{border:none;padding:0;cursor:pointer;font-family:var(--font-mono);font-weight:700;transition:box-shadow .12s}
+button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 35%,transparent)}

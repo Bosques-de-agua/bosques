@@ -180,7 +180,8 @@
       <h1 class="h1">Objetivos<span class="infob" tabindex="0">i<span class="infopop"><b>Lo que nos comprometimos a lograr</b><ul>
         <li>Tres niveles, como la hoja de ruta y el método Tracción. El <b>objetivo del año</b> es lo que tiene que ser cierto al cierre del período. La <b>roca</b> es el compromiso de un trimestre, con respuesta de sí o no. El <b>hito</b> es un punto con fecha adentro de una roca.</li>
         <li>Cada roca tiene una <b>fecha límite</b> y una frase que dice <b>cómo sabemos que está cumplida</b>. Sin esa frase, es una intención y no una roca. En la ficha también van sus hitos y <b>lo que depende de qué</b>: las cadenas que rompen el año si se cortan.</li>
-        <li>El <b>estado</b>, de rocas y de hitos: pendiente, en curso, bloqueada o cumplida; al cerrar el trimestre, una roca que no se cumplió queda como <b>no cumplida</b>.</li>
+        <li>Cada objetivo del año tiene su <b>fecha de concreción</b> (cuándo se proyecta concretarlo) y su color, que heredan sus rocas. Tocá el <b>número</b> de un objetivo para ver solo sus rocas; tocá el resto del cuadrito para abrir su ficha.</li>
+        <li>El <b>estado</b>, de rocas y de hitos (los objetivos no llevan): pendiente, en curso, bloqueada o cumplida; al cerrar el trimestre, una roca que no se cumplió queda como <b>no cumplida</b>.</li>
         <li>En la <b>línea de tiempo</b> se ven tres trimestres; con las flechas se corre de a uno. Arrastrá una barra para moverla, o su borde para cambiarle la fecha: siempre pregunta antes. Tocala para abrir su ficha, donde todo se edita libremente.</li>
         <li><b>Lista</b> muestra lo mismo agrupado por trimestre. En el teléfono se ve siempre así.</li>
         <li>No son tareas ni temas: son lo que queremos haber logrado. Las tareas del día a día siguen en Tareas.</li></ul></span></span><div class="seg2 estviews" id="rocasSeg"><button data-rv="linea" class="on">Línea de tiempo</button><button data-rv="lista">Lista</button></div></h1>
@@ -297,11 +298,11 @@
   <div class="phead">
     <button class="btn btn-icon close" id="closeRoca" aria-label="Cerrar"><svg viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <div class="ey"><span id="rKind">Objetivo del trimestre</span></div>
-    <input class="title" id="rTitulo" autocapitalize="sentences" autocorrect="on" aria-label="Título del objetivo" placeholder="Título">
+    <div class="rtitrow"><span class="rrdot" id="rEstDot"></span><input class="title" id="rTitulo" autocapitalize="sentences" autocorrect="on" aria-label="Título" placeholder="Título"></div>
     <div class="pctl">
       <div class="c"><label>Proyecto</label><select class="pick" id="rProy"></select></div>
       <div class="c"><label>Responsable</label><select class="pick" id="rResp"></select></div>
-      <div class="c"><label>Estado</label><select class="pick" id="rEstado"></select></div>
+      <div class="c" data-solo="roca"><label>Estado</label><select class="pick" id="rEstado"></select></div>
     </div>
     <div class="pctl" data-solo="roca">
       <div class="c" style="flex:1 1 100%"><label>Sale del objetivo del año</label><select class="pick" id="rMeta"></select></div>
@@ -310,7 +311,7 @@
       <div class="c"><label>Código <small>opcional</small></label><input class="txt" id="rCodigo" placeholder="T1·2" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
     </div>
     <div class="pctl" data-solo="meta">
-      <div class="c"><label>Vence</label><input type="date" class="txt" id="rVence"></div>
+      <div class="c"><label>Fecha de concreción</label><input type="date" class="txt" id="rVence" title="Cuándo se proyecta concretarlo"></div>
       <div class="c"><label>Código en el plan anual <small>opcional</small></label><input class="txt" id="rPlan" placeholder="A2 · A6" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
       <div class="c" style="flex:1 1 100%"><label class="rsigue"><input type="checkbox" id="rSigue"> Sigue después de esa fecha</label></div>
     </div>
@@ -318,7 +319,7 @@
   </div>
   <div class="pbody">
     <div class="sec"><div class="sh"><h3>Cómo sabemos que está cumplido</h3></div><textarea class="txt autoalto" id="rExito" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Algo que se pueda comprobar. Ej: boletos firmados de las 3 parcelas"></textarea></div>
-    <div class="sec"><div class="sh"><h3>Contexto y notas</h3></div><textarea class="txt autoalto" id="rPorque" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Por qué importa, en qué está, qué hay que tener en cuenta"></textarea></div>
+    <div class="sec"><div class="sh"><h3>Descripción</h3></div><textarea class="txt autoalto" id="rPorque" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Por qué importa, en qué está, qué hay que tener en cuenta"></textarea></div>
     <div class="sec" data-solo="roca"><div class="sh"><h3>Hitos</h3></div><div id="rHitos"></div></div>
     <div class="sec" data-solo="roca"><div class="sh"><h3>Lo que depende de qué</h3></div><div id="rDepende"></div></div>
     <div class="sec" data-solo="roca"><div class="sh"><h3>Avances</h3></div><div class="avadd"><textarea class="txt" id="rAvIn" rows="1" autocapitalize="sentences" autocorrect="on" placeholder="¿En qué está? Una línea por revisión" title="Enter agrega · Shift+Enter baja de renglón"></textarea><button class="btn" id="rAvAdd">Agregar</button></div><div id="rAvances" class="avlist"></div></div>
