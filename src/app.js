@@ -7,7 +7,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
 // aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista","calVer","calColor"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes","recordatorios"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -2840,8 +2840,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(cel){ cel.classList.add("resaltada"); cel.scrollIntoView({behavior:"smooth",block:"center"}); } })); }
   // Todo lo que cae en cada día, en el orden en que se lee: lo que tiene hora
   // primero y en orden. Lo usan la grilla del mes y el cuadro del día.
-  function calPorDia(){ const me=state.me; const byDay={};
-    const push=(ds,c)=>{ (byDay[ds]=byDay[ds]||[]).push(c); };
+  // Qué se ve en el calendario y de qué color: es de cada navegador. Cuatro
+  // tipos, cada uno con su forma —el evento es el único lleno; la tarea va
+  // con borde, el recordatorio con una barra al costado y lo de Google con
+  // borde punteado— y con un color a elegir.
+  const CAL_TIPOS=[["event","Eventos","ev"],["task","Tareas","task"],["rec","Recordatorios","rec"],["google","Google Calendar","gcal"]];
+  const CAL_COLORES=[["#4a8fc4","Azul"],["#2f8f7f","Verde agua"],["#5b8c3a","Verde"],["#c9902f","Ámbar"],["#c0674a","Terracota"],["#a3445f","Rosa"],["#7b5ea7","Violeta"],["#7d786e","Gris"]];
+  const CAL_DEFECTO={event:"#4a8fc4",task:"estado",rec:"#7b5ea7",google:"#4285f4"};
+  const calVe=t=>!(state.calVer&&state.calVer[t]===false);
+  function calColor(t){ const c=state.calColor&&state.calColor[t]; return (c==="estado"&&t==="task")||/^#[0-9a-f]{6}$/i.test(c||"")?c:CAL_DEFECTO[t]; }
+  let calMenuAbierto="";
+  function calFiltrosHTML(){ return `<div class="calfils" role="group" aria-label="Qué se ve en el calendario">${CAL_TIPOS.map(([t,nombre,cls])=>{ const c=calColor(t), ve=calVe(t);
+      return `<span class="calfil${ve?"":" off"}" style="--cc:${c==="estado"?"var(--s-curso)":c}"><button class="cfcolor" data-cfcolor="${t}" title="Color de ${nombre.toLowerCase()}" aria-label="Elegir el color de ${nombre.toLowerCase()}"><span class="cfmuestra ${cls}${c==="estado"?" estado":""}"></span></button><button class="cfver" data-cfver="${t}" aria-pressed="${ve}" title="${ve?"Ocultar":"Mostrar"} ${nombre.toLowerCase()}">${nombre}</button>`
+        +(calMenuAbierto===t?`<span class="cfmenu">${t==="task"?`<button class="cfop${c==="estado"?" on":""}" data-cfset="${t}|estado"><span class="cfsw estado"></span>Según su estado</button>`:""}${CAL_COLORES.concat(t==="google"?[["#4285f4","Azul Google"]]:[]).map(([hex,n])=>`<button class="cfop${c===hex?" on":""}" data-cfset="${t}|${hex}"><span class="cfsw" style="background:${hex}"></span>${n}</button>`).join("")}</span>`:"")+`</span>`; }).join("")}</div>`; }
+  function calPorDia(todo){ const me=state.me; const byDay={};
+    const push=(ds,c)=>{ if(!todo&&!calVe(c.type))return; (byDay[ds]=byDay[ds]||[]).push(c); };
     // Una tarea sin responsable es del equipo, así que va al calendario de
     // todos. El filtro de antes la escondía de todas partes: desde que la
     // identidad sale del email de la sesión, `me` nunca está vacío, y una
@@ -2862,17 +2875,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const byDay=calPorDia();
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':''}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':'task'}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'&&calColor('task')==='estado'?`style="--cc:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       // En el teléfono los chips no entran: un puntito dice que ese día hay algo.
       const hay=chips.length?`<span class="calhay" aria-hidden="true">${chips.length}</span>`:"";
       cells+=`<div class="calcell ${inMonth?'':'out'} ${ds===todayS?'today':''}${inMonth&&ds<todayS?' ya':''}" data-day="${inMonth?ds:''}">${inMonth?`<span class="dnum">${dayNum}</span>${hay}${shown}${more}`:''}</div>`; }
-    mount.innerHTML=`<div class="cal"><div class="calhead"><h3>${MES[m]} ${y}</h3><div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
+    const cc=t=>{ const c=calColor(t); return c==="estado"?"var(--s-curso)":c; };
+    mount.innerHTML=`<div class="cal" style="--c-ev:${cc("event")};--c-task:${cc("task")};--c-rec:${cc("rec")};--c-g:${cc("google")}"><div class="calhead"><h3>${MES[m]} ${y}</h3>${calFiltrosHTML()}<div class="nav"><button class="btn btn-icon" data-cal="prev">‹</button><button class="btn" data-cal="today">Hoy</button><button class="btn btn-icon" data-cal="next">›</button></div></div><div class="calgrid">${DOWL.map(d=>`<div class="caldow">${d}</div>`).join("")}${cells}</div></div>`;
+    mount.querySelectorAll("[data-cfver]").forEach(b=>b.addEventListener("click",()=>{ const t=b.dataset.cfver; state.calVer=Object.assign({},state.calVer,{[t]:!calVe(t)}); calMenuAbierto=""; save(); renderCalendar(); }));
+    mount.querySelectorAll("[data-cfcolor]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); calMenuAbierto=calMenuAbierto===b.dataset.cfcolor?"":b.dataset.cfcolor; renderCalendar(); }));
+    mount.querySelectorAll("[data-cfset]").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const [t,c]=b.dataset.cfset.split("|"); state.calColor=Object.assign({},state.calColor,{[t]:c}); calMenuAbierto=""; save(); renderCalendar(); }));
     mount.querySelector('[data-cal="prev"]').addEventListener("click",()=>{ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderCalendar(); });
     mount.querySelector('[data-cal="next"]').addEventListener("click",()=>{ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(); });
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
     mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; abrirDia(ds); }));
     mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else if(c.type==="google")verGoogle(c.g,c.hora); else if(c.type==="rec"){ volverADia=null; recForm(recPorId(c.rec.id)); } else openEvView(c.id); })); }
+  document.addEventListener("click",e=>{ if(calMenuAbierto&&!e.target.closest(".cfmenu")){ calMenuAbierto=""; if(active==="panel")renderCalendar(); } });
   // ---------- EL CUADRO DEL DÍA ----------
   // Tocar un día abre todo lo que tiene (en la grilla entran tres cosas y en
   // el teléfono ninguna), los huecos libres de la jornada y el botón de nuevo
@@ -2895,19 +2913,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(JORNADA[1]-cur>=HUECO_MIN)libres.push([cur,JORNADA[1]]);
     return libres.filter(([a,b])=>b-a>=HUECO_MIN); }
   function abrirDia(ds){ const box=document.getElementById("evBox"); const me=state.me; const hoy=ymdLocal(new Date());
-    const items=calPorDia()[ds]||[];
+    const items=calPorDia()[ds]||[], todos=calPorDia(true)[ds]||[], ocultos=todos.length-items.length;
+    const colorDe=t=>{ const c=calColor(t); return c==="estado"?"":c; };
     const fila=(c,i)=>{ let hora="—", meta="", marca="", cls=c.pasado?" pasado":"";
-      if(c.type==="event"){ const ev=c.ev; hora=ev.time?horaEv(ev):"todo el día"; marca="background:var(--sky)";
+      if(c.type==="event"){ const ev=c.ev; hora=ev.time?horaEv(ev):"todo el día"; marca="background:"+colorDe("event");
         const mio=(ev.rsvp||{})[me]; meta=(c.pasado?"terminó · ":"")+(mio==="yes"?"vas":mio==="no"?"no vas":puedeResponder(ev)?"sin responder":"no estás invitado")+(esParaTodos(ev)?" · todo el equipo":" · "+invitadosDe(ev).join(", ")); }
-      else if(c.type==="task"){ hora=c.hora||"—"; marca="background:"+c.color;
+      else if(c.type==="task"){ hora=c.hora||"—"; marca="background:transparent;border:2px solid "+(colorDe("task")||c.color)+";border-radius:3px";
         const n=c.node?N(c.node):null; meta="Tarea · "+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:"")); }
-      else if(c.type==="rec"){ hora=c.hora||"—"; marca="background:var(--accent-priv)"; meta="Recordatorio · solo lo ves vos"+(c.rec.hecho?" · hecho":"")+(c.rec.aviso?" · con aviso":"")+(c.rec.repite?" · "+REC_REPITE[c.rec.repite].toLowerCase():""); }
-      else { hora=c.hora||"todo el día"; marca="border:1px dashed #4285f4"; meta="Tu Google Calendar · solo lo ves vos"; }
+      else if(c.type==="rec"){ hora=c.hora||"—"; marca="border-radius:2px;width:4px;height:14px;margin-top:3px;background:"+colorDe("rec"); meta="Recordatorio · solo lo ves vos"+(c.rec.hecho?" · hecho":"")+(c.rec.aviso?" · con aviso":"")+(c.rec.repite?" · "+recRepiteTxt(c.rec):""); }
+      else { hora=c.hora||"todo el día"; marca="border:1px dashed "+colorDe("google"); meta="Tu Google Calendar · solo lo ves vos"; }
       return `<div class="diarow${cls}" data-i="${i}"><span class="diahora">${esc(hora)}</span><span class="diamarca" style="${marca}"></span><span class="diacuerpo"><b>${esc(c.titulo||c.label)}</b><span class="diameta">${esc(meta)}</span></span></div>`; };
-    const libres=huecosLibres(ds,items);
+    const libres=huecosLibres(ds,todos);
     const pasoYa=ds<hoy;
     box.innerHTML=`<h2 class="diatit">${esc(mayus(fechaLarga(ds)))}<small>${esc(ds===hoy?"hoy":cuantoFalta(ds))}</small></h2>`
       +(items.length?`<div class="dialista">${items.map(fila).join("")}</div>`:`<p class="diavacio">${pasoYa?"No hubo nada este día.":"No hay nada agendado."}</p>`)
+      +(ocultos?`<p class="diaocultos">Hay ${ocultos} cosa${ocultos===1?"":"s"} más que no se ${ocultos===1?"ve":"ven"} por los filtros del calendario.</p>`:"")
       +(pasoYa?"":`<div class="dialab">Horarios libres <small>de ${deMin(JORNADA[0])} a ${deMin(JORNADA[1])} · tocá uno para agregar algo a esa hora</small></div>`
         +(libres.length?`<div class="dialibres">${libres.map(([a,b])=>`<button class="dialibre" data-h="${deMin(a)}">${deMin(a)}–${deMin(b)}</button>`).join("")}</div>`:`<p class="diavacio">No quedan huecos de media hora o más.</p>`))
       +`<div class="row" style="margin-top:14px"><div style="flex:1"></div><button class="btn" id="diaCerrar">Cerrar</button><button class="btn btn-primary" id="diaNuevo">＋ Agregar</button></div>`;
@@ -3801,7 +3821,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // El aviso lo manda la función `recordatorios` de Supabase, que un cron
   // llama cada 5 minutos: la app solo guarda cuándo querés que te avise.
   const REC_AVISOS=[["","No avisarme"],["0","A la hora"],["10","10 minutos antes"],["60","1 hora antes"],["1440","1 día antes"]];
-  const REC_REPITE={"":"No se repite",dia:"Todos los días",semana:"Cada semana",mes:"Cada mes",anio:"Cada año"};
+  const REC_REPITE={"":"No se repite",dia:"Todos los días",semana:"Cada semana",mes:"Cada mes",anio:"Cada año",custom:"Personalizado…"};
+  // Personalizado: cada N horas, días, semanas o meses ("día por medio" = cada 2 días).
+  const REC_UNIDADES={hora:["hora","horas"],dia:["día","días"],semana:["semana","semanas"],mes:["mes","meses"]};
+  const recRepiteTxt=r=>r.repite==="custom"?`cada ${r.cadaN===1?"":r.cadaN+" "}${REC_UNIDADES[r.cadaU][r.cadaN===1?0:1]}`:(REC_REPITE[r.repite]||"").toLowerCase();
   const REC_HORA_SIN="09:00";   // un recordatorio sin hora avisa a las 9
   function recsDe(quien){ const m=state.recordatorios||(state.recordatorios={}); const w=quien||state.me; if(!w)return [];
     if(!Array.isArray(m[w]))m[w]=[];
@@ -3810,12 +3833,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return m[w]; }
   function normRecs(lista){ return (Array.isArray(lista)?lista:[]).filter(r=>r&&typeof r.id==="string"&&typeof r.t==="string").map(r=>{
     if(!/^\d{4}-\d{2}-\d{2}$/.test(r.fecha||""))r.fecha=ymdLocal(new Date()); if(!HORA_RE.test(r.hora||""))r.hora="";
-    if(!REC_AVISOS.some(a=>a[0]===r.aviso))r.aviso=""; if(!(r.repite in REC_REPITE))r.repite=""; r.hecho=!!r.hecho; if(typeof r.nota!=="string")r.nota=""; return r; }); }
+    if(!REC_AVISOS.some(a=>a[0]===r.aviso))r.aviso=""; if(!(r.repite in REC_REPITE))r.repite="";
+    if(r.repite==="custom"){ r.cadaN=Math.max(1,Math.min(999,parseInt(r.cadaN,10)||1)); if(!REC_UNIDADES[r.cadaU])r.cadaU="dia"; if(r.cadaU==="hora"&&!r.hora)r.hora=REC_HORA_SIN; } else { delete r.cadaN; delete r.cadaU; } r.hecho=!!r.hecho; if(typeof r.nota!=="string")r.nota=""; return r; }); }
   const recPorId=id=>recsDe().find(r=>r.id===id)||null;
   function recSiguiente(r){ const [y,m,d]=r.fecha.split("-").map(Number);
+    if(r.repite==="custom"){ const n=r.cadaN||1;
+      if(r.cadaU==="hora"){ const [hh,mm]=(r.hora||REC_HORA_SIN).split(":").map(Number); const t=new Date(y,m-1,d,hh+n,mm); r.hora=String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0"); return ymdLocal(t); }
+      return ymdLocal(r.cadaU==="semana"?new Date(y,m-1,d+7*n):r.cadaU==="mes"?new Date(y,m-1+n,d):new Date(y,m-1,d+n)); }
     const f=r.repite==="dia"?new Date(y,m-1,d+1):r.repite==="semana"?new Date(y,m-1,d+7):r.repite==="mes"?new Date(y,m,d):new Date(y+1,m-1,d); return ymdLocal(f); }
   // Tildar: uno que se repite no se cierra, pasa a su próxima fecha.
-  function recTildar(r,hecho){ if(hecho&&r.repite){ const hoy=ymdLocal(new Date()); r.fecha=recSiguiente(r); while(r.fecha<hoy)r.fecha=recSiguiente(r); return; }
+  function recTildar(r,hecho){ if(hecho&&r.repite){ const hoy=ymdLocal(new Date()); const pasada=()=>{ if(r.fecha<hoy)return true; if(r.fecha>hoy||!(r.repite==="custom"&&r.cadaU==="hora"))return false; const t=new Date(); return aMin(r.hora||REC_HORA_SIN)<t.getHours()*60+t.getMinutes(); };
+      r.fecha=recSiguiente(r); let tope=0; while(pasada()&&tope++<5000)r.fecha=recSiguiente(r); return; }
     r.hecho=hecho; if(hecho)r.hechoTs=nowMs(); else delete r.hechoTs; }
   function recCuando(r){ const hoy=ymdLocal(new Date()), man=ymdLocal(new Date(nowMs()+DAY)), ayer=ymdLocal(new Date(nowMs()-DAY));
     const dia=r.fecha===hoy?"hoy":r.fecha===man?"mañana":r.fecha===ayer?"ayer":(d=>["dom","lun","mar","mié","jue","vie","sáb"][d.getDay()]+" "+d.getDate()+"/"+(d.getMonth()+1))(aFecha(r.fecha));
@@ -3828,7 +3856,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const lista=recsDe().filter(r=>!r.hecho&&r.fecha<=hasta).sort((a,b)=>(a.fecha+(a.hora||"99")).localeCompare(b.fecha+(b.hora||"99")));
     const mas=recsDe().filter(r=>!r.hecho&&r.fecha>hasta).length;
     return `<div class="card reccard" id="recCard"><div class="rechead"><span class="lab">${ICO_CAMPANA} Tus recordatorios <span class="recsolo">solo los ves vos</span></span><button class="rowbtn" data-recnuevo>＋ recordatorio</button></div>`
-      +(lista.length?lista.map(r=>`<div class="recrow${recVencido(r)?" venc":""}" data-rec="${esc(r.id)}"><input type="checkbox" class="lchk" data-rechecho title="${r.repite?"Hecho: pasa a la próxima vez":"Hecho"}"><span class="rect">${esc(r.t)}</span>${r.repite?`<span class="recrep" title="${esc(REC_REPITE[r.repite])}">↻</span>`:""}${r.aviso?`<span class="recav" title="Te avisa: ${esc((REC_AVISOS.find(a=>a[0]===r.aviso)||[])[1]||"").toLowerCase()}">${ICO_CAMPANA}</span>`:""}<span class="reccu">${esc(recCuando(r))}</span></div>`).join("")
+      +(lista.length?lista.map(r=>`<div class="recrow${recVencido(r)?" venc":""}" data-rec="${esc(r.id)}"><input type="checkbox" class="lchk" data-rechecho title="${r.repite?"Hecho: pasa a la próxima vez":"Hecho"}"><span class="rect">${esc(r.t)}</span>${r.repite?`<span class="recrep" title="Se repite ${esc(recRepiteTxt(r))}">↻</span>`:""}${r.aviso?`<span class="recav" title="Te avisa: ${esc((REC_AVISOS.find(a=>a[0]===r.aviso)||[])[1]||"").toLowerCase()}">${ICO_CAMPANA}</span>`:""}<span class="reccu">${esc(recCuando(r))}</span></div>`).join("")
         :`<div class="recvacio">Nada pendiente${todo?"":" para los próximos 7 días"}.</div>`)
       +(mas?`<div class="recmas">Y ${plural(mas,"más adelante","más adelante")}: están en el calendario.</div>`:"")+`</div>`; }
   function wireRecsPanel(box){ const c=box.querySelector("#recCard"); if(!c)return;
@@ -3860,14 +3888,19 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       <div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿Qué no te querés olvidar?</label><input class="txt" id="rcT" autocapitalize="sentences" autocorrect="on" placeholder="Ej: llamar al escribano" value="${esc(r.t)}"></div></div>
       <div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="rcF" value="${esc(r.fecha)}"></div><div class="c"><label>Hora <small>opcional</small></label><input type="time" class="txt" id="rcH" value="${esc(r.hora)}"></div></div>
       <div class="pctl"><div class="c"><label>Avisarme al celular</label><select class="pick" id="rcA">${REC_AVISOS.map(a=>`<option value="${a[0]}"${a[0]===r.aviso?" selected":""}>${a[1]}</option>`).join("")}</select></div><div class="c"><label>Se repite</label><select class="pick" id="rcR">${Object.keys(REC_REPITE).map(k=>`<option value="${k}"${k===r.repite?" selected":""}>${REC_REPITE[k]}</option>`).join("")}</select></div></div>
+      <div class="pctl reccustom" id="rcCustom" hidden><div class="c" style="flex:1 1 100%"><label>Se repite cada</label><div class="reccada"><input type="number" class="txt" id="rcNum" min="1" max="999" step="1" value="${r.repite==="custom"?r.cadaN:2}" aria-label="Cada cuántos"><select class="pick" id="rcU">${Object.keys(REC_UNIDADES).map(u=>`<option value="${u}"${(r.repite==="custom"?r.cadaU:"dia")===u?" selected":""}>${REC_UNIDADES[u][1]}</option>`).join("")}</select><span class="reccadatxt" id="rcCadaTxt"></span></div></div></div>
       <div class="rechint" id="rcHint"></div>
-      <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nota <small>opcional</small></label><textarea class="txt" id="rcN" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Un teléfono, un link, un detalle…">${esc(r.nota)}</textarea></div></div>
+      <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nota <small>opcional</small></label><textarea class="txt" id="rcNota" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Un teléfono, un link, un detalle…">${esc(r.nota)}</textarea></div></div>
       ${nuevo?"":`<label class="rechecho"><input type="checkbox" id="rcHecho"${r.hecho?" checked":""}> Hecho${r.repite?" (pasa a la próxima vez)":""}</label>`}
       <div class="row">${nuevo?"":`<button class="btn danger" id="rcDel">Eliminar</button>`}<div style="flex:1"></div><button class="btn" id="rcNo">Cancelar</button><button class="btn btn-primary" id="rcOk">${nuevo?"Guardar":"Guardar cambios"}</button></div>`;
     const $=id=>box.querySelector("#"+id);
     const hint=()=>{ const a=$("rcA").value, h=$("rcH").value;
       $("rcHint").textContent=!a?"":(h?"":`Sin hora, se toma las ${REC_HORA_SIN}. `)+"El aviso llega a los dispositivos donde activaste las notificaciones (Configuración → Avisos), con hasta 5 minutos de demora."; };
-    $("rcA").addEventListener("change",hint); $("rcH").addEventListener("change",hint); hint();
+    const custom=()=>{ const es=$("rcR").value==="custom"; $("rcCustom").hidden=!es; if(!es)return;
+      const n=Math.max(1,parseInt($("rcNum").value,10)||1), u=$("rcU").value;
+      $("rcCadaTxt").textContent=n===2&&u==="dia"?"día por medio":n===1?"":(u==="hora"&&!$("rcH").value?"ponele una hora de inicio":""); };
+    $("rcR").addEventListener("change",custom); $("rcNum").addEventListener("input",custom); $("rcU").addEventListener("change",custom); custom();
+    $("rcA").addEventListener("change",hint); $("rcH").addEventListener("change",()=>{ hint(); custom(); }); hint();
     document.getElementById("evModal").classList.add("on"); if(nuevo)$("rcT").focus();
     $("rcNo").addEventListener("click",volver);
     $("rcT").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("rcOk").click(); } });
@@ -3877,7 +3910,10 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       // Se busca de nuevo por id: mientras el formulario estaba abierto pudo llegar tu lista desde otro dispositivo.
       let o=nuevo?null:recPorId(rec.id); if(!nuevo&&!o){ closeEv(); note("Ese recordatorio ya no existe."); return; }
       if(nuevo){ o={id:"rc"+uid(),ts:nowMs(),hecho:false}; recsDe().push(o); }
-      Object.assign(o,{t,fecha:f,hora:h,aviso:$("rcA").value,repite:$("rcR").value,nota:$("rcN").value.trim()});
+      const rep=$("rcR").value, cu=$("rcU").value;
+      if(rep==="custom"&&cu==="hora"&&!h){ note("Para repetir cada tantas horas, poné la hora en que empieza."); return; }
+      Object.assign(o,{t,fecha:f,hora:h,aviso:$("rcA").value,repite:rep,nota:$("rcNota").value.trim()});
+      if(rep==="custom"){ o.cadaN=Math.max(1,Math.min(999,parseInt($("rcNum").value,10)||1)); o.cadaU=cu; } else { delete o.cadaN; delete o.cadaU; }
       const hc=$("rcHecho"); if(hc&&hc.checked!==o.hecho)recTildar(o,hc.checked);
       save(); if(volverADia)volverADia=o.fecha; volver(); renderActive(); });
     const del=$("rcDel"); if(del)del.addEventListener("click",()=>{ const lista=recsDe(), i=lista.findIndex(x=>x.id===rec.id); if(i<0){ closeEv(); return; }

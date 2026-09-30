@@ -1999,3 +1999,45 @@ button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb
 .queop small{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.4}
 /* Los modales viven fuera de #app, que es quien fija la tipografía: sin esto, sus botones salían en la letra por defecto del navegador. */
 .modal .box{font-family:var(--font-ui)}
+
+/* ══ Calendario: filtros por tipo, con su forma y su color ══
+   El evento es el único lleno. La tarea va con borde y un cuadradito; el
+   recordatorio, con fondo suave y una barra al costado; lo de Google, con
+   borde punteado. El color de cada tipo lo elige cada uno. */
+.calhead{flex-wrap:wrap}
+.calfils{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:6px}
+.calfil{position:relative;display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface-2);font-size:11.5px}
+.calfil.off{opacity:.5}
+.calfil.off .cfver{text-decoration:line-through}
+.calfil button{font:inherit;color:var(--ink-soft);background:none;border:none;cursor:pointer}
+.cfcolor{padding:4px 2px 4px 8px;display:inline-flex;align-items:center}
+.cfver{padding:4px 10px 4px 5px}
+.cfver:hover{color:var(--ink)}
+.cfmuestra{display:inline-block;width:13px;height:10px;border-radius:3px;box-sizing:border-box}
+.cfmuestra.ev{background:var(--cc)}
+.cfmuestra.task{border:1.5px solid var(--cc)}
+.cfmuestra.task.estado{border-color:var(--s-curso);border-right-color:var(--s-listo);border-bottom-color:var(--s-espera)}
+.cfmuestra.rec{background:color-mix(in srgb,var(--cc) 25%,transparent);box-shadow:inset 3px 0 0 var(--cc)}
+.cfmuestra.gcal{border:1.5px dashed var(--cc)}
+.cfcolor:hover .cfmuestra{outline:2px solid color-mix(in srgb,var(--cc) 40%,transparent);outline-offset:1px}
+.cfmenu{position:absolute;top:calc(100% + 5px);left:0;z-index:20;display:flex;flex-direction:column;min-width:170px;padding:5px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow-lg)}
+.cfmenu .cfop{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r-sm);font-size:12.5px;color:var(--ink);text-align:left}
+.cfmenu .cfop:hover,.cfmenu .cfop.on{background:var(--surface-2)}
+.cfmenu .cfop.on{font-weight:600}
+.cfsw{width:14px;height:14px;border-radius:50%;flex:none}
+.cfsw.estado{background:conic-gradient(var(--s-curso) 0 33%,var(--s-listo) 0 66%,var(--s-espera) 0)}
+.chipcal.ev{background:var(--c-ev,var(--sky))}
+.chipcal.ev.pasado{background:color-mix(in srgb,var(--c-ev,var(--sky)) 28%,var(--surface-3));color:var(--ink-faint)}
+.chipcal.task{--cc:var(--c-task);background:transparent;color:var(--ink);border:1px solid color-mix(in srgb,var(--cc) 75%,transparent);padding:0 5px 0 15px;position:relative}
+.chipcal.task::before{content:"";position:absolute;left:4px;top:50%;width:6px;height:6px;margin-top:-4px;border:1.5px solid var(--cc);border-radius:2px}
+.chipcal.rec{background:color-mix(in srgb,var(--c-rec,var(--accent-priv)) 22%,transparent);color:var(--ink);box-shadow:inset 3px 0 0 var(--c-rec,var(--accent-priv));border-radius:0 var(--r-xs) var(--r-xs) 0}
+.chipcal.gcal{border-color:color-mix(in srgb,var(--c-g,#4285f4) 70%,var(--line))}
+.diaocultos{font-size:12px;color:var(--ink-faint);margin:6px 0 0}
+.diamarca{box-sizing:border-box}
+/* Repetición personalizada */
+.reccustom[hidden]{display:none}
+.reccada{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.reccada .txt{width:80px}
+.reccada .pick{width:auto}
+.reccadatxt{font-size:12px;color:var(--ink-faint)}
+@media (max-width:640px){ .calfils{margin-left:0;width:100%;order:3} }
