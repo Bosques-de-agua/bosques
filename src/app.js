@@ -337,7 +337,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +(otros.length?`<span class="tavs" title="También a cargo: ${esc(otros.join(", "))}">${otros.map(p=>avatarMarkup(p,"av2",true)).join("")}</span>`:"")
       +`<button class="go" data-ficha="${n.id}" title="Abrir la ficha del tema">↗</button></div>`
       +(abierto&&mias.length?`<div class="temasub">`+mias.map(x=>{ const sr=subRuta(x.node.id,n.id);
-          return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="sdotc" style="background:${cssv(STATUS[x.k.status].v)}" title="${STATUS[x.k.status].l}"></span><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${sr?`<span class="ltema">${esc(sr)}</span>`:""}${cuandoTag(x.k)}${prioTag(x.k)}</div>`; }).join("")+`</div>`:"")
+          return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="sdotc" style="background:${cssv(STATUS[x.k.status].v)}" title="${STATUS[x.k.status].l}"></span><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${sr?`<span class="ltema">${esc(sr)}</span>`:""}${cuandoTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`; }).join("")+`</div>`:"")
       +`</div>`; }
   function temaCard(n){ const ruta=rutaDe(n), c=temaCuentas(n);
     const el=document.createElement("div"); el.className="kcard tcard"; el.style.borderLeftColor=accentOf(n);
@@ -2950,6 +2950,12 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   // La hora, cuando la tiene. Sin hora no se muestra nada: la fecha sola ya
   // vive en el calendario y en la tarjeta.
   function cuandoTag(k){ return k&&k.dueTime?`<span class="lhora" title="${esc(k.due||"")}">${esc(k.dueTime)}</span>`:""; }
+  // Con quién compartís la tarea: las fotos de los otros responsables, o
+  // "Tarea grupal" cuando está todo el equipo. Va justo antes de la prioridad.
+  function compartidaTag(k){ const me=state.me, os=ownersOf(k), otros=os.filter(o=>o&&o!==me); if(!otros.length)return "";
+    const eq=nombresEquipo();
+    if(eq.length>2&&eq.every(p=>os.includes(p)))return `<span class="lcomp lgrupal" title="La llevan todos: ${esc(eq.join(", "))}">Tarea grupal</span>`;
+    return `<span class="lcomp" title="La compartís con ${esc(otros.join(", "))}">${otros.map(o=>avatarMarkup(o,"lav")).join("")}</span>`; }
   function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
     const foco=objFocoGuardar(box); renderMyTasksAdentro(box,me); objFocoReponer(box,foco); }
@@ -2993,7 +2999,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
-      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
+      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${compartidaTag(x.k)}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
     wireLineasTarea(box,me);
     document.getElementById("newPrivBtn").addEventListener("click",()=>openNewTask(true));
     const pfd=document.getElementById("panelFilt"), pfm=pfd.querySelector(".fmenu");
