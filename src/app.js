@@ -9,7 +9,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
 const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
-const PRIV_KEYS=["privTasks","myNotes"];
+const PRIV_KEYS=["privTasks","myNotes","recordatorios"];
 const PREFS_KEY="mesa-bosques-prefs";
 
 function loadLocalPrefs(){
@@ -472,6 +472,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(Array.isArray(ev.para)){ ev.para=[...new Set(ev.para.map(String).filter(Boolean))]; if(!ev.para.length)delete ev.para; } else if(ev.para!=null)delete ev.para; });
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
     normObjetivos(d); normMesa(d); normRocas(d);
+    if(!d.recordatorios||typeof d.recordatorios!=="object"||Array.isArray(d.recordatorios))d.recordatorios={};
     // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
     if(!d._dmpair){ const viejo=d.chat.dm||{}, nuevo={};
       Object.keys(viejo).forEach(k=>{ const arr=viejo[k]||[]; if(k.includes(" ~ ")){ nuevo[k]=(nuevo[k]||[]).concat(arr); return; }
@@ -552,10 +553,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!Array.isArray(v))v=m[quien]=[];
     return v; }
   function myPrivateSlice(){ const me=state.me; if(!me)return null;
-    return { privTasks:(state.privTasks||{})[me]||[], myNotes:notasDe(me) }; }
+    return { privTasks:(state.privTasks||{})[me]||[], myNotes:notasDe(me), recordatorios:recsDe(me) }; }
   function mountPrivate(p){ const me=state.me; if(!me||!p)return;
     state.privTasks=state.privTasks||{}; state.myNotes=state.myNotes||{};
     if(Array.isArray(p.privTasks))state.privTasks[me]=p.privTasks;
+    if(Array.isArray(p.recordatorios)){ state.recordatorios=state.recordatorios||{}; state.recordatorios[me]=normRecs(p.recordatorios); }
     // Se aceptan las dos formas: el texto viejo de una sola nota y la lista
     // nueva. notasDe() convierte lo que haga falta al leerlo.
     if(typeof p.myNotes==="string"||Array.isArray(p.myNotes))state.myNotes[me]=p.myNotes; }
@@ -2785,6 +2787,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +vis.map(o=>`<div class="evrow gcalrow"><div class="evrow-main"><b>${esc(o.g.titulo)}</b><span class="evrow-meta">${o.fin?"del "+esc(fechaLarga(o.ds))+" al "+esc(fechaLarga(o.fin)):esc(fechaLarga(o.ds))}${o.hora?" · "+esc(o.hora):""}</span></div></div>`).join("")
       +(filas.length>vis.length?`<div class="evrow-meta" style="padding-top:6px">y ${filas.length-vis.length} más</div>`:"")+`</div>`; }
   function renderUpcoming(){ const box=document.getElementById("upcoming"); if(!box)return;
+    renderUpcomingEventos(box); if(!state.me)return;
+    box.insertAdjacentHTML("afterbegin",recsPanelHTML(panelView()==="upcoming")); wireRecsPanel(box); }
+  function renderUpcomingEventos(box){
     cargarGoogle();
     const today=ymdLocal(new Date()); const me=state.me; const solaEnPantalla=panelView()==="upcoming";
     // En el Panel completo es un resumen corto; siendo la unica cosa en
@@ -2843,6 +2848,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // fecha sin dueño no aparecía en el calendario de nadie.
     activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
     if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
+    if(me)recsDe(me).forEach(r=>push(r.fecha,{type:"rec",hora:r.hora||"",label:(r.hora?r.hora+" ":"")+r.t,titulo:r.t,rec:r,pasado:r.hecho}));
     eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,titulo:ev.title||"Evento",id:ev.id,ev,pasado:evPasado(ev)}));
     const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,titulo:o.g.titulo,g:o.g,pasado:!o.g.diaEntero&&!!o.g.fin&&nowMs()>=new Date(o.g.fin).getTime()})));
     cargarGoogle();
@@ -2856,7 +2862,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const byDay=calPorDia();
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':''}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':''}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'?`style="background:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       // En el teléfono los chips no entran: un puntito dice que ese día hay algo.
       const hay=chips.length?`<span class="calhay" aria-hidden="true">${chips.length}</span>`:"";
@@ -2866,7 +2872,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     mount.querySelector('[data-cal="next"]').addEventListener("click",()=>{ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(); });
     mount.querySelector('[data-cal="today"]').addEventListener("click",()=>{ const t=new Date(); cal.y=t.getFullYear(); cal.m=t.getMonth(); renderCalendar(); });
     mount.querySelectorAll(".calcell").forEach(cell=>cell.addEventListener("click",e=>{ if(e.target.closest(".chipcal"))return; const ds=cell.dataset.day; if(!ds)return; abrirDia(ds); }));
-    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else if(c.type==="google")verGoogle(c.g,c.hora); else openEvView(c.id); })); }
+    mount.querySelectorAll(".chipcal").forEach(ch=>ch.addEventListener("click",e=>{ e.stopPropagation(); const c=(byDay[ch.dataset.cell]||[])[+ch.dataset.idx]; if(!c)return; if(c.type==="task"){ if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); } else if(c.type==="google")verGoogle(c.g,c.hora); else if(c.type==="rec"){ volverADia=null; recForm(recPorId(c.rec.id)); } else openEvView(c.id); })); }
   // ---------- EL CUADRO DEL DÍA ----------
   // Tocar un día abre todo lo que tiene (en la grilla entran tres cosas y en
   // el teléfono ninguna), los huecos libres de la jornada y el botón de nuevo
@@ -2895,22 +2901,24 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         const mio=(ev.rsvp||{})[me]; meta=(c.pasado?"terminó · ":"")+(mio==="yes"?"vas":mio==="no"?"no vas":puedeResponder(ev)?"sin responder":"no estás invitado")+(esParaTodos(ev)?" · todo el equipo":" · "+invitadosDe(ev).join(", ")); }
       else if(c.type==="task"){ hora=c.hora||"—"; marca="background:"+c.color;
         const n=c.node?N(c.node):null; meta="Tarea · "+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:"")); }
+      else if(c.type==="rec"){ hora=c.hora||"—"; marca="background:var(--accent-priv)"; meta="Recordatorio · solo lo ves vos"+(c.rec.hecho?" · hecho":"")+(c.rec.aviso?" · con aviso":"")+(c.rec.repite?" · "+REC_REPITE[c.rec.repite].toLowerCase():""); }
       else { hora=c.hora||"todo el día"; marca="border:1px dashed #4285f4"; meta="Tu Google Calendar · solo lo ves vos"; }
       return `<div class="diarow${cls}" data-i="${i}"><span class="diahora">${esc(hora)}</span><span class="diamarca" style="${marca}"></span><span class="diacuerpo"><b>${esc(c.titulo||c.label)}</b><span class="diameta">${esc(meta)}</span></span></div>`; };
     const libres=huecosLibres(ds,items);
     const pasoYa=ds<hoy;
     box.innerHTML=`<h2 class="diatit">${esc(mayus(fechaLarga(ds)))}<small>${esc(ds===hoy?"hoy":cuantoFalta(ds))}</small></h2>`
       +(items.length?`<div class="dialista">${items.map(fila).join("")}</div>`:`<p class="diavacio">${pasoYa?"No hubo nada este día.":"No hay nada agendado."}</p>`)
-      +(pasoYa?"":`<div class="dialab">Horarios libres <small>de ${deMin(JORNADA[0])} a ${deMin(JORNADA[1])} · tocá uno para crear el evento ahí</small></div>`
+      +(pasoYa?"":`<div class="dialab">Horarios libres <small>de ${deMin(JORNADA[0])} a ${deMin(JORNADA[1])} · tocá uno para agregar algo a esa hora</small></div>`
         +(libres.length?`<div class="dialibres">${libres.map(([a,b])=>`<button class="dialibre" data-h="${deMin(a)}">${deMin(a)}–${deMin(b)}</button>`).join("")}</div>`:`<p class="diavacio">No quedan huecos de media hora o más.</p>`))
-      +`<div class="row" style="margin-top:14px"><div style="flex:1"></div><button class="btn" id="diaCerrar">Cerrar</button><button class="btn btn-primary" id="diaNuevo">＋ Nuevo evento</button></div>`;
+      +`<div class="row" style="margin-top:14px"><div style="flex:1"></div><button class="btn" id="diaCerrar">Cerrar</button><button class="btn btn-primary" id="diaNuevo">＋ Agregar</button></div>`;
     document.getElementById("evModal").classList.add("on");
     box.querySelector("#diaCerrar").addEventListener("click",closeEv);
-    box.querySelector("#diaNuevo").addEventListener("click",()=>{ volverADia=ds; openEvNew(ds); });
-    box.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>{ volverADia=ds; openEvNew(ds,null,b.dataset.h); }));
+    box.querySelector("#diaNuevo").addEventListener("click",()=>elegirQueAgregar(ds,""));
+    box.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>elegirQueAgregar(ds,b.dataset.h)));
     box.querySelectorAll(".diarow").forEach(r=>r.addEventListener("click",()=>{ const c=items[+r.dataset.i]; if(!c)return;
       if(c.type==="event"){ volverADia=ds; openEvView(c.id); }
       else if(c.type==="task"){ closeEv(); if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); }
+      else if(c.type==="rec"){ volverADia=ds; recForm(recPorId(c.rec.id)); }
       else verGoogle(c.g,c.hora); })); }
   // A qué tema pertenece, al lado del nombre y antes de la prioridad. Va en
   // cursiva y apagado a propósito: tiene que poder ignorarse de un vistazo,
@@ -3202,7 +3210,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     document.getElementById("ntNode").innerHTML=nodeOptionsHTML(preT);
     const preP=(f.people.length===1&&f.people[0]!=="__none")?f.people[0]:(state.me||"");
     ntOwnersArr=preP?[preP]:[]; renderNtOwners();
-    document.getElementById("ntDue").value=""; document.getElementById("ntDueTime").value="";
+    document.getElementById("ntDue").value=o.due||""; document.getElementById("ntDueTime").value=o.dueTime||"";
     document.getElementById("ntStatus").innerHTML=STORD.filter(s=>s!=="listo").map(s=>`<option value="${s}"${s==="sin"?" selected":""}>${STATUS[s].l}</option>`).join("");
     document.getElementById("ntPrio").innerHTML=`<option value="" selected>— sin prioridad —</option>`+PRORD.map(v=>`<option value="${v}">${PRIO[v].l}</option>`).join("");
     ntModal.classList.add("on"); setTimeout(()=>document.getElementById("ntTitle").focus(),40); }
@@ -3785,6 +3793,97 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         ofrecerDeshacer(`Se eliminó <b>${esc(o.titulo||"el objetivo")}</b>`,()=>{ (meta?state.rocas.metas:state.rocas.items).splice(i,0,o); hijos.forEach(h=>{ const x=state.rocas.items.find(y=>y.id===h.id); if(x)x.meta=o.id; }); }); },
         {title:meta?"Eliminar objetivo del año":"Eliminar roca",yes:"Eliminar",danger:true}); }); }
 
+  // ---------- RECORDATORIOS ----------
+  // No todo lo que va al calendario es un evento. Un recordatorio es tuyo y de
+  // nadie más (vive en tu tabla privada, como las notas): un texto con fecha,
+  // hora opcional y, si querés, un aviso al celular. Se tilda cuando está
+  // hecho; si se repite, al tildarlo pasa solo a la próxima vez.
+  // El aviso lo manda la función `recordatorios` de Supabase, que un cron
+  // llama cada 5 minutos: la app solo guarda cuándo querés que te avise.
+  const REC_AVISOS=[["","No avisarme"],["0","A la hora"],["10","10 minutos antes"],["60","1 hora antes"],["1440","1 día antes"]];
+  const REC_REPITE={"":"No se repite",dia:"Todos los días",semana:"Cada semana",mes:"Cada mes",anio:"Cada año"};
+  const REC_HORA_SIN="09:00";   // un recordatorio sin hora avisa a las 9
+  function recsDe(quien){ const m=state.recordatorios||(state.recordatorios={}); const w=quien||state.me; if(!w)return [];
+    if(!Array.isArray(m[w]))m[w]=[];
+    // Los hechos hace más de dos meses ya no sirven ni de historial.
+    const viejo=nowMs()-60*DAY; if(m[w].some(r=>r&&r.hecho&&r.hechoTs&&r.hechoTs<viejo))m[w]=m[w].filter(r=>!(r&&r.hecho&&r.hechoTs&&r.hechoTs<viejo));
+    return m[w]; }
+  function normRecs(lista){ return (Array.isArray(lista)?lista:[]).filter(r=>r&&typeof r.id==="string"&&typeof r.t==="string").map(r=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(r.fecha||""))r.fecha=ymdLocal(new Date()); if(!HORA_RE.test(r.hora||""))r.hora="";
+    if(!REC_AVISOS.some(a=>a[0]===r.aviso))r.aviso=""; if(!(r.repite in REC_REPITE))r.repite=""; r.hecho=!!r.hecho; if(typeof r.nota!=="string")r.nota=""; return r; }); }
+  const recPorId=id=>recsDe().find(r=>r.id===id)||null;
+  function recSiguiente(r){ const [y,m,d]=r.fecha.split("-").map(Number);
+    const f=r.repite==="dia"?new Date(y,m-1,d+1):r.repite==="semana"?new Date(y,m-1,d+7):r.repite==="mes"?new Date(y,m,d):new Date(y+1,m-1,d); return ymdLocal(f); }
+  // Tildar: uno que se repite no se cierra, pasa a su próxima fecha.
+  function recTildar(r,hecho){ if(hecho&&r.repite){ const hoy=ymdLocal(new Date()); r.fecha=recSiguiente(r); while(r.fecha<hoy)r.fecha=recSiguiente(r); return; }
+    r.hecho=hecho; if(hecho)r.hechoTs=nowMs(); else delete r.hechoTs; }
+  function recCuando(r){ const hoy=ymdLocal(new Date()), man=ymdLocal(new Date(nowMs()+DAY)), ayer=ymdLocal(new Date(nowMs()-DAY));
+    const dia=r.fecha===hoy?"hoy":r.fecha===man?"mañana":r.fecha===ayer?"ayer":(d=>["dom","lun","mar","mié","jue","vie","sáb"][d.getDay()]+" "+d.getDate()+"/"+(d.getMonth()+1))(aFecha(r.fecha));
+    return dia+(r.hora?" "+r.hora:""); }
+  const recVencido=r=>{ const hoy=ymdLocal(new Date()); if(r.hecho)return false; if(r.fecha<hoy)return true; if(r.fecha>hoy||!r.hora)return false; const t=new Date(); return aMin(r.hora)<t.getHours()*60+t.getMinutes(); };
+  const ICO_CAMPANA=`<svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3a4 4 0 0 0-4 4c0 3.5-1.2 4.6-1.6 5a.5.5 0 0 0 .3.9h10.6a.5.5 0 0 0 .3-.9c-.4-.4-1.6-1.5-1.6-5a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.4 15.5a1.8 1.8 0 0 0 3.2 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  // La tarjeta del Panel: lo pendiente de hoy para atrás y de la semana que viene.
+  function recsPanelHTML(todo){ const me=state.me; if(!me)return "";
+    const hasta=ymdLocal(new Date(nowMs()+(todo?3650:7)*DAY));
+    const lista=recsDe().filter(r=>!r.hecho&&r.fecha<=hasta).sort((a,b)=>(a.fecha+(a.hora||"99")).localeCompare(b.fecha+(b.hora||"99")));
+    const mas=recsDe().filter(r=>!r.hecho&&r.fecha>hasta).length;
+    return `<div class="card reccard" id="recCard"><div class="rechead"><span class="lab">${ICO_CAMPANA} Tus recordatorios <span class="recsolo">solo los ves vos</span></span><button class="rowbtn" data-recnuevo>＋ recordatorio</button></div>`
+      +(lista.length?lista.map(r=>`<div class="recrow${recVencido(r)?" venc":""}" data-rec="${esc(r.id)}"><input type="checkbox" class="lchk" data-rechecho title="${r.repite?"Hecho: pasa a la próxima vez":"Hecho"}"><span class="rect">${esc(r.t)}</span>${r.repite?`<span class="recrep" title="${esc(REC_REPITE[r.repite])}">↻</span>`:""}${r.aviso?`<span class="recav" title="Te avisa: ${esc((REC_AVISOS.find(a=>a[0]===r.aviso)||[])[1]||"").toLowerCase()}">${ICO_CAMPANA}</span>`:""}<span class="reccu">${esc(recCuando(r))}</span></div>`).join("")
+        :`<div class="recvacio">Nada pendiente${todo?"":" para los próximos 7 días"}.</div>`)
+      +(mas?`<div class="recmas">Y ${plural(mas,"más adelante","más adelante")}: están en el calendario.</div>`:"")+`</div>`; }
+  function wireRecsPanel(box){ const c=box.querySelector("#recCard"); if(!c)return;
+    c.addEventListener("click",e=>{ if(e.target.closest("[data-recnuevo]")){ recForm(null,ymdLocal(new Date())); return; }
+      if(e.target.closest("[data-rechecho]"))return; const r=e.target.closest("[data-rec]"); if(r)recForm(recPorId(r.dataset.rec)); });
+    c.addEventListener("change",e=>{ const cb=e.target.closest("[data-rechecho]"); if(!cb)return; const r=recPorId(cb.closest("[data-rec]").dataset.rec); if(!r)return;
+      const antes={fecha:r.fecha,hecho:r.hecho}; recTildar(r,true); save(); renderPanel();
+      ofrecerDeshacer(`Hecho: <b>${esc(r.t)}</b>${r.repite?" · pasa al "+esc(recCuando(r)):""}`,()=>{ const x=recPorId(r.id); if(x){ x.fecha=antes.fecha; x.hecho=antes.hecho; delete x.hechoTs; } }); }); }
+  // Qué se agrega al calendario: no todo es un evento.
+  function elegirQueAgregar(ds,hora){ const box=document.getElementById("evBox"); const hoy=ymdLocal(new Date());
+    box.innerHTML=`<h2 class="diatit">Agregar al ${esc(fechaLarga(ds))}<small>${esc(hora?"a las "+hora:ds===hoy?"hoy":cuantoFalta(ds))}</small></h2>
+      <div class="queagregar">
+        <button class="queop" data-que="evento"><span class="qico" style="color:var(--sky)">${ICO.calendario}</span><span><b>Evento</b><small>Una reunión o actividad con gente del equipo. Se avisa por el chat y cada uno responde si va.</small></span></button>
+        <button class="queop" data-que="rec"><span class="qico" style="color:var(--accent-priv)">${ICO_CAMPANA}</span><span><b>Recordatorio</b><small>Solo para vos: algo que no te querés olvidar, con aviso al celular si querés.</small></span></button>
+        <button class="queop" data-que="tarea"><span class="qico" style="color:var(--s-curso)"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.8 10.2l2.2 2.2 4.2-4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Tarea</b><small>Algo para hacer, con esta fecha de vencimiento. Va a un tema, o es privada.</small></span></button>
+      </div>
+      <div class="row" style="margin-top:14px"><div style="flex:1"></div><button class="btn" id="queVolver">Volver</button></div>`;
+    document.getElementById("evModal").classList.add("on");
+    box.querySelector("#queVolver").addEventListener("click",()=>abrirDia(ds));
+    box.querySelectorAll("[data-que]").forEach(b=>b.addEventListener("click",()=>{ const q=b.dataset.que;
+      if(q==="evento"){ volverADia=ds; openEvNew(ds,null,hora||""); }
+      else if(q==="rec"){ volverADia=ds; recForm(null,ds,hora||""); }
+      else { closeEv(); openNewTask({due:ds,dueTime:hora||""}); } })); }
+  function recForm(rec,ds,hora){ const box=document.getElementById("evBox"); const nuevo=!rec;
+    if(!state.me){ note("No pudimos identificarte para guardar un recordatorio."); return; }
+    const r=rec||{t:"",fecha:ds||ymdLocal(new Date()),hora:hora||"",aviso:"0",repite:"",nota:"",hecho:false};
+    const volver=()=>{ if(volverADia)abrirDia(volverADia); else closeEv(); };
+    box.innerHTML=`<h2>${nuevo?"Nuevo recordatorio":"Recordatorio"}</h2><p class="recintro">Solo lo ves vos.</p>
+      <div class="pctl"><div class="c" style="flex:1 1 100%"><label>¿Qué no te querés olvidar?</label><input class="txt" id="rcT" autocapitalize="sentences" autocorrect="on" placeholder="Ej: llamar al escribano" value="${esc(r.t)}"></div></div>
+      <div class="pctl"><div class="c"><label>Fecha</label><input type="date" class="txt" id="rcF" value="${esc(r.fecha)}"></div><div class="c"><label>Hora <small>opcional</small></label><input type="time" class="txt" id="rcH" value="${esc(r.hora)}"></div></div>
+      <div class="pctl"><div class="c"><label>Avisarme al celular</label><select class="pick" id="rcA">${REC_AVISOS.map(a=>`<option value="${a[0]}"${a[0]===r.aviso?" selected":""}>${a[1]}</option>`).join("")}</select></div><div class="c"><label>Se repite</label><select class="pick" id="rcR">${Object.keys(REC_REPITE).map(k=>`<option value="${k}"${k===r.repite?" selected":""}>${REC_REPITE[k]}</option>`).join("")}</select></div></div>
+      <div class="rechint" id="rcHint"></div>
+      <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Nota <small>opcional</small></label><textarea class="txt" id="rcN" rows="2" autocapitalize="sentences" autocorrect="on" placeholder="Un teléfono, un link, un detalle…">${esc(r.nota)}</textarea></div></div>
+      ${nuevo?"":`<label class="rechecho"><input type="checkbox" id="rcHecho"${r.hecho?" checked":""}> Hecho${r.repite?" (pasa a la próxima vez)":""}</label>`}
+      <div class="row">${nuevo?"":`<button class="btn danger" id="rcDel">Eliminar</button>`}<div style="flex:1"></div><button class="btn" id="rcNo">Cancelar</button><button class="btn btn-primary" id="rcOk">${nuevo?"Guardar":"Guardar cambios"}</button></div>`;
+    const $=id=>box.querySelector("#"+id);
+    const hint=()=>{ const a=$("rcA").value, h=$("rcH").value;
+      $("rcHint").textContent=!a?"":(h?"":`Sin hora, se toma las ${REC_HORA_SIN}. `)+"El aviso llega a los dispositivos donde activaste las notificaciones (Configuración → Avisos), con hasta 5 minutos de demora."; };
+    $("rcA").addEventListener("change",hint); $("rcH").addEventListener("change",hint); hint();
+    document.getElementById("evModal").classList.add("on"); if(nuevo)$("rcT").focus();
+    $("rcNo").addEventListener("click",volver);
+    $("rcT").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("rcOk").click(); } });
+    $("rcOk").addEventListener("click",()=>{ const t=$("rcT").value.trim(); if(!t){ note("Escribí qué querés recordar."); return; }
+      const f=$("rcF").value; if(!/^\d{4}-\d{2}-\d{2}$/.test(f)){ note("Elegí una fecha."); return; }
+      const h=HORA_RE.test($("rcH").value)?$("rcH").value:"";
+      // Se busca de nuevo por id: mientras el formulario estaba abierto pudo llegar tu lista desde otro dispositivo.
+      let o=nuevo?null:recPorId(rec.id); if(!nuevo&&!o){ closeEv(); note("Ese recordatorio ya no existe."); return; }
+      if(nuevo){ o={id:"rc"+uid(),ts:nowMs(),hecho:false}; recsDe().push(o); }
+      Object.assign(o,{t,fecha:f,hora:h,aviso:$("rcA").value,repite:$("rcR").value,nota:$("rcN").value.trim()});
+      const hc=$("rcHecho"); if(hc&&hc.checked!==o.hecho)recTildar(o,hc.checked);
+      save(); if(volverADia)volverADia=o.fecha; volver(); renderActive(); });
+    const del=$("rcDel"); if(del)del.addEventListener("click",()=>{ const lista=recsDe(), i=lista.findIndex(x=>x.id===rec.id); if(i<0){ closeEv(); return; }
+      const [x]=lista.splice(i,1); save(); volver(); renderActive();
+      ofrecerDeshacer(`Se eliminó el recordatorio <b>${esc(x.t)}</b>`,()=>{ recsDe().splice(Math.min(i,recsDe().length),0,x); }); }); }
+
   fPerson.addEventListener("change",renderActive);
   objWire(document.getElementById("objBoard")); objWire(document.getElementById("myTasks"));
   document.getElementById("sendMsg").addEventListener("click",sendMsg);
@@ -3955,6 +4054,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(q.get("vista")==="semana"){ state.tareasVista="semana"; showTab("tareas"); history.replaceState(null,"",window.location.pathname); }
     // El aviso de "se actualizó un documento" abre ese documento.
     const doc=q.get("doc"); if(doc&&/^[a-z0-9-]+$/.test(doc)&&document.getElementById("tab-"+doc)){ showTab(doc); history.replaceState(null,"",window.location.pathname); } }catch(e){}
+  try{ const q=new URLSearchParams(window.location.search); const rid=q.get("rec");
+    if(rid){ history.replaceState(null,"",window.location.pathname); showTab("panel"); const r=recPorId(rid); if(r){ volverADia=null; recForm(r); } } }catch(e){}
   try{ const q=new URLSearchParams(window.location.search); const tid=q.get("tarea");
     if(tid){ const hit=allItems().find(x=>x.k.id===tid);
       if(hit){ showTab("tareas"); setTimeout(()=>openTask(hit.node.id,hit.k.id),60); }

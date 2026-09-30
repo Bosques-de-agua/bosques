@@ -1967,3 +1967,35 @@ textarea.txt.autoalto{min-height:34px;overflow-y:auto}
 /* El número del cuadrito es el botón que prende sus rocas */
 button.rmn{border:none;padding:0;cursor:pointer;font-family:var(--font-mono);font-weight:700;transition:box-shadow .12s}
 button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb,var(--pc) 35%,transparent)}
+
+/* ══ Recordatorios: tuyos, con su color de "privado" ══ */
+.chipcal.rec{background:color-mix(in srgb,var(--accent-priv) 24%,transparent);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent-priv)}
+.chipcal.rec.pasado{text-decoration:line-through;opacity:.6}
+.reccard{border-left:3px solid var(--accent-priv);margin-bottom:14px}
+.rechead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.rechead .lab{display:flex;align-items:center;gap:6px}
+.rechead .ico{width:14px;height:14px}
+.recsolo{text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)}
+.recrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid var(--line-soft);cursor:pointer;font-size:13.5px}
+.recrow .rect{flex:1;min-width:0;color:var(--ink);overflow-wrap:anywhere}
+.recrow:hover .rect{color:var(--wood-deep)}
+.recrow .reccu{flex:none;font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+.recrow.venc .reccu{color:#b0452d;font-weight:600}
+[data-theme="dark"] .recrow.venc .reccu{color:#ff9c85}
+.recrow .recav .ico{width:13px;height:13px;color:var(--ink-faint);vertical-align:-2px}
+.recrow .recrep{color:var(--ink-faint);font-size:12px}
+.recvacio,.recmas{font-size:12.5px;color:var(--ink-faint);padding:5px 0 2px}
+.recintro{margin:-4px 0 10px;font-size:12.5px;color:var(--ink-faint)}
+.rechint{font-size:11.5px;color:var(--ink-faint);margin:-2px 0 8px}
+.rechint:empty{display:none}
+.rechecho{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);margin:4px 0 2px;cursor:pointer}
+/* Elegir qué se agrega al calendario */
+.queagregar{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.queop{display:flex;align-items:flex-start;gap:12px;text-align:left;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;cursor:pointer}
+.queop:hover{border-color:var(--wood)}
+.queop .qico{flex:none;margin-top:1px}
+.queop .qico .ico{width:20px;height:20px}
+.queop b{display:block;font-size:14px;font-weight:600}
+.queop small{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.4}
+/* Los modales viven fuera de #app, que es quien fija la tipografía: sin esto, sus botones salían en la letra por defecto del navegador. */
+.modal .box{font-family:var(--font-ui)}
