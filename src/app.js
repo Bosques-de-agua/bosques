@@ -9,7 +9,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
 const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista","calVer","calColor"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
-const PRIV_KEYS=["privTasks","myNotes","recordatorios"];
+const PRIV_KEYS=["privTasks","myNotes","recordatorios","misEtiquetas"];
 const PREFS_KEY="mesa-bosques-prefs";
 
 function loadLocalPrefs(){
@@ -473,6 +473,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!d.privTasks||typeof d.privTasks!=="object")d.privTasks={};
     normObjetivos(d); normMesa(d); normRocas(d);
     if(!d.recordatorios||typeof d.recordatorios!=="object"||Array.isArray(d.recordatorios))d.recordatorios={};
+    if(!d.misEtiquetas||typeof d.misEtiquetas!=="object"||Array.isArray(d.misEtiquetas))d.misEtiquetas={};
     // DM viejos: la clave era una sola persona, así el mensaje no llegaba a destino. Se reparte por remitente al par correcto.
     if(!d._dmpair){ const viejo=d.chat.dm||{}, nuevo={};
       Object.keys(viejo).forEach(k=>{ const arr=viejo[k]||[]; if(k.includes(" ~ ")){ nuevo[k]=(nuevo[k]||[]).concat(arr); return; }
@@ -538,7 +539,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(panelOpen&&N(selId))renderPanelBody(N(selId));
     if(rocSel){ if(!rocItem(rocSel)){ rocOcultar(); scrim.classList.remove("on"); } else syncRoca(false); }
     if(mesaSel){ if(!mesaItem(mesaSel)){ mesaOcultar(); scrim.classList.remove("on"); } else syncMesaDrawer(false); }
-    if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); syncTaskDone(curTask()); }
+    if(taskOpen&&curTask()){ renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); renderTEtiq(); syncTaskDone(curTask()); }
     loadTreeOpen(); sweepArchive(); syncPeopleList(); refreshChrome(); renderActive();
   }
   // Mi porción privada: es lo único que sube a la tabla con permisos.
@@ -553,10 +554,11 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!Array.isArray(v))v=m[quien]=[];
     return v; }
   function myPrivateSlice(){ const me=state.me; if(!me)return null;
-    return { privTasks:(state.privTasks||{})[me]||[], myNotes:notasDe(me), recordatorios:recsDe(me) }; }
+    return { privTasks:(state.privTasks||{})[me]||[], myNotes:notasDe(me), recordatorios:recsDe(me), misEtiquetas:etiqLista(me) }; }
   function mountPrivate(p){ const me=state.me; if(!me||!p)return;
     state.privTasks=state.privTasks||{}; state.myNotes=state.myNotes||{};
     if(Array.isArray(p.privTasks))state.privTasks[me]=p.privTasks;
+    if(Array.isArray(p.misEtiquetas)){ state.misEtiquetas=state.misEtiquetas||{}; state.misEtiquetas[me]=p.misEtiquetas.filter(x=>x&&typeof x.id==="string"&&Array.isArray(x.tags)).map(x=>({id:x.id,tags:[...new Set(x.tags.map(t=>String(t).trim()).filter(Boolean))]})).filter(x=>x.tags.length); }
     if(Array.isArray(p.recordatorios)){ state.recordatorios=state.recordatorios||{}; state.recordatorios[me]=normRecs(p.recordatorios); }
     // Se aceptan las dos formas: el texto viejo de una sola nota y la lista
     // nueva. notasDe() convierte lo que haga falta al leerlo.
@@ -2998,8 +3000,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       wireSemana(box,()=>{ renderPanel(); refreshChrome(); }); wireFocoSeg(); return; }
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
-        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
-      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${compartidaTag(x.k)}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'));
+        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${etiqTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
+      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${etiqTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'))
+      +focoEtiquetasHTML(me,pasa,seenSet);
     wireLineasTarea(box,me);
     document.getElementById("newPrivBtn").addEventListener("click",()=>openNewTask(true));
     const pfd=document.getElementById("panelFilt"), pfm=pfd.querySelector(".fmenu");
@@ -3010,6 +3013,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
     const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); });
     wireFocoSeg(); }
+  // Un grupo por cada etiqueta tuya, con todas sus tareas juntas (tuyas o no,
+  // de un tema o privadas), aunque sigan también en su grupo de estado.
+  function focoEtiquetasHTML(me,pasa,seenSet){ const lista=etiqLista(me); if(!lista.length)return "";
+    const equipo=new Map(activeItems().map(x=>[x.k.id,x])), privs=new Map(privL(me).filter(k=>!k.archived).map(k=>[k.id,k]));
+    return etiqTodas().map(t=>{ const ids=lista.filter(e=>e.tags.includes(t)).map(e=>e.id);
+      const filas=ids.map(id=>{ const x=equipo.get(id); if(x&&pasa(x.k))return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}<span class="lest" style="--sc:${cssv(STATUS[x.k.status].v)}" title="${esc(STATUS[x.k.status].l)}"></span>${compartidaTag(x.k)}${prioTag(x.k)}</div>`;
+        const k=privs.get(id); if(k&&pasa(k))return `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span><span class="ltema">privada</span>${cuandoTag(k)}${prioTag(k)}</div>`;
+        return ""; }).filter(Boolean);
+      if(!filas.length)return "";
+      return `<div class="card focoetiq" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span class="etiqmarca"></span>${esc(t)} · ${filas.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— tu etiqueta, solo la ves vos</span></div>${filas.join("")}</div>`; }).join(""); }
   // Los renglones de tarea son los mismos en las dos pestañas de Tu foco: en
   // la lista por estado y adentro de un tema abierto.
   function wireLineasTarea(box,me){
@@ -3091,7 +3104,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k); document.getElementById("tRepite").value=REPITE[k.repite]?k.repite:"";
     avEdit=null; const avIn=document.getElementById("tAvInput"); if(avIn){ avIn.value=""; }
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
-    renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances();
+    renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); renderTEtiq();
     taskDrawer.classList.add("on"); requestAnimationFrame(()=>{ autoAlto(tObj); autoAlto(tNotas); autoAlto(document.getElementById("tAvInput")); }); scrim.classList.add("on"); taskDrawer.setAttribute("aria-hidden","false"); }
   function closeTask(){ taskOpen=false; taskDrawer.classList.remove("on"); scrim.classList.remove("on"); taskDrawer.setAttribute("aria-hidden","true"); if(active==="panel")renderPanel(); }
   function syncTaskDone(k){ const cb=document.getElementById("tDoneChk"); if(cb)cb.checked=!!k.done; syncEspera(k);
@@ -3818,6 +3831,28 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         lista.splice(i,1); hijos.forEach(x=>{ x.meta=""; }); rocOcultar(); scrim.classList.remove("on"); save(); renderActive();
         ofrecerDeshacer(`Se eliminó <b>${esc(o.titulo||"el objetivo")}</b>`,()=>{ (meta?state.rocas.metas:state.rocas.items).splice(i,0,o); hijos.forEach(h=>{ const x=state.rocas.items.find(y=>y.id===h.id); if(x)x.meta=o.id; }); }); },
         {title:meta?"Eliminar objetivo del año":"Eliminar roca",yes:"Eliminar",danger:true}); }); }
+
+  // ---------- ETIQUETAS PERSONALES ----------
+  // Una marca tuya sobre cualquier tarea ("campo", "Pampa de Achala"…), que
+  // no cambia nada para el resto: vive en tu parte privada, como tus notas.
+  // No es un estado —el estado es del equipo—: la tarea sigue en su lugar, y
+  // además aparece junta con las otras de la misma etiqueta en Mi foco.
+  // Se guarda como lista {id de la tarea, etiquetas} para que la mezcla entre
+  // dispositivos funcione igual que con el resto de lo privado.
+  const ETIQ_SUGERIDAS=["Campo"];
+  function etiqLista(quien){ const m=state.misEtiquetas||(state.misEtiquetas={}); const w=quien||state.me; if(!w)return [];
+    if(!Array.isArray(m[w]))m[w]=[]; return m[w]; }
+  const etiqDe=taskId=>{ const x=etiqLista().find(e=>e.id===taskId); return x?x.tags:[]; };
+  function etiqTodas(){ const s=new Set(ETIQ_SUGERIDAS); etiqLista().forEach(e=>e.tags.forEach(t=>s.add(t))); return [...s].sort((a,b)=>(a==="Campo"?-1:b==="Campo"?1:a.localeCompare(b))); }
+  function etiqPoner(taskId,tag,on){ const l=etiqLista(); let x=l.find(e=>e.id===taskId);
+    if(on){ if(!x){ x={id:taskId,tags:[]}; l.push(x); } if(!x.tags.includes(tag))x.tags.push(tag); }
+    else if(x){ x.tags=x.tags.filter(t=>t!==tag); if(!x.tags.length)l.splice(l.indexOf(x),1); } }
+  const etiqTag=k=>etiqDe(k.id).map(t=>`<span class="letiq" title="Tu etiqueta · solo la ves vos">${esc(t)}</span>`).join("");
+  function renderTEtiq(){ const box=document.getElementById("tEtiq"), k=curTask(); if(!box||!k)return; const mias=etiqDe(k.id);
+    box.innerHTML=etiqTodas().map(t=>`<button type="button" class="etiqop${mias.includes(t)?" on":""}" data-etiq="${esc(t)}" aria-pressed="${mias.includes(t)}">${mias.includes(t)?"✓ ":""}${esc(t)}</button>`).join("")+`<button type="button" class="etiqop nueva" data-etiqnueva>＋ etiqueta</button>`; }
+  { const box=document.getElementById("tEtiq"); if(box)box.addEventListener("click",e=>{ const k=curTask(); if(!k)return;
+    if(e.target.closest("[data-etiqnueva]")){ pedirTexto("Nueva etiqueta","Ej: Pampa de Achala",t=>{ const v=t.trim().slice(0,40); if(!v)return; const ya=etiqTodas().find(x=>norm(x)===norm(v))||v; etiqPoner(k.id,ya,true); save(); renderTEtiq(); renderActive(); }); return; }
+    const b=e.target.closest("[data-etiq]"); if(!b)return; const t=b.dataset.etiq; etiqPoner(k.id,t,!etiqDe(k.id).includes(t)); save(); renderTEtiq(); renderActive(); }); }
 
   // ---------- RECORDATORIOS ----------
   // No todo lo que va al calendario es un evento. Un recordatorio es tuyo y de

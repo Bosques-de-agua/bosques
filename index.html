@@ -103,6 +103,7 @@
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
         <li>Arriba de todo en tu foco, <b>tus objetivos de la semana</b>: los tildás o sumás desde ahí, y abajo, plegados, los generales del equipo. <b>Ver todos</b> te lleva a los de todo el equipo, en Tareas.</li>
         <li><b>Tu foco</b> tiene tres pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas); <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama; y <b>Tu semana</b>, la revisión de la pestaña Tareas pero solo con lo tuyo: tus tareas completadas (con un botón para archivarlas todas juntas), lo vencido, lo que vence y lo que no se mueve.</li>
+        <li><b>Tus etiquetas</b>: en la ficha de cualquier tarea podés marcarla con una etiqueta tuya (por ejemplo <b>Campo</b>, o una que crees vos). Nadie más la ve. Acá, abajo de los estados, aparece un grupo por etiqueta con todas esas tareas juntas.</li>
         <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
         <li>Pasando el mouse por una tarea ves su <b>último avance</b>.</li>
@@ -290,6 +291,7 @@
     <hr class="tsep">
     <div class="sec" id="tPrivSec"><div id="tPrivBox"></div></div>
     <div class="sec"><div class="sh"><h3>Pertenece a</h3></div><div id="tBelong"></div></div>
+    <div class="sec"><div class="sh"><h3>Tus etiquetas <small class="etiqsolo">solo las ves vos</small></h3></div><div id="tEtiq" class="etiqs"></div></div>
     <div class="sec"><div class="sh"><h3>Archivos vinculados</h3><button class="mini-add" id="tAddFile">＋ archivo de Drive</button></div><div id="tFiles"></div></div>
   </div>
   <div class="pfoot" style="display:flex;align-items:center;gap:8px"><button class="btn" id="tArch"><svg class="ico" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="13" height="3.4" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5 7.4v7.1A1.5 1.5 0 0 0 6.5 16h7a1.5 1.5 0 0 0 1.5-1.5V7.4" stroke="currentColor" stroke-width="1.4"/><path d="M8.4 10.4h3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg> Archivar</button><div style="flex:1"></div><button class="btn danger" id="tDel">Eliminar</button></div>
