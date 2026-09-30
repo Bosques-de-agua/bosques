@@ -1,7 +1,7 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
 import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
-import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, hayPrivadoSinGuardar } from "./private.js";
+import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { cargarResumenes } from "./resumen.js";
@@ -165,6 +165,7 @@ async function launchApp(session) {
   // El testigo de guardado: la app avisa en pantalla si algo no llegó a la base.
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err, "privado"));
+  setPrivateMergedHandler((mezcla) => app.applyPrivateState(mezcla));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 
   // Quién tiene la app abierta ahora, para el punto verde del chat. Va por el

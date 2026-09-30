@@ -12,7 +12,7 @@
 // Están para que no vuelva.
 import { supabase } from "./supabaseClient.js";
 import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
-import { pushPrivateState, setPrivateSaveStateHandler } from "./private.js";
+import { pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, mezclarPrivado, fetchPrivateState } from "./private.js";
 
 const salida = document.getElementById("salida");
 let fallaron = 0;
@@ -37,6 +37,15 @@ supabase.from = (tabla) => ({
   },
 });
 
+// Para probar la mezcla entre dispositivos: una base que además se deja leer.
+function supabaseConLectura(leer) {
+  supabase.from = (tabla) => ({
+    upsert: async (fila) => { const error = responder(fila); escrituras.push({ tabla, data: fila.data, ok: !error }); return { error }; },
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: leer(), error: null }) }) }),
+  });
+}
+const fromSinLectura = supabase.from;
+function supabaseSinLectura() { supabase.from = fromSinLectura; }
 const soloOk = () => escrituras.filter((e) => e.ok);
 function reiniciar() { escrituras = []; responder = () => null; }
 
@@ -150,6 +159,43 @@ const rec = soloOk()[soloOk().length - 1];
 afirmar(rec && rec.data.v === "PERDIDO", "y lo que entra es EXACTAMENTE lo que se había perdido",
   "entró: " + JSON.stringify(rec && rec.data));
 afirmar(hayCambiosSinGuardar() === false, "una vez guardado, deja de contar como pendiente");
+
+// -----------------------------------------------------------------------
+// Dos dispositivos con la app abierta: la copia vieja de uno no puede pisar
+// lo que se anotó en el otro. La falla real: un recordatorio creado en un
+// dispositivo desapareció a los 90 segundos, cuando el otro guardó lo suyo.
+// -----------------------------------------------------------------------
+linea("\n6. Lo privado se mezcla entre dispositivos, no se pisa");
+{
+  const r = (id, t) => ({ id, t });
+  const b = { recordatorios: [r("a", "viejo"), r("b", "se borra allá"), r("c", "se borra acá")], myNotes: [] };
+  const local = { recordatorios: [r("a", "viejo"), r("b", "se borra allá"), r("d", "nuevo de acá")], myNotes: [{ id: "n1", text: "nota de acá" }] };
+  const remoto = { recordatorios: [r("a", "cambiado allá"), r("c", "se borra acá"), r("e", "nuevo de allá")], myNotes: [] };
+  const m = mezclarPrivado(b, local, remoto);
+  const ids = m.recordatorios.map((x) => x.id).sort().join("");
+  afirmar(ids === "ade", "entran lo nuevo de acá y lo nuevo de allá; lo borrado en cualquiera de los dos no vuelve", "quedaron: " + ids);
+  afirmar(m.recordatorios.find((x) => x.id === "a").t === "cambiado allá", "lo que solo cambió allá, queda como allá");
+  afirmar(m.myNotes.length === 1, "la nota escrita acá no se pierde");
+  const choque = mezclarPrivado({ recordatorios: [r("a", "base")] }, { recordatorios: [r("a", "acá")] }, { recordatorios: [r("a", "allá")] });
+  afirmar(choque.recordatorios[0].t === "acá", "si los dos tocaron lo mismo, gana lo que se está guardando ahora");
+
+  // De punta a punta: se leyó la fila, otro dispositivo escribió, y recién ahí guarda este.
+  reiniciar();
+  let fila = { data: { recordatorios: [r("a", "viejo")] }, updated_at: "2026-09-30T16:00:00.000+00:00" };
+  supabaseConLectura(() => fila);
+  await fetchPrivateState("yo@ejemplo.org");
+  fila = { data: { recordatorios: [r("a", "viejo"), r("x", "creado en el celular")] }, updated_at: "2026-09-30T16:05:00.000+00:00" };
+  let avisado = null;
+  setPrivateMergedHandler((d) => { avisado = d; });
+  pushPrivateState("yo@ejemplo.org", { recordatorios: [r("a", "viejo"), r("y", "creado en la compu")] });
+  await esperar(900);
+  const ult = soloOk()[soloOk().length - 1];
+  const guardados = ult ? ult.data.recordatorios.map((x) => x.id).sort().join("") : "";
+  afirmar(guardados === "axy", "al guardar desde la compu, el recordatorio del celular sigue ahí", "se guardó: " + guardados);
+  afirmar(!!avisado && avisado.recordatorios.length === 3, "y la pantalla se entera de lo que vino del otro dispositivo");
+  setPrivateMergedHandler(null);
+  supabaseSinLectura();
+}
 
 // =======================================================================
 setSaveStateHandler(null);

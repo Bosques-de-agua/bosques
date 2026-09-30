@@ -9,7 +9,7 @@ import { TablaFaltante } from "./team.js";
 export async function fetchPrivateState(email) {
   const { data, error } = await supabase
     .from("user_private")
-    .select("data")
+    .select("data,updated_at")
     .eq("email", email)
     .maybeSingle();
   if (error) {
@@ -24,7 +24,53 @@ export async function fetchPrivateState(email) {
     }
     throw error;
   }
+  // Lo que se acaba de leer es el punto de partida para mezclar más tarde.
+  base = data ? copia(data.data) : null;
+  visto = data && data.updated_at ? Date.parse(data.updated_at) : 0;
   return data ? data.data : null;
+}
+
+// ── Dos dispositivos, una sola fila ──────────────────────────────────────
+// Tus datos privados son UNA fila y cada guardado la manda entera. Con la app
+// abierta en la compu y en el celular, la copia vieja de uno pisaba lo que
+// acababas de anotar en el otro (pasó el primer día de los recordatorios: uno
+// creado en un dispositivo desapareció cuando el otro guardó una nota).
+// Ahora, antes de escribir, se mira si alguien más escribió desde la última
+// vez que leímos. Si sí, se MEZCLA en vez de pisar, comparando tres copias:
+// la base (lo último que sabíamos que había), la local y la remota.
+//   · está en la remota y no en la local: si estaba en la base, acá se borró
+//     (no vuelve); si no estaba, es nuevo de allá (entra).
+//   · está en la local y no en la remota: si estaba en la base, allá se borró
+//     (se va, salvo que acá se haya cambiado); si no, es nuevo de acá (queda).
+//   · está en las dos: gana la local si cambió respecto de la base; si no, la remota.
+// Vale para las listas de cosas con `id` (recordatorios, tareas privadas,
+// notas). Lo que no sea una lista así se queda con la versión local.
+let base = null;
+let visto = 0;
+let onMezcla = null;
+const copia = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));
+const esLista = (v) => Array.isArray(v) && v.every((x) => x && typeof x === "object" && typeof x.id === "string");
+export function setPrivateMergedHandler(fn) {
+  onMezcla = fn;
+}
+export function mezclarPrivado(b, local, remoto) {
+  const out = Object.assign({}, remoto || {}, local || {});
+  for (const k of Object.keys(out)) {
+    const L = local ? local[k] : undefined, R = remoto ? remoto[k] : undefined, B = b ? b[k] : undefined;
+    if (!esLista(L || []) || !esLista(R || []) || !Array.isArray(L) || !Array.isArray(R)) continue;
+    const enB = new Map((esLista(B || []) && Array.isArray(B) ? B : []).map((x) => [x.id, JSON.stringify(x)]));
+    const enR = new Map(R.map((x) => [x.id, x]));
+    const enL = new Set(L.map((x) => x.id));
+    const lista = [];
+    for (const x of L) {
+      const cambio = enB.get(x.id) !== JSON.stringify(x);
+      if (enR.has(x.id)) lista.push(cambio ? x : enR.get(x.id));
+      else if (!enB.has(x.id) || cambio) lista.push(x);
+    }
+    for (const x of R) if (!enL.has(x.id) && !enB.has(x.id)) lista.push(x);
+    out[k] = lista;
+  }
+  return out;
 }
 
 let saveTimer = null;
@@ -51,10 +97,23 @@ const REINTENTOS = 3;
 async function escribir(email, payload, intento = 0, mia = generacion) {
   if (mia !== generacion) return;
   escribiendo = true;
+  // ¿Escribió otro dispositivo desde la última vez que leímos? Entonces se
+  // mezcla. Si no se puede averiguar, se guarda como siempre.
+  let mezclado = false;
+  try {
+    const r = await supabase.from("user_private").select("data,updated_at").eq("email", email).maybeSingle();
+    const fila = r && r.data;
+    if (fila && fila.updated_at && Date.parse(fila.updated_at) !== visto) {
+      payload = mezclarPrivado(base, payload, fila.data);
+      mezclado = true;
+    }
+  } catch (e) { /* sin lectura previa: se escribe lo local */ }
+  if (mia !== generacion) { return; }
+  const ahora = new Date().toISOString();
   const { error } = await supabase.from("user_private").upsert({
     email,
     data: payload,
-    updated_at: new Date().toISOString(),
+    updated_at: ahora,
   });
   // Entró algo más nuevo mientras se escribía: el resultado de ésta ya no
   // manda. `escribiendo` queda como está, que es el lado seguro.
@@ -70,7 +129,11 @@ async function escribir(email, payload, intento = 0, mia = generacion) {
     return;
   }
   escribiendo = false;
+  base = copia(payload);
+  visto = Date.parse(ahora);
   if (onEstado) onEstado("guardado");
+  // Lo mezclado trae cosas del otro dispositivo: la pantalla tiene que enterarse.
+  if (mezclado && onMezcla && !pending) onMezcla(copia(payload));
 }
 
 export function pushPrivateState(email, data) {
