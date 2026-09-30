@@ -2062,3 +2062,13 @@ button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb
 .etiqmarca{width:9px;height:9px;border-radius:2px;background:var(--wood);transform:rotate(45deg)}
 .lest{flex:none;width:8px;height:8px;border-radius:50%;background:var(--sc)}
 @media (max-width:620px){ #myTasks .listline .letiq{display:none} }
+
+/* Tarea hecha en el calendario: el cuadradito tildado y el texto apagado */
+.chipcal.task.hecha{color:var(--ink-faint);border-color:color-mix(in srgb,var(--cc) 40%,transparent)}
+.chipcal.task.hecha::before{background:var(--cc);border-color:var(--cc)}
+.chipcal.task.hecha::after{content:"";position:absolute;left:5.5px;top:50%;width:2px;height:4px;margin-top:-4px;border:solid var(--surface);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.chipcal.task.hecha,.chipcal.rec.pasado{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink-faint) 70%,transparent)}
+/* Cuadro del día: tareas y recordatorios se tildan ahí mismo */
+.diachk{flex:none;width:15px;height:15px;margin:3px 0 0;cursor:pointer;accent-color:var(--dc,var(--s-listo))}
+.diarow.hecho .diacuerpo b{color:var(--ink-faint);text-decoration:line-through}
+.diarow.hecho .diameta{opacity:.7}

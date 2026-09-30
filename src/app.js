@@ -2861,15 +2861,23 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // todos. El filtro de antes la escondía de todas partes: desde que la
     // identidad sale del email de la sesión, `me` nunca está vacío, y una
     // fecha sin dueño no aparecía en el calendario de nadie.
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id}); });
-    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),priv:true,taskId:k.id}); });
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id,hecha:!!k.done}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),priv:true,taskId:k.id,hecha:!!k.done}); });
     if(me)recsDe(me).forEach(r=>push(r.fecha,{type:"rec",hora:r.hora||"",label:(r.hora?r.hora+" ":"")+r.t,titulo:r.t,rec:r,pasado:r.hecho}));
     eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,titulo:ev.title||"Evento",id:ev.id,ev,pasado:evPasado(ev)}));
     const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,titulo:o.g.titulo,g:o.g,pasado:!o.g.diaEntero&&!!o.g.fin&&nowMs()>=new Date(o.g.fin).getTime()})));
     cargarGoogle();
     // Dentro de un día, lo que tiene hora va en orden y antes de lo que no la
     // tiene: si hay una reunión a las 9, quiero verla arriba de todo.
+    // Orden dentro de un día: lo pendiente arriba y lo ya hecho al final; y
+    // en cada parte, los eventos de la app, los recordatorios, las tareas y
+    // por último lo que viene de Google. Dentro de cada tipo, lo que tiene
+    // hora va primero y en orden.
+    const RANGO={event:0,rec:1,task:2,google:3};
+    const hecho=c=>c.type==="task"?!!c.hecha:c.type==="rec"?!!(c.rec&&c.rec.hecho):false;
     Object.keys(byDay).forEach(ds=>byDay[ds].sort((a,b)=>{
+      if(hecho(a)!==hecho(b))return hecho(a)?1:-1;
+      if(RANGO[a.type]!==RANGO[b.type])return RANGO[a.type]-RANGO[b.type];
       if(!!a.hora!==!!b.hora)return a.hora?-1:1;
       return a.hora<b.hora?-1:a.hora>b.hora?1:0; }));
     return byDay; }
@@ -2877,7 +2885,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const byDay=calPorDia();
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':'task'}${c.pasado?' pasado':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'&&calColor('task')==='estado'?`style="--cc:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':'task'}${c.pasado?' pasado':''}${c.type==='task'&&c.hecha?' hecha':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'&&calColor('task')==='estado'?`style="--cc:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       // En el teléfono los chips no entran: un puntito dice que ese día hay algo.
       const hay=chips.length?`<span class="calhay" aria-hidden="true">${chips.length}</span>`:"";
@@ -2924,7 +2932,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         const n=c.node?N(c.node):null; meta="Tarea · "+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:"")); }
       else if(c.type==="rec"){ hora=c.hora||"—"; marca="border-radius:2px;width:4px;height:14px;margin-top:3px;background:"+colorDe("rec"); meta="Recordatorio · solo lo ves vos"+(c.rec.hecho?" · hecho":"")+(c.rec.aviso?" · con aviso":"")+(c.rec.repite?" · "+recRepiteTxt(c.rec):""); }
       else { hora=c.hora||"todo el día"; marca="border:1px dashed "+colorDe("google"); meta="Tu Google Calendar · solo lo ves vos"; }
-      return `<div class="diarow${cls}" data-i="${i}"><span class="diahora">${esc(hora)}</span><span class="diamarca" style="${marca}"></span><span class="diacuerpo"><b>${esc(c.titulo||c.label)}</b><span class="diameta">${esc(meta)}</span></span></div>`; };
+      const tildable=c.type==="task"||c.type==="rec", hecho=c.type==="task"?!!c.hecha:c.type==="rec"?!!c.rec.hecho:false;
+      if(hecho)cls+=" hecho";
+      return `<div class="diarow${cls}" data-i="${i}"><span class="diahora">${esc(hora)}</span>${tildable?`<input type="checkbox" class="diachk" data-diachk="${i}"${hecho?" checked":""} title="${c.type==="rec"?(c.rec.repite?"Hecho: pasa a la próxima vez":"Hecho"):"Marcar terminada"}">`:`<span class="diamarca" style="${marca}"></span>`}<span class="diacuerpo"><b>${esc(c.titulo||c.label)}</b><span class="diameta">${esc(meta)}</span></span></div>`; };
     const libres=huecosLibres(ds,todos);
     const pasoYa=ds<hoy;
     box.innerHTML=`<h2 class="diatit">${esc(mayus(fechaLarga(ds)))}<small>${esc(ds===hoy?"hoy":cuantoFalta(ds))}</small></h2>`
@@ -2937,7 +2947,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     box.querySelector("#diaCerrar").addEventListener("click",closeEv);
     box.querySelector("#diaNuevo").addEventListener("click",()=>elegirQueAgregar(ds,""));
     box.querySelectorAll("[data-h]").forEach(b=>b.addEventListener("click",()=>elegirQueAgregar(ds,b.dataset.h)));
-    box.querySelectorAll(".diarow").forEach(r=>r.addEventListener("click",()=>{ const c=items[+r.dataset.i]; if(!c)return;
+    box.querySelectorAll("[data-diachk]").forEach(cb=>{ cb.addEventListener("click",e=>e.stopPropagation());
+      cb.style.setProperty("--dc",(()=>{ const c=items[+cb.dataset.diachk]; const col=c&&calColor(c.type==="rec"?"rec":"task"); return !c?"":col==="estado"?c.color:col; })());
+      cb.addEventListener("change",()=>{ const c=items[+cb.dataset.diachk]; if(!c)return;
+        if(c.type==="task"){ const k=c.priv?privL().find(x=>x.id===c.taskId):((N(c.node)||{}).items||[]).find(x=>x.id===c.taskId); if(!k)return; setDone(k,cb.checked); }
+        else { const r=recPorId(c.rec.id); if(!r)return; recTildar(r,cb.checked); }
+        save(); refreshChrome(); renderActive(); abrirDia(ds); }); });
+    box.querySelectorAll(".diarow").forEach(r=>r.addEventListener("click",e=>{ if(e.target.closest(".diachk"))return; const c=items[+r.dataset.i]; if(!c)return;
       if(c.type==="event"){ volverADia=ds; openEvView(c.id); }
       else if(c.type==="task"){ closeEv(); if(c.priv)openTask("__priv",c.taskId); else openTask(c.node,c.taskId); }
       else if(c.type==="rec"){ volverADia=ds; recForm(recPorId(c.rec.id)); }
