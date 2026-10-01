@@ -20,6 +20,7 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { informeSemanal, lunesDe, semanaPasada, ymd } from "./semana-informe.mjs";
+import { buscarRetrocesos, textoAuditoria } from "./semana-retrocesos.mjs";
 
 function env() {
   const out = {};
@@ -84,4 +85,26 @@ const { texto, cuentas } = informeSemanal({
 });
 if (nota) console.log(nota + "\n");
 console.log(texto);
+
+// La auditoría de datos (semana-retrocesos.mjs): todos los respaldos por hora
+// de la semana, más el último de antes para tener contra qué comparar el
+// primero. Se bajan de a uno, para no tener la semana entera en memoria dos veces.
+{
+  const { data: lista, error } = await sb
+    .from("app_state_backup").select("id,taken_at")
+    .eq("kind", "app_state")
+    .gte("taken_at", (abre ? new Date(abre.taken_at) : inicio).toISOString())
+    .lt("taken_at", new Date(fin.getTime() + 1).toISOString())
+    .order("taken_at", { ascending: true });
+  if (error) {
+    console.log("\nAUDITORÍA DE DATOS: no se pudo hacer (" + error.message + "). Decilo en el resumen.");
+  } else {
+    const fotos = [];
+    for (const b of lista) {
+      const { data: d } = await sb.from("app_state_backup").select("data").eq("id", b.id).single();
+      if (d) fotos.push({ id: b.id, taken_at: b.taken_at, data: d.data });
+    }
+    console.log("\n" + textoAuditoria(buscarRetrocesos(fotos), fotos.length));
+  }
+}
 console.error(`\n[${ymd(inicio)} → ${ymd(fin)}] ` + Object.entries(cuentas).map(([k, v]) => `${k}:${v}`).join(" "));
