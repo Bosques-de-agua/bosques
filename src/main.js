@@ -1,6 +1,6 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
-import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, setRemoteMergedHandler } from "./sync.js";
+import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, setRemoteMergedHandler, recuperarInterrumpido } from "./sync.js";
 import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
@@ -76,6 +76,10 @@ async function launchApp(session) {
   // porción vacía y borraría las notas y tareas privadas de verdad.
   const email = session.user.email;
   setClientEmail(email);
+  // ¿Quedó algo a medio guardar la última vez que se cerró la app acá? Se
+  // mezcla con lo recién leído y se sube apenas arranca (ver sync.js).
+  const rescate = recuperarInterrumpido(seed, email);
+  if (rescate) seed = rescate;
   let priv = null;
   let privOk = true;
   try {
@@ -169,6 +173,7 @@ async function launchApp(session) {
   // Si al guardar hubo que mezclar con lo de otro, la pantalla pasa a mostrar
   // la mezcla (que es lo que quedó en la base).
   setRemoteMergedHandler((mezcla) => app.applyRemoteState(mezcla));
+  if (rescate) pushRemoteState(rescate);
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 
   // Quién tiene la app abierta ahora, para el punto verde del chat. Va por el

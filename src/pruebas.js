@@ -11,7 +11,7 @@
 // Cada prueba de acá corresponde a una falla REAL que existió en el código.
 // Están para que no vuelva.
 import { supabase } from "./supabaseClient.js";
-import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, fetchRemoteState, setRemoteMergedHandler, versionConocida } from "./sync.js";
+import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, fetchRemoteState, setRemoteMergedHandler, versionConocida, recuperarInterrumpido } from "./sync.js";
 import { mezclar3 } from "./mezcla.js";
 import { pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, mezclarPrivado, fetchPrivateState } from "./private.js";
 
@@ -288,6 +288,52 @@ linea("\n8. Una copia vieja no pisa la base: choca, relee y mezcla");
   afirmar(versionConocida() === db.updated_at, "y queda parado sobre la versión nueva");
   setRemoteMergedHandler(null);
   supabaseSinLectura();
+}
+
+// -----------------------------------------------------------------------
+// 9. Lo que quedó a medio guardar al cerrar se recupera al volver a abrir,
+//    sin pisar lo que otro cambió después.
+// -----------------------------------------------------------------------
+linea("\n9. Un cambio que quedó a medio guardar al cerrar se recupera");
+{
+  const CLAVE = "mesa-guardado-interrumpido";
+  const t = (id, notas) => ({ id, title: id, notas });
+  const base = { nodes: { A: { items: [t("a", "1"), t("b", "1")] } } };
+  const anotar = (state) => localStorage.setItem(CLAVE, JSON.stringify({ email: "yo@ejemplo.org", state, base, version: "v1" }));
+  const mio = { nodes: { A: { items: [t("a", "MIO"), t("b", "1")] } } };
+
+  // (a) No llegó a guardarse, y otro tocó OTRA tarea: entran las dos cosas.
+  anotar(mio);
+  let r = recuperarInterrumpido({ nodes: { A: { items: [t("a", "1"), t("b", "DE OTRO")] } } }, "yo@ejemplo.org");
+  afirmar(r && r.nodes.A.items[0].notas === "MIO" && r.nodes.A.items[1].notas === "DE OTRO",
+    "si no había llegado: entra lo mío y queda lo del otro", JSON.stringify(r));
+  afirmar(localStorage.getItem(CLAVE) === null, "y la anotación se borra (no se recupera dos veces)");
+
+  // (b) Sí había llegado, y después otro editó ESE MISMO campo: queda lo del otro.
+  anotar(mio);
+  r = recuperarInterrumpido({ nodes: { A: { items: [t("a", "EDITADO DESPUÉS"), t("b", "1")] } } }, "yo@ejemplo.org");
+  afirmar(r === null || r.nodes.A.items[0].notas === "EDITADO DESPUÉS", "lo viejo anotado no le gana a lo editado después");
+
+  // (c) Había llegado y nadie tocó nada: no hay nada que hacer.
+  anotar(mio);
+  afirmar(recuperarInterrumpido(mio, "yo@ejemplo.org") === null, "si ya había llegado, no se vuelve a escribir nada");
+
+  // (d) Era de otra persona que usó este navegador: no se toca.
+  anotar(mio);
+  afirmar(recuperarInterrumpido(base, "otra@ejemplo.org") === null, "lo anotado por otra persona no se aplica");
+
+  // (e) De punta a punta: hay algo esperando, se cierra la pestaña y la base no responde.
+  reiniciar();
+  responder = () => ({ message: "sin red (simulado)" });
+  pushRemoteState({ nodes: { A: { items: [t("a", "CERRANDO")] } } });
+  window.dispatchEvent(new Event("pagehide"));
+  const quedo = JSON.parse(localStorage.getItem(CLAVE) || "null");
+  afirmar(!!quedo && quedo.state.nodes.A.items[0].notas === "CERRANDO", "al cerrar con algo sin guardar, queda anotado en el navegador");
+  await esperar(3500);
+  responder = () => null;
+  reintentarPendiente();
+  await esperar(500);
+  afirmar(localStorage.getItem(CLAVE) === null, "cuando por fin se guarda, la anotación se borra");
 }
 
 // =======================================================================

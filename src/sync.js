@@ -1,5 +1,5 @@
 import { supabase, CLIENT_ID } from "./supabaseClient.js";
-import { mezclar3 } from "./mezcla.js";
+import { mezclar3, igual } from "./mezcla.js";
 
 const ROW_ID = 1;
 
@@ -137,6 +137,7 @@ async function escribir(state, intento = 0, mia = generacion, sobre = { base, ve
   escribiendo = true;
   if (onEstado) onEstado("guardando");
   const desde = sobre.version;
+  enVuelo = { state, sobre };
   let r = await escribirSiSigue(state, sobre);
   let mezclado = false;
   // Alguien escribió en el medio: se relee, se mezcla y se vuelve a probar
@@ -181,12 +182,51 @@ async function escribir(state, intento = 0, mia = generacion, sobre = { base, ve
   }
   escribiendo = false;
   ultimoFallido = null;
+  enVuelo = null;
+  if (!pendiente) olvidarInterrumpido();
   // Lo que acaba de entrar pasa a ser la base. Salvo que mientras tanto se haya
   // enterado de algo más nuevo (un aviso en vivo de otro): ese manda.
   if (!version || version === desde || version === sobre.version) conocida(state, r.updatedAt);
   if (onEstado) onEstado("guardado");
   if (mezclado && onMezcla && !pendiente) onMezcla(copia(state));
   return true;
+}
+
+// ── Lo que quedó a medio guardar al cerrar ───────────────────────────────
+// Al cerrar la pestaña (o cuando el celular la manda a segundo plano, que
+// puede ser lo último que pase antes de que el sistema la mate), si hay algo
+// sin confirmar se anota en el navegador junto con su base. La próxima vez que
+// se abre la app, se recupera mezclándolo con lo que hay en la base.
+//
+// Esa mezcla es con `ganaRemoto`: el cambio anotado es VIEJO. Si otro tocó el
+// mismo campo después, lo de él es más nuevo y queda. Lo que nadie tocó, entra.
+// Y si el guardado sí había llegado, la mezcla no cambia nada.
+const CLAVE_INTERRUMPIDO = "mesa-guardado-interrumpido";
+let enVuelo = null;
+function anotarInterrumpido() {
+  const que = pendiente ? { state: pendiente, sobre: pendienteSobre }
+    : escribiendo && enVuelo ? enVuelo
+    : ultimoFallido;
+  if (!que || !que.sobre || !que.sobre.base) return;
+  try {
+    localStorage.setItem(CLAVE_INTERRUMPIDO, JSON.stringify({
+      email: EMAIL, ts: Date.now(), state: que.state, base: que.sobre.base, version: que.sobre.version,
+    }));
+  } catch (e) { /* sin lugar o sin permiso: queda el keepalive */ }
+}
+function olvidarInterrumpido() {
+  try { localStorage.removeItem(CLAVE_INTERRUMPIDO); } catch (e) { /* nada */ }
+}
+// Se llama al arrancar, con lo recién leído de la base. Devuelve el estado a
+// usar (la mezcla) o null si no había nada que recuperar.
+export function recuperarInterrumpido(remoto, email) {
+  let anotado = null;
+  try { anotado = JSON.parse(localStorage.getItem(CLAVE_INTERRUMPIDO) || "null"); } catch (e) { /* nada */ }
+  olvidarInterrumpido();
+  if (!anotado || !remoto || !anotado.state || !anotado.base) return null;
+  if (anotado.email && email && anotado.email !== email) return null; // era de otra persona
+  const mezcla = mezclar3(anotado.base, anotado.state, remoto, true);
+  return igual(mezcla, remoto) ? null : mezcla;
 }
 
 let pendienteSobre = null;
@@ -219,8 +259,8 @@ supabase.auth.getSession().then(({ data }) => { TOKEN = (data && data.session &&
 supabase.auth.onAuthStateChange((_evento, session) => { TOKEN = (session && session.access_token) || ""; });
 
 // Va con la misma condición de versión que el camino normal. Si alguien
-// escribió en el medio, la base no lo acepta y este último cambio se pierde.
-// Es el único caso, y es mucho mejor que lo de antes: pisar todo lo ajeno.
+// escribió en el medio, la base no lo acepta; el cambio no se pierde porque
+// quedó anotado en el navegador y se recupera al volver a abrir la app.
 function escribirAlVuelo(payload, sobre) {
   const url = import.meta.env.VITE_SUPABASE_URL;
   const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -266,9 +306,9 @@ function vaciar(seVa) {
 }
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") vaciar(false);
+    if (document.visibilityState === "hidden") { anotarInterrumpido(); vaciar(false); }
   });
-  window.addEventListener("pagehide", () => vaciar(true));
+  window.addEventListener("pagehide", () => { anotarInterrumpido(); vaciar(true); });
 }
 
 // El email de quien está usando la app, para que las notificaciones no le

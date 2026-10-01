@@ -49,43 +49,48 @@ const esObjeto = (v) => v !== null && typeof v === "object" && !Array.isArray(v)
 const conId = (v) => Array.isArray(v) && v.every((x) => esObjeto(x) && (typeof x.id === "string" || typeof x.id === "number"));
 const primitivos = (v) => Array.isArray(v) && v.every((x) => x === null || typeof x !== "object");
 
-export function mezclar3(base, local, remoto) {
+//
+// `ganaRemoto`: en un choque de verdad (los dos tocaron el mismo campo) gana
+// la base en vez de lo local. Se usa al recuperar un guardado que quedó
+// interrumpido al cerrar: ese cambio es VIEJO, y lo que otro escribió después
+// sobre el mismo campo es más nuevo.
+export function mezclar3(base, local, remoto, ganaRemoto = false) {
   if (igual(local, remoto)) return local;
   if (igual(local, base)) return remoto;   // acá no se tocó: vale lo de allá
   if (igual(remoto, base)) return local;   // allá no se tocó: vale lo de acá
   // Los dos lo cambiaron.
   if (local === AUSENTE) return remoto;    // borrado acá, editado allá: editar gana
   if (remoto === AUSENTE) return local;    // borrado allá, editado acá: editar gana
-  if (esObjeto(local) && esObjeto(remoto)) return mezclarObjetos(esObjeto(base) ? base : {}, local, remoto);
-  if (conId(local) && conId(remoto)) return mezclarListas(conId(base) ? base : [], local, remoto);
+  if (esObjeto(local) && esObjeto(remoto)) return mezclarObjetos(esObjeto(base) ? base : {}, local, remoto, ganaRemoto);
+  if (conId(local) && conId(remoto)) return mezclarListas(conId(base) ? base : [], local, remoto, ganaRemoto);
   if (primitivos(local) && primitivos(remoto)) return mezclarConjuntos(primitivos(base) ? base : [], local, remoto);
-  return local;
+  return ganaRemoto ? remoto : local;
 }
 
-function mezclarObjetos(b, l, r) {
+function mezclarObjetos(b, l, r, g) {
   const out = {};
   const claves = new Set([...Object.keys(l), ...Object.keys(r)]);
   for (const k of claves) {
-    const v = mezclar3(b[k], l[k], r[k]);
+    const v = mezclar3(b[k], l[k], r[k], g);
     if (v !== AUSENTE) out[k] = v;
   }
   return out;
 }
 
-function mezclarListas(b, l, r) {
+function mezclarListas(b, l, r, g) {
   const enB = new Map(b.map((x) => [x.id, x]));
   const enR = new Map(r.map((x) => [x.id, x]));
   const enL = new Set(l.map((x) => x.id));
   const out = [];
   for (const x of l) {
-    const v = mezclar3(enB.get(x.id), x, enR.get(x.id));
+    const v = mezclar3(enB.get(x.id), x, enR.get(x.id), g);
     if (v !== AUSENTE) out.push(v);
   }
   // Lo de allá que acá no está: si es nuevo, entra; si acá se borró sin que
   // allá lo tocaran, no vuelve; si allá lo cambiaron, vuelve.
   for (const x of r) {
     if (enL.has(x.id)) continue;
-    const v = mezclar3(enB.get(x.id), AUSENTE, x);
+    const v = mezclar3(enB.get(x.id), AUSENTE, x, g);
     if (v !== AUSENTE) out.push(v);
   }
   return out;
