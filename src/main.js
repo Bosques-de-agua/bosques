@@ -1,6 +1,6 @@
 import "./style.css";
 import { supabase } from "./supabaseClient.js";
-import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
+import { fetchRemoteState, pushRemoteState, subscribeRemoteState, setClientEmail, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, setRemoteMergedHandler } from "./sync.js";
 import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, hayPrivadoSinGuardar } from "./private.js";
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
@@ -166,6 +166,9 @@ async function launchApp(session) {
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));
   setPrivateSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err, "privado"));
   setPrivateMergedHandler((mezcla) => app.applyPrivateState(mezcla));
+  // Si al guardar hubo que mezclar con lo de otro, la pantalla pasa a mostrar
+  // la mezcla (que es lo que quedó en la base).
+  setRemoteMergedHandler((mezcla) => app.applyRemoteState(mezcla));
   subscribeRemoteState((remoteData) => app.applyRemoteState(remoteData));
 
   // Quién tiene la app abierta ahora, para el punto verde del chat. Va por el

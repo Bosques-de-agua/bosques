@@ -11,7 +11,8 @@
 // Cada prueba de acá corresponde a una falla REAL que existió en el código.
 // Están para que no vuelva.
 import { supabase } from "./supabaseClient.js";
-import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente } from "./sync.js";
+import { pushRemoteState, setSaveStateHandler, hayCambiosSinGuardar, reintentarPendiente, fetchRemoteState, setRemoteMergedHandler, versionConocida } from "./sync.js";
+import { mezclar3 } from "./mezcla.js";
 import { pushPrivateState, setPrivateSaveStateHandler, setPrivateMergedHandler, mezclarPrivado, fetchPrivateState } from "./private.js";
 
 const salida = document.getElementById("salida");
@@ -29,11 +30,25 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 let escrituras = [];
 let responder = () => null; // devuelve un error, o null si sale bien
 
+// La escritura condicionada a la versión (`update ... where updated_at = …`)
+// se comporta acá como si la base nunca hubiera cambiado: estas pruebas miran
+// reintentos y fallos de red. Los choques de versión se prueban en la 8.
 supabase.from = (tabla) => ({
   upsert: async (fila) => {
     const error = responder(fila);
     escrituras.push({ tabla, data: fila.data, ok: !error });
     return { error };
+  },
+  update: (fila) => {
+    const u = {
+      eq: () => u,
+      select: async () => {
+        const error = responder(fila);
+        escrituras.push({ tabla, data: fila.data, ok: !error });
+        return error ? { data: null, error } : { data: [{ updated_at: fila.updated_at }], error: null };
+      },
+    };
+    return u;
   },
 });
 
@@ -194,6 +209,84 @@ linea("\n6. Lo privado se mezcla entre dispositivos, no se pisa");
   afirmar(guardados === "axy", "al guardar desde la compu, el recordatorio del celular sigue ahí", "se guardó: " + guardados);
   afirmar(!!avisado && avisado.recordatorios.length === 3, "y la pantalla se entera de lo que vino del otro dispositivo");
   setPrivateMergedHandler(null);
+  supabaseSinLectura();
+}
+
+// -----------------------------------------------------------------------
+// 7. La mezcla de tres copias del estado del equipo.
+// -----------------------------------------------------------------------
+linea("\n7. Mezcla del estado del equipo");
+{
+  const t = (id, extra) => ({ id, title: id, ...extra });
+  const b = { nodes: { A: { name: "A", children: ["x"], items: [t("t1", { notas: "vieja" }), t("t2"), t("t3")] } }, mesa: { items: [] } };
+  const local = { nodes: { A: { name: "A", children: ["x"], items: [t("t1", { notas: "vieja" }), t("t2", { archived: true }), t("t3")] } }, mesa: { items: [] } };
+  const remoto = { nodes: { A: { name: "A Lab", children: ["x", "y"], items: [t("t1", { notas: "vieja\n29/09: 20%" }), t("t2"), t("t4")] }, B: { name: "nuevo" } }, mesa: { items: [{ id: "m1" }] } };
+  const m = mezclar3(b, local, remoto);
+  const it = m.nodes.A.items;
+  afirmar(it.find((k) => k.id === "t1").notas.includes("29/09"), "la nota escrita en otro dispositivo no se pierde");
+  afirmar(it.find((k) => k.id === "t2").archived === true, "lo que este dispositivo cambió, queda");
+  afirmar(!it.some((k) => k.id === "t3"), "lo borrado allá no vuelve", it.map((k) => k.id).join(","));
+  afirmar(it.some((k) => k.id === "t4") && !!m.nodes.B && m.mesa.items.length === 1, "lo creado allá (tarea, tema, pendiente) queda");
+  afirmar(m.nodes.A.name === "A Lab" && m.nodes.A.children.join() === "x,y", "renombres e hijos nuevos de allá quedan");
+  const r2 = mezclar3({ o: ["Nico", "Pablo"] }, { o: ["Nico", "Pablo", "Lucas"] }, { o: ["Nico"] });
+  afirmar(r2.o.join() === "Nico,Lucas", "responsables: se suma lo agregado acá y se va lo quitado allá", r2.o.join());
+  const r3 = mezclar3({ l: [t("a", { v: 1 })] }, { l: [] }, { l: [t("a", { v: 2 })] });
+  afirmar(r3.l.length === 1, "borrar acá no le gana a editar allá");
+}
+
+// -----------------------------------------------------------------------
+// 8. Un dispositivo con la copia vieja NO pisa la base: choca y mezcla.
+//
+// La falla real (01/10): un celular dormido desde el mediodía se despertó a
+// la mañana, archivó solo una tarea y subió su copia ENTERA. Se perdieron
+// una tarde de notas, 4 pendientes de la Mesa y un tema con 6 tareas.
+// -----------------------------------------------------------------------
+linea("\n8. Una copia vieja no pisa la base: choca, relee y mezcla");
+{
+  let db = null;
+  const filasEscritas = [];
+  supabase.from = () => {
+    const filtros = {};
+    const q = {
+      select: () => q,
+      eq: (c, v) => { filtros[c] = v; return q; },
+      maybeSingle: async () => ({ data: db && JSON.parse(JSON.stringify(db)), error: null }),
+      update: (fila) => {
+        const u = {
+          eq: (c, v) => { filtros[c] = v; return u; },
+          select: async () => {
+            if (filtros.updated_at !== db.updated_at) return { data: [], error: null };
+            db = { data: JSON.parse(JSON.stringify(fila.data)), updated_at: fila.updated_at };
+            filasEscritas.push(db.data);
+            return { data: [{ updated_at: db.updated_at }], error: null };
+          },
+        };
+        return u;
+      },
+      upsert: async (fila) => { db = { data: fila.data, updated_at: fila.updated_at }; filasEscritas.push(fila.data); return { error: null }; },
+    };
+    return q;
+  };
+  const tarea = (id, notas) => ({ id, title: id, notas });
+  db = { data: { nodes: { A: { name: "A", items: [tarea("siembra", "27/09"), tarea("vieja", "")] } }, mesa: { items: [] } }, updated_at: "2026-09-30T15:00:00.000Z" };
+  await fetchRemoteState();                                   // el celular lee al mediodía y se duerme
+  const copiaDelCelular = JSON.parse(JSON.stringify(db.data));
+  // Durante la tarde, otro dispositivo trabaja.
+  db = { data: { nodes: { A: { name: "A", items: [tarea("siembra", "27/09\n29/09: 20%"), tarea("vieja", "")] }, T: { name: "Siembra de 10k TN", items: [tarea("n1", "")] } }, mesa: { items: [{ id: "def1" }, { id: "def2" }] } }, updated_at: "2026-09-30T19:00:00.000Z" };
+  // A la mañana, el celular cambia una sola cosa sobre su copia vieja y guarda.
+  copiaDelCelular.nodes.A.items[1].archived = true;
+  let mostrado = null;
+  setRemoteMergedHandler((d) => { mostrado = d; });
+  pushRemoteState(copiaDelCelular);
+  await esperar(600);
+  const fin = db.data;
+  afirmar(fin.nodes.A.items[0].notas.includes("29/09"), "la nota de la tarde sigue en la base");
+  afirmar(!!fin.nodes.T && fin.mesa.items.length === 2, "el tema nuevo y los pendientes de la Mesa siguen");
+  afirmar(fin.nodes.A.items[1].archived === true, "y el cambio del celular también entró");
+  afirmar(!filasEscritas.some((d) => !d.nodes.T), "en ningún momento se escribió la copia vieja", "escrituras: " + filasEscritas.length);
+  afirmar(!!mostrado && !!mostrado.nodes.T, "la pantalla del celular pasa a mostrar la mezcla");
+  afirmar(versionConocida() === db.updated_at, "y queda parado sobre la versión nueva");
+  setRemoteMergedHandler(null);
   supabaseSinLectura();
 }
 
