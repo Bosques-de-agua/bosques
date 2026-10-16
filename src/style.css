@@ -2084,3 +2084,13 @@ button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb
 .chipcal.task.lim{border-style:dashed}
 .chipcal.task.venc{--cc:var(--p-alta);color:var(--p-alta)}
 .chipcal.task.corrida{font-style:italic}
+
+/* Novedades de la app: cartel al abrir y lista en Configuración */
+.novbox{width:min(520px,92vw);max-height:86vh;overflow:auto}
+.novitem+.novitem{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.novitem h3{margin:4px 0 2px;font-size:15.5px;color:var(--ink)}
+.novfecha{font-size:12px;color:var(--ink-faint);margin-bottom:8px}
+.novitem ul{margin:0;padding-left:18px;display:grid;gap:7px;font-size:13.5px;line-height:1.45;color:var(--ink-soft)}
+.novitem b{color:var(--ink)}
+.novcfg p{margin:4px 0 10px;font-size:13px;color:var(--ink-soft)}
+.novbox .btn[hidden],.novcfg .btn[hidden]{display:none}

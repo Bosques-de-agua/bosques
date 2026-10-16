@@ -7,7 +7,7 @@ import { grabadorDisponible, empezarGrabacion, subirAudio, urlDeAudio, borrarAud
 // `tasksSeen` y la lectura del chat NO están acá: qué viste ya no depende del
 // aparato desde el que entraste. `chatSeen` sí se queda, pero solo como el
 // resto de una época: se lee al arrancar para migrar y no se escribe más.
-const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista","calVer","calColor"];
+const LOCAL_KEYS=["me","theme","palette","navRail","panelView","tab","chatChan","estProj","estFocus","treeOpen","taskFilters","panelFilter","chatSeen","focoVista","tareasVista","verSinEnc","emojiUsados","velAudio","anchoSolapa","mesaVista","rocasVista","calVer","calColor","novVisto"];
 // Datos personales: van a una tabla propia con permisos, nunca a la fila compartida.
 const PRIV_KEYS=["privTasks","myNotes","recordatorios","misEtiquetas"];
 const PREFS_KEY="mesa-bosques-prefs";
@@ -32,7 +32,7 @@ function stripShared(state){ const o=stripLocal(state); const me=state.me;
     if(Object.keys(resto).length)o[k]=resto; else delete o[k]; });
   return o; }
 
-export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto, cargarResumenes }){
+export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateState, saveMember, inviteEmail, refreshTeam, hayPendiente, privadoRoto, cargarResumenes, novedades }){
   // Los documentos arman su botón y su sección antes que nada: más abajo se
   // enlazan todos los .navtab de una, y uno que llegue tarde no respondería.
   montarDocs();
@@ -4210,6 +4210,26 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   if(!TABS.includes(active))active="panel";
   showTab(active);
   window.addEventListener("resize",()=>{ if(active==="estructura"&&estView()==="mapa")applyCam(); });
+
+  // Novedades de la app (src/novedades.js, la más nueva primero). La última
+  // se muestra sola una vez por navegador; las anteriores, desde
+  // Configuración. La notificación de novedad llega con ?novedades=1.
+  const NOV=Array.isArray(novedades)?novedades.filter(n=>n&&n.id&&n.titulo):[];
+  const novPuntoHTML=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+  const novFecha=ds=>{ try{ return mayus(fechaLarga(ds)); }catch(e){ return ds; } };
+  function abrirNovedades(todas){ const m=document.getElementById("novModal"); if(!m||!NOV.length)return;
+    const lista=todas?NOV:NOV.slice(0,1);
+    document.getElementById("novBody").innerHTML=lista.map(n=>`<section class="novitem"><h3>${esc(n.titulo)}</h3><div class="novfecha">${esc(novFecha(n.fecha))}</div><ul>${(n.puntos||[]).map(p=>`<li>${novPuntoHTML(p)}</li>`).join("")}</ul></section>`).join("");
+    document.getElementById("novTodas").hidden=todas||NOV.length<2;
+    m.classList.add("on");
+    state.novVisto=NOV[0].id; saveLocalPrefs(state); }
+  document.getElementById("novOk").addEventListener("click",()=>document.getElementById("novModal").classList.remove("on"));
+  document.getElementById("novTodas").addEventListener("click",()=>abrirNovedades(true));
+  document.getElementById("novModal").addEventListener("click",e=>{ if(e.target.id==="novModal")e.target.classList.remove("on"); });
+  { const b=document.getElementById("novVer"); if(b){ b.hidden=!NOV.length; b.addEventListener("click",()=>abrirNovedades(true)); } }
+  try{ const q=new URLSearchParams(window.location.search);
+    if(q.get("novedades")){ history.replaceState(null,"",window.location.pathname); setTimeout(()=>abrirNovedades(false),300); }
+    else if(NOV.length&&state.novVisto!==NOV[0].id)setTimeout(()=>abrirNovedades(false),900); }catch(e){}
 
   // Si llegaste desde una notificación, abrimos esa tarea directamente.
   try{ const q=new URLSearchParams(window.location.search);

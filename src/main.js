@@ -5,6 +5,7 @@ import { fetchPrivateState, pushPrivateState, setPrivateSaveStateHandler, setPri
 import { fetchTeam, upsertMe, inviteEmail, TablaFaltante } from "./team.js";
 import { startApp } from "./app.js";
 import { cargarResumenes } from "./resumen.js";
+import { NOVEDADES } from "./novedades.js";
 import { initPush, reengancharPush } from "./push.js";
 import { initPicker } from "./picker.js";
 import { initCalendario } from "./calendario.js";
@@ -165,6 +166,7 @@ async function launchApp(session) {
     // El resumen de los lunes: la app solo lo lee (lo escribe la tarea
     // programada que corre en la máquina de Nico).
     cargarResumenes,
+    novedades: NOVEDADES,
   });
   // El testigo de guardado: la app avisa en pantalla si algo no llegó a la base.
   setSaveStateHandler((estado, err) => app.mostrarEstadoGuardado(estado, err));

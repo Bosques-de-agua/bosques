@@ -9,6 +9,7 @@
 // llega a la base ni lo ve el equipo.
 import "./style.css";
 import { startApp } from "./app.js";
+import { NOVEDADES } from "./novedades.js";
 
 // El markup vive en index.html y se lee de ahí, para que este banco no se
 // desincronice cuando la app cambie.
@@ -95,6 +96,7 @@ const espiaPrivado = async (d) => { window.__push.privado = d; };
 const privadoRoto = new URLSearchParams(location.search).has("privroto");
 
 const app = startApp({
+  novedades: NOVEDADES,
   seed: null, // sin semilla, la app se siembra sola con su ejemplo
   priv: null,
   yo: team[0],

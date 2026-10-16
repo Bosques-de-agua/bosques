@@ -201,6 +201,7 @@
         <li>Abajo, <b>el equipo</b>: quiénes entran y cómo sumar a alguien nuevo; y el <b>respaldo</b>, para bajar una copia.</li></ul></span></span></h1>
       <div id="profile"></div>
       <div id="config" style="margin-top:22px"></div>
+      <div class="card novcfg" style="margin-top:22px"><div class="lab">Novedades de la app</div><p>Lo que fue cambiando en Estudio, contado en pocas líneas.</p><button class="btn" id="novVer">Ver novedades</button></div>
     </div></section>
     <section class="tab nopad" id="tab-chat">
       <div class="chatwrap">
@@ -390,6 +391,12 @@
   </div>
   <div class="pvframe"><iframe id="pvFrame" title="Vista del archivo" src="about:blank" referrerpolicy="no-referrer"></iframe><img id="pvImg" class="pvimg" alt="" hidden></div>
   <p class="pvfoot" id="pvFoot">Es el archivo en Drive, de solo lectura. Si dice que necesitás permiso, abrilo en Drive: se ve con la cuenta de Google que tengas abierta en este navegador.</p>
+</div></div>
+
+<div class="modal" id="novModal"><div class="box novbox">
+  <h2>Novedades en Estudio</h2>
+  <div id="novBody"></div>
+  <div class="row"><button class="btn" id="novTodas" hidden>Ver las anteriores</button><div style="flex:1"></div><button class="btn btn-primary" id="novOk">Entendido</button></div>
 </div></div>
 
 <div class="modal" id="askModal"><div class="box" style="width:min(430px,92vw)">
