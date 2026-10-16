@@ -102,7 +102,7 @@
         <li>Si conectaste tu <b>Google Calendar</b> (en Configuración), tus eventos personales aparecen con <b>borde punteado</b> y en su propio bloque. Solo los ves vos.</li>
         <li>Al abrir un evento tenés <b>Agregar a mi calendario</b>: se abre Google Calendar con todo cargado y lo confirmás con un clic. El recordatorio te lo manda Google.</li>
         <li>Arriba de todo en tu foco, <b>tus objetivos de la semana</b>: los tildás o sumás desde ahí, y abajo, plegados, los generales del equipo. <b>Ver todos</b> te lleva a los de todo el equipo, en Tareas.</li>
-        <li><b>Tu foco</b> tiene tres pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas); <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama; y <b>Tu semana</b>, la revisión de la pestaña Tareas pero solo con lo tuyo: tus tareas completadas (con un botón para archivarlas todas juntas), lo vencido, lo que vence y lo que no se mueve.</li>
+        <li><b>Tu foco</b> tiene tres pestañas: <b>Tus tareas</b>, las del equipo a tu nombre agrupadas por estado (el casillero las marca terminadas); <b>Tus temas</b>, los temas de los que sos encargado, con las cuentas de toda su rama; y <b>Tu semana</b>, la revisión de la pestaña Tareas pero solo con lo tuyo: tus tareas completadas (con un botón para archivarlas todas juntas), lo que tenés para hacer, lo vencido, lo que vence y lo que no se mueve. Arriba de todo hay un buscador de tus tareas.</li>
         <li><b>Tus etiquetas</b>: en la ficha de cualquier tarea podés marcarla con una etiqueta tuya (por ejemplo <b>Campo</b>, o una que crees vos). Nadie más la ve. Acá, abajo de los estados, aparece un grupo por etiqueta con todas esas tareas juntas.</li>
         <li><b>Privadas</b>: solo para vos, no aparecen en la pestaña Tareas. Desde su ficha podés compartirlas a un tema, y al revés.</li>
         <li><b>Mis notas</b> es tu bloc personal: tampoco lo ve el resto.</li>
@@ -152,7 +152,7 @@
         <li>El <b>↻</b> marca una tarea que se repite: al terminarla se crea sola la siguiente.</li>
         <li>El <b>circulito</b> al lado del título es la prioridad: rojo intenso = alta, apagado = baja.</li>
         <li>En <b>Temas</b> ves quién está a cargo de qué: una columna por persona, con los temas que tiene encargados. Los que no tienen encargado quedan afuera, pero se pueden pedir con un botón.</li>
-        <li><b>Semana</b> es la revisión del lunes: las tareas completadas en 7 días (el botón <b>archivar</b> las manda todas juntas al Archivo, sin esperar al archivado automático), lo vencido, lo que vence en 7 días, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
+        <li><b>Semana</b> es la revisión del lunes: las tareas completadas en 7 días (el botón <b>archivar</b> las manda todas juntas al Archivo, sin esperar al archivado automático), lo que planeaste encarar en 7 días (lo atrasado se corre solo a hoy), lo vencido y lo que vence en 7 días según la <b>fecha límite</b>, lo que no se mueve hace 14 y lo que no tiene responsable y vence en 2 semanas. Tocá una tarea para resolverla ahí.</li>
         <li><b>Resumen</b> es lo que pasó la semana <i>anterior</i>, contado en palabras. Lo escribe una inteligencia artificial los lunes, leyendo lo que quedó registrado acá — al pie dice con qué modelo. Puede equivocarse: la fuente son las tareas. Del chat solo mira cuántos mensajes hubo, nunca qué se dijo. Semana mira hacia adelante; Resumen, hacia atrás.</li>
         <li><b>Foco semanal</b>: los objetivos de la semana, los generales del equipo y un cuadro por persona. Cualquiera escribe en cualquier cuadro. Con las flechas vas a la semana pasada (queda quieta, como registro de qué se cumplió) o a la que viene (para adelantar). Lo que no se tildó se trae a la semana nueva con un botón; con → pasás uno a la semana siguiente. Tus objetivos también aparecen arriba de todo en Mi foco.</li></ul></span></span><div class="seg2 estviews" id="tareasViewSeg"><button data-v="tareas" class="on">Tareas</button><button data-v="objetivos" title="Los objetivos de cada semana, del equipo y de cada uno">Foco semanal</button><button data-v="semana">Semana</button><button data-v="temas">Temas</button><button data-v="resumen" title="Lo que pasó la semana pasada, contado por la IA">Resumen</button></div></h1>
       <div class="tbar"><span class="barlab">Vista</span><div class="seg2" id="groupSeg"><button data-g="estado" class="on">Por estado</button><button data-g="persona">Por persona</button><button data-g="prioridad">Por prioridad</button></div><span style="color:var(--ink-faint);font-size:12.5px" id="taskCount"></span><div style="flex:1"></div><button class="btn btn-primary" id="newTaskBtn"><svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Nueva tarea</button></div>
@@ -276,10 +276,12 @@
     <div class="pctl" id="tEsperaRow" hidden><div class="c" style="flex:1 1 100%"><label>¿De quién se espera? <span class="tespdesde" id="tEsperaDesde"></span></label><input class="txt" id="tEsperaDe" autocapitalize="sentences" autocorrect="on" placeholder="Ej: Franco (Ministerio)"></div></div>
     <div class="pctl">
       <div class="c" style="flex:1 1 100%"><label>Responsables</label><div class="ppick" id="tOwners"></div></div>
-      <div class="c"><label>Fecha</label><input type="date" class="txt" id="tDue"></div>
+      <div class="c"><label title="El día que la querés encarar. Si pasa y no la terminaste, se corre sola a hoy.">Para el</label><input type="date" class="txt" id="tDue"></div>
       <!-- La hora va aparte y es opcional, igual que en los eventos: la mayoría
            de las tareas vencen un día, no a una hora. Sirve para una reunión. -->
       <div class="c"><label>Hora <small>opcional</small></label><input type="time" class="txt" id="tDueTime"></div>
+      <div class="c" id="tLimC" hidden><label title="El día que tiene que estar terminada. Es la única fecha que vence.">Fecha límite <small>opcional</small></label><input type="date" class="txt" id="tLimite"></div>
+      <div class="c limadd"><button type="button" class="rowbtn" id="tLimAdd">＋ fecha límite</button></div>
       <div class="c"><label>Se repite</label><select class="pick" id="tRepite"><option value="">No</option><option value="semana">Cada semana</option><option value="mes">Cada mes</option><option value="anio">Cada año</option></select></div>
     </div>
   </div>
@@ -405,8 +407,10 @@
   <div class="pctl"><div class="c" style="flex:1 1 100%"><label>Tema al que pertenece</label><select class="pick" id="ntNode"></select></div></div>
   <div class="pctl">
     <div class="c" style="flex:1 1 100%"><label>Responsables</label><div class="ppick" id="ntOwners"></div></div>
-    <div class="c"><label>Fecha</label><input type="date" class="txt" id="ntDue"></div>
+    <div class="c"><label title="El día que la querés encarar. Si pasa y no la terminaste, se corre sola a hoy.">Para el</label><input type="date" class="txt" id="ntDue"></div>
     <div class="c"><label>Hora <small>opcional</small></label><input type="time" class="txt" id="ntDueTime"></div>
+    <div class="c" id="ntLimC" hidden><label title="El día que tiene que estar terminada. Es la única fecha que vence.">Fecha límite <small>opcional</small></label><input type="date" class="txt" id="ntLimite"></div>
+    <div class="c limadd"><button type="button" class="rowbtn" id="ntLimAdd">＋ fecha límite</button></div>
   </div>
   <div class="pctl">
     <div class="c"><label>Estado</label><select class="pick" id="ntStatus"></select></div>

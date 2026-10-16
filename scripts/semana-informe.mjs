@@ -63,7 +63,7 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
   const ahora = tareasDe(despues), previo = antes ? tareasDe(antes) : new Map();
 
   const completadas = [], nuevas = [], cambios = [], avances = [], reabiertas = [];
-  const quietas = [], vencidas = [];
+  const quietas = [], vencidas = [], atrasadas = [];
   const hoyYMD = ymd(new Date(ahoraMs));
 
   for (const [id, { k, ruta }] of ahora) {
@@ -82,7 +82,11 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
       const ult = (k.avances || []).reduce((m, a) => Math.max(m, a.ts || 0), 0);
       const dias = ult ? Math.floor((ahoraMs - ult) / DIA) : null;
       if (dias === null || dias >= 14) quietas.push({ t: k.title, ruta, quien: duenos(k), dias, prio: k.prio || "—" });
-      if (k.due && k.due < hoyYMD) vencidas.push({ t: k.title, ruta, quien: duenos(k), vencio: k.due });
+      // Dos fechas: `limite` es la que vence; `due` es el día en que se
+      // planeó encararla, y si quedó atrás no es un vencimiento sino algo que
+      // se corrió (en la app pasa sola al día siguiente).
+      if (k.limite && k.limite < hoyYMD) vencidas.push({ t: k.title, ruta, quien: duenos(k), vencio: k.limite });
+      else if (k.due && k.due < hoyYMD) atrasadas.push({ t: k.title, ruta, quien: duenos(k), era: k.due });
     }
   }
 
@@ -161,7 +165,8 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
   bloque("Eventos", eventos, (x) => `${x.dia}${x.hora ? " " + x.hora : ""} · ${x.t} · ${x.van} confirmados`, "ninguno");
   bloque("Abiertas y quietas hace 14 días o más al cerrar la semana", quietas.sort((a, b) => (b.dias === null ? 1e9 : b.dias) - (a.dias === null ? 1e9 : a.dias)),
     (x) => `${x.t} · ${x.ruta} · ${x.quien} · ${x.dias === null ? "nunca tuvo un avance" : x.dias + " días sin novedades"} · prioridad ${x.prio}`);
-  bloque("Vencidas y sin terminar", vencidas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · vencía ${x.vencio}`);
+  bloque("Vencidas y sin terminar (fecha límite pasada)", vencidas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · vencía ${x.vencio}`);
+  bloque("Planeadas para un día que ya pasó y sin terminar (no vencen: se corren solas)", atrasadas, (x) => `${x.t} · ${x.ruta} · ${x.quien} · era para el ${x.era}`, "ninguna");
   bloque("Mesa de trabajo: pendientes cerrados con su conclusión", mesaCerrados, (x) => `${x.t} · ${x.tema} · cerró ${x.por}: ${x.conclusion}`, "ninguno");
   bloque("Mesa de trabajo: pendientes nuevos", mesaNuevos, (x) => `${x.t} · ${x.tema} · lo planteó ${x.por}`, "ninguno");
   bloque("Mesa de trabajo: aportes escritos", mesaAportes.sort((a, b) => a.ts - b.ts), (x) => `[${fecha(x.ts)}] ${x.por} en "${x.t}": ${x.texto}`, "ninguno");
@@ -180,7 +185,7 @@ export function informeSemanal({ despues, antes, antesDe, despuesDe, inicio, fin
   return { texto: L.join("\n"), cuentas: {
     completadas: completadas.length, avances: avances.length, nuevas: nuevas.length,
     cambios: cambios.length, reabiertas: reabiertas.length, quietas: quietas.length,
-    vencidas: vencidas.length, eventos: eventos.length,
+    vencidas: vencidas.length, atrasadas: atrasadas.length, eventos: eventos.length,
     objetivos: objGrupos.reduce((n, [, l]) => n + l.length, 0),
     objetivosCumplidos: objGrupos.reduce((n, [, l]) => n + l.filter((x) => x.startsWith("[cumplido]")).length, 0),
     mesaCerrados: mesaCerrados.length, mesaNuevos: mesaNuevos.length, mesaAportes: mesaAportes.length,

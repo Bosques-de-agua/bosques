@@ -89,6 +89,7 @@ function icsDe(data: any, nombre: string): string {
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
   ];
   const hace30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const hoyArg = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);   // Argentina, UTC-3
   // Eventos del equipo: los que son para todos y los que te invitan.
   for (const ev of data?.events || []) {
     if (!ymdOk(ev.date) || ev.date < hace30) continue;
@@ -99,10 +100,18 @@ function icsDe(data: any, nombre: string): string {
   // Tus tareas con fecha, abiertas. Las privadas no viven acá: nunca salen.
   for (const node of Object.values<any>(data?.nodes || {})) {
     for (const k of node.items || []) {
-      if (k.done || k.archived || !ymdOk(k.due) || k.due < hace30) continue;
+      if (k.done || k.archived) continue;
       const owners = Array.isArray(k.owners) ? k.owners : [];
       if (!owners.includes(nombre)) continue;
-      l.push(...evento(String(k.id), "Tarea · " + (k.title || "Tarea"), k.due, k.dueTime, node.name ? "Tema: " + node.name : "", `${APP_URL}/?tarea=${encodeURIComponent(k.id)}`));
+      const url = `${APP_URL}/?tarea=${encodeURIComponent(k.id)}`, tema = node.name ? "Tema: " + node.name : "";
+      // "Para el": si ya pasó y sigue abierta, se corre a hoy (igual que en la app).
+      if (ymdOk(k.due)) {
+        const dia = k.due < hoyArg ? hoyArg : k.due;
+        l.push(...evento(String(k.id), "Tarea · " + (k.title || "Tarea"), dia, k.due < hoyArg ? "" : k.dueTime, tema + (k.due < hoyArg ? (tema ? " · " : "") + "Era para el " + k.due : ""), url));
+      }
+      // La fecha límite, aparte y de día entero.
+      if (ymdOk(k.limite) && k.limite >= hace30)
+        l.push(...evento(String(k.id) + "-lim", "Vence · " + (k.title || "Tarea"), k.limite, "", tema, url));
     }
   }
   l.push("END:VCALENDAR");

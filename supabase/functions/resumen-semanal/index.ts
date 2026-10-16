@@ -60,23 +60,31 @@ Deno.serve(async (req) => {
 
   const { data: miembros } = await supabase.from("team_members").select("email,name");
   const { data: estado } = await supabase.from("app_state").select("data").eq("id", 1).single();
+  const ymd = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
   const tareas: any[] = [];
   for (const node of Object.values<any>(estado?.data?.nodes || {}))
-    for (const k of node.items || []) if (!k.done && !k.archived && /^\d{4}-\d{2}-\d{2}$/.test(k.due || "")) tareas.push(k);
+    for (const k of node.items || []) if (!k.done && !k.archived && (ymd(k.due) || ymd(k.limite))) tareas.push(k);
 
   const resultado: Record<string, any> = {};
   for (const m of miembros || []) {
     if (prueba && m.email !== prueba) continue;
     const nombre = String(m.name || "").trim();
     const mias = tareas.filter((k) => Array.isArray(k.owners) && k.owners.includes(nombre));
-    const vencidas = mias.filter((k) => k.due < hoy);
-    const proximas = mias.filter((k) => k.due >= hoy && k.due <= en7).sort((a, b) => (a.due < b.due ? -1 : 1));
-    if (!vencidas.length && !proximas.length) { resultado[m.email] = "nada"; continue; }
+    // Dos fechas por tarea: solo `limite` vence. `due` es el día en que se
+    // planeó encararla; si ya pasó, en la app se corre sola a hoy.
+    const vencidas = mias.filter((k) => ymd(k.limite) && k.limite < hoy);
+    const proximas = mias.filter((k) => ymd(k.limite) && k.limite >= hoy && k.limite <= en7).sort((a, b) => (a.limite < b.limite ? -1 : 1));
+    const paraHacer = mias.filter((k) => ymd(k.due) && k.due <= en7);
+    if (!vencidas.length && !proximas.length && !paraHacer.length) { resultado[m.email] = "nada"; continue; }
     const partes = [];
     if (vencidas.length) partes.push(vencidas.length === 1 ? "1 vencida" : `${vencidas.length} vencidas`);
     if (proximas.length) partes.push(proximas.length === 1 ? "1 vence esta semana" : `${proximas.length} vencen esta semana`);
-    const detalle = proximas.slice(0, 3).map((k) => `${k.title} (${k.due === hoy ? "hoy" : diaCorto(k.due)})`).join(", ");
-    const body = partes.join(" · ") + (detalle ? `: ${detalle}` + (proximas.length > 3 ? "…" : "") : "");
+    if (paraHacer.length) partes.push(paraHacer.length === 1 ? "1 para hacer" : `${paraHacer.length} para hacer`);
+    // El detalle nombra lo que vence; si nada vence, lo que tenés para hacer.
+    const lista = proximas.length ? proximas : paraHacer.slice().sort((a, b) => (a.due < b.due ? -1 : 1));
+    const cuando = (d: string) => (d <= hoy ? "hoy" : diaCorto(d));
+    const detalle = lista.slice(0, 3).map((k) => `${k.title} (${cuando(proximas.length ? k.limite : k.due)})`).join(", ");
+    const body = partes.join(" · ") + (detalle ? `: ${detalle}` + (lista.length > 3 ? "…" : "") : "");
     resultado[m.email] = await enviar(supabase, m.email, "🗓 Tu semana", body, "/?vista=semana");
   }
   return Response.json({ ok: true, hoy, resultado });

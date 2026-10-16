@@ -337,7 +337,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       +(otros.length?`<span class="tavs" title="También a cargo: ${esc(otros.join(", "))}">${otros.map(p=>avatarMarkup(p,"av2",true)).join("")}</span>`:"")
       +`<button class="go" data-ficha="${n.id}" title="Abrir la ficha del tema">↗</button></div>`
       +(abierto&&mias.length?`<div class="temasub">`+mias.map(x=>{ const sr=subRuta(x.node.id,n.id);
-          return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="sdotc" style="background:${cssv(STATUS[x.k.status].v)}" title="${STATUS[x.k.status].l}"></span><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${sr?`<span class="ltema">${esc(sr)}</span>`:""}${cuandoTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`; }).join("")+`</div>`:"")
+          return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="sdotc" style="background:${cssv(STATUS[x.k.status].v)}" title="${STATUS[x.k.status].l}"></span><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${sr?`<span class="ltema">${esc(sr)}</span>`:""}${cuandoTag(x.k)}${limTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`; }).join("")+`</div>`:"")
       +`</div>`; }
   function temaCard(n){ const ruta=rutaDe(n), c=temaCuentas(n);
     const el=document.createElement("div"); el.className="kcard tcard"; el.style.borderLeftColor=accentOf(n);
@@ -368,7 +368,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     else { const p=state.me&&state.privTasks&&state.privTasks[state.me]; if(Array.isArray(p)&&p.includes(k))arr=p; }
     if(!arr)return;
     const n=newTask(); Object.assign(n,{title:k.title,owners:ownersOf(k).slice(),prio:k.prio||"",objetivo:k.objetivo||"",notas:k.notas||"",dueTime:k.dueTime||"",repite:k.repite,
-      due:sumarPeriodo(k.due,k.repite),files:(k.files||[]).map(f=>Object.assign({},f,{id:"f"+uid()}))});
+      due:sumarPeriodo(k.due,k.repite),...(k.limite?{limite:sumarPeriodo(k.limite,k.repite)}:{}),files:(k.files||[]).map(f=>Object.assign({},f,{id:"f"+uid()}))});
     arr.splice(arr.indexOf(k)+1,0,n); k.repSig=n.id; }
   function setStatus(k,st){ if(st==="espera"&&k.status!=="espera")k.esperaDesde=nowMs();
     if(st!=="espera"){ delete k.esperaDesde; delete k.esperaDe; }
@@ -485,7 +485,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     Object.keys(d.chatSeen||{}).forEach(p=>{ if(!d.chatSeen[p]||typeof d.chatSeen[p]!=="object")d.chatSeen[p]={}; });
     const fixItem=k=>{ if(k.notas==null)k.notas=""; if(k.due==null)k.due="";
       if(k.avances!=null)k.avances=Array.isArray(k.avances)?k.avances.filter(a=>a&&typeof a.text==="string"&&a.id):[];
-      if(k.repite!=null&&!["semana","mes","anio"].includes(k.repite))delete k.repite; if(k.dueTime==null)k.dueTime=""; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
+      if(k.repite!=null&&!["semana","mes","anio"].includes(k.repite))delete k.repite; if(k.dueTime==null)k.dueTime=""; if(k.limite!=null&&!/^\d{4}-\d{2}-\d{2}$/.test(k.limite))delete k.limite; if(k.status==="bloq"||!STATUS[k.status])k.status="espera"; k.done=(k.status==="listo"); if(k.doneAt===undefined)k.doneAt=null; if(k.done&&!k.doneAt)k.doneAt=nowMs(); if(!k.done)k.doneAt=null; if(k.archived==null)k.archived=false; if(k.archivedAt===undefined)k.archivedAt=(k.archived?(k.doneAt||null):null); if(k.objetivo==null)k.objetivo="";
       if(!Array.isArray(k.owners))k.owners=(k.owner&&String(k.owner).trim())?[String(k.owner).trim()]:[]; k.owners=k.owners.map(o=>String(o).trim()).filter(Boolean); delete k.owner;
       if(!Array.isArray(k.files))k.files=[];
       if(k.prio==null||!PRIO[k.prio])k.prio="";
@@ -1401,16 +1401,22 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const ahora=nowMs(), hoy=ymdLocal(new Date()), en=d=>ymdLocal(new Date(ahora+d*DAY));
     const abiertas=itemsSemana(persona).filter(x=>!x.k.archived&&!x.k.done);
     const terminadas=completadasSemana(persona), sinArchivar=terminadas.filter(x=>!x.k.archived).length;
-    const vencidas=abiertas.filter(x=>x.k.due&&x.k.due<hoy).sort((a,b)=>a.k.due<b.k.due?-1:1);
-    const proximas=abiertas.filter(x=>x.k.due&&x.k.due>=hoy&&x.k.due<=en(7)).sort((a,b)=>a.k.due<b.k.due?-1:1);
+    // "Para hacer" mira la fecha en que la querés encarar (lo atrasado ya
+    // viene corrido a hoy); "Vencidas" y "Vencen" miran SOLO la fecha límite.
+    const paraHacer=abiertas.filter(x=>x.k.due&&paraEl(x.k,hoy)<=en(7)).sort((a,b)=>(paraEl(a.k,hoy)+a.k.due)<(paraEl(b.k,hoy)+b.k.due)?-1:1);
+    const vencidas=abiertas.filter(x=>x.k.limite&&x.k.limite<hoy).sort((a,b)=>a.k.limite<b.k.limite?-1:1);
+    const proximas=abiertas.filter(x=>x.k.limite&&x.k.limite>=hoy&&x.k.limite<=en(7)).sort((a,b)=>a.k.limite<b.k.limite?-1:1);
     const sinMov=abiertas.map(x=>{ const u=ultimoAvance(x.k);
         const dEsp=(x.k.status==="espera"&&x.k.esperaDesde)?diasDesde(x.k.esperaDesde):-1, dAv=u?diasDesde(u.ts):-1;
         if(dEsp>=SIN_NOVEDADES_DIAS)return {x,d:dEsp,txt:(x.k.esperaDe?"espera a "+x.k.esperaDe:"en espera")+" · "+dEsp+" d"};
         if(dAv>=SIN_NOVEDADES_DIAS)return {x,d:dAv,txt:dAv+" d sin novedades"};
         return null; }).filter(Boolean).sort((a,b)=>b.d-a.d);
-    const sinResp=persona?[]:abiertas.filter(x=>!ownersOf(x.k).length&&x.k.due&&x.k.due<=en(14)).sort((a,b)=>a.k.due<b.k.due?-1:1);
-    const niNi=persona?0:abiertas.filter(x=>!ownersOf(x.k).length&&!x.k.due).length;
-    const dm=ds=>{ const [y,m,d]=ds.split("-"); return d+"/"+m; };
+    // Sin responsable: la fecha que llegue antes, sea para encararla o límite.
+    const cuando=k=>[paraEl(k,hoy),k.limite].filter(Boolean).sort()[0]||"";
+    const sinResp=persona?[]:abiertas.filter(x=>!ownersOf(x.k).length&&cuando(x.k)&&cuando(x.k)<=en(14)).sort((a,b)=>cuando(a.k)<cuando(b.k)?-1:1);
+    const niNi=persona?0:abiertas.filter(x=>!ownersOf(x.k).length&&!x.k.due&&!x.k.limite).length;
+    const dm=dmy;
+    const paraTxt=k=>{ const p=paraEl(k,hoy); return (p===hoy?"hoy":dm(p))+(corrida(k,hoy)?" · era del "+dm(k.due):"")+(k.dueTime?" · "+k.dueTime:""); };
     const fila=(x,meta,cls)=>`<div class="semline${x.k.archived?" arch":""}" data-node="${x.priv?"__priv":esc(x.node.id)}" data-task="${esc(x.k.id)}"><span class="st">${esc(x.k.title||"Tarea")}</span><span class="sm${cls?" "+cls:""}">${esc(meta)}</span></div>`;
     // En tu semana todo es tuyo: decir quién sobra. Ahí se dice el tema.
     const quien=x=>{ if(persona)return x.priv?"privada":(x.node.name||"");
@@ -1419,12 +1425,13 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const archBtn=sinArchivar?`<button class="semarch" data-archsem="${persona?esc(persona):""}" title="Mandar al Archivo las ${sinArchivar} que todavía no están">${ICO.archivar} archivar${sinArchivar<terminadas.length?" "+sinArchivar:""}</button>`:"";
     return `<div class="semgrid">`
       +bloque("Tareas completadas",terminadas,terminadas.map(x=>fila(x,(x.k.archived?"archivada · ":"")+quien(x))).join(""),"","",archBtn)
-      +bloque("Vencidas",vencidas,vencidas.map(x=>fila(x,"venció "+dm(x.k.due)+" · "+quien(x),"mal")).join(""),"","mal")
-      +bloque("Vencen en los próximos 7 días",proximas,proximas.map(x=>fila(x,(x.k.due===hoy?"hoy":dm(x.k.due))+" · "+quien(x))).join(""))
+      +bloque("Para hacer",paraHacer,paraHacer.map(x=>fila(x,paraTxt(x.k)+" · "+quien(x))).join(""))
+      +bloque("Vencidas",vencidas,vencidas.map(x=>fila(x,"venció "+dm(x.k.limite)+" · "+quien(x),"mal")).join(""),"","mal")
+      +bloque("Vencen en los próximos 7 días",proximas,proximas.map(x=>fila(x,(x.k.limite===hoy?"hoy":dm(x.k.limite))+" · "+quien(x))).join(""))
       +bloque("Sin movimiento",sinMov,sinMov.map(o=>fila(o.x,o.txt,"ojo")).join(""),"","ojo")
-      +(persona?"":bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,(x.k.due<hoy?"venció ":"vence ")+dm(x.k.due))).join(""),
+      +(persona?"":bloque("Sin responsable",sinResp,sinResp.map(x=>fila(x,x.k.limite&&cuando(x.k)===x.k.limite?(x.k.limite<hoy?"venció ":"vence ")+dm(x.k.limite):"para el "+paraTxt(x.k))).join(""),
         niNi?`<div class="semnota">Además, ${niNi} tarea${niNi===1?" no tiene":"s no tienen"} fecha ni responsable.</div>`:""))
-      +`</div><p class="semayuda">Completadas: las terminadas en los últimos 7 días; se archivan solas a los ${ARCH_DAYS} días o con el botón, y las archivadas quedan tachadas un día antes de salir de la lista.${persona?"":" Sin responsable muestra solo las que vencen en las próximas 2 semanas."} Sin movimiento: 14 días o más sin avances, o esperando.</p>`; }
+      +`</div><p class="semayuda">Para hacer: lo que planeaste encarar en los próximos 7 días; lo que quedó atrás se corre solo a hoy. Vencidas y Vencen miran solo la fecha límite. Completadas: las terminadas en los últimos 7 días; se archivan solas a los ${ARCH_DAYS} días o con el botón, y las archivadas quedan tachadas un día antes de salir de la lista.${persona?"":" Sin responsable muestra solo las que vencen en las próximas 2 semanas."} Sin movimiento: 14 días o más sin avances, o esperando.</p>`; }
 
   // Los temas, en columnas por encargado: la misma lectura que "por persona"
   // de las tareas, un piso más arriba. Los que no tienen encargado quedan
@@ -1467,7 +1474,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function taskCard(x){ const k=x.k,node=x.node; const c=document.createElement("div"); c.className="kcard"; c.dataset.item=k.id; c.style.borderLeftColor=cssv(STATUS[k.status].v);
     const path=pathOf(node.id).map(p=>p.name).join(" › ");
     const pr=prioOf(k);
-    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${REPITE[k.repite]?`<span class="krep" title="Se repite ${REPITE[k.repite]}">↻</span>`:""}${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)">${ICO.calendario} ${esc(k.due)}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${marcaEspera(k)}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
+    c.innerHTML=`<div class="kt"><input type="checkbox" class="kchk" ${k.done?"checked":""} title="Marcar terminada"><span class="ktt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${REPITE[k.repite]?`<span class="krep" title="Se repite ${REPITE[k.repite]}">↻</span>`:""}${pr?`<span class="kprio" style="background:${cssv(pr.v)}" title="Prioridad ${pr.l.toLowerCase()}"></span>`:""}${k.done?`<button class="karch" title="Mandar al archivo">${ICO.archivar}</button>`:""}</div><div class="kp"><span>${esc(path)}</span>${k.due?`<span style="color:var(--ink-faint)" title="Para el ${esc(k.due)}">${ICO.calendario} ${corrida(k)?"hoy · era del "+esc(dmy(k.due)):esc(dmy(k.due))}${k.dueTime?" · "+esc(k.dueTime):""}</span>`:''}${limTag(k)}${marcaEspera(k)}${marcaAvance(k)}${ownersOf(k).length?`<span class="kavs">${ownersOf(k).map(o=>avatarMarkup(o,"kwho",true)).join("")}</span>`:''}</div>`;
     const kchk=c.querySelector(".kchk");
     kchk.addEventListener("pointerdown",e=>e.stopPropagation());
     kchk.addEventListener("click",e=>e.stopPropagation());
@@ -2861,8 +2868,16 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // todos. El filtro de antes la escondía de todas partes: desde que la
     // identidad sale del email de la sesión, `me` nunca está vacío, y una
     // fecha sin dueño no aparecía en el calendario de nadie.
-    activeItems().forEach(x=>{ const k=x.k; if(!k.due)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),node:x.node.id,taskId:k.id,hecha:!!k.done}); });
-    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if(!k.due||k.archived)return; push(k.due,{type:"task",hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),priv:true,taskId:k.id,hecha:!!k.done}); });
+    // Cada tarea va el día que la querés encarar (si quedó atrás, hoy) y,
+    // si tiene, otra vez el día que vence. Si los dos caen el mismo día, va
+    // una sola con la marca de límite.
+    const hoyC=hoyYMD();
+    const ponerTarea=(k,base)=>{ const p=paraEl(k,hoyC), lim=k.limite||"";
+      const c=Object.assign({type:"task",titulo:k.title||"Tarea",estado:k.status,color:cssv(STATUS[k.status].v),taskId:k.id,hecha:!!k.done},base);
+      if(p)push(p,Object.assign({},c,{hora:k.dueTime||"",label:(k.dueTime?k.dueTime+" ":"")+(k.title||"Tarea"),desde:corrida(k,hoyC)?k.due:"",lim:lim===p,venc:lim===p&&vencida(k,hoyC)}));
+      if(lim&&lim!==p)push(lim,Object.assign({},c,{hora:"",label:"⚑ "+(k.title||"Tarea"),lim:true,soloLim:true,venc:vencida(k,hoyC)})); };
+    activeItems().forEach(x=>{ const k=x.k; if(!k.due&&!k.limite)return; const resp=ownersOf(k); if(me&&resp.length&&!resp.includes(me))return; ponerTarea(k,{node:x.node.id}); });
+    if(me)(state.privTasks&&state.privTasks[me]||[]).forEach(k=>{ if((!k.due&&!k.limite)||k.archived)return; ponerTarea(k,{priv:true}); });
     if(me)recsDe(me).forEach(r=>push(r.fecha,{type:"rec",hora:r.hora||"",label:(r.hora?r.hora+" ":"")+r.t,titulo:r.t,rec:r,pasado:r.hecho}));
     eventosVisibles().forEach(ev=>push(ev.date,{type:"event",hora:ev.time||"",label:(ev.time?ev.time+" ":"")+ev.title,titulo:ev.title||"Evento",id:ev.id,ev,pasado:evPasado(ev)}));
     const gpd=googlePorDia(); Object.keys(gpd).forEach(ds=>gpd[ds].forEach(o=>push(ds,{type:"google",hora:o.hora,label:(o.hora?o.hora+" ":"")+o.g.titulo,titulo:o.g.titulo,g:o.g,pasado:!o.g.diaEntero&&!!o.g.fin&&nowMs()>=new Date(o.g.fin).getTime()})));
@@ -2885,7 +2900,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const byDay=calPorDia();
     const totalCells=Math.ceil((startDow+daysIn)/7)*7; let cells="";
     for(let i=0;i<totalCells;i++){ const dayNum=i-startDow+1; const inMonth=dayNum>=1&&dayNum<=daysIn; const ds=ymdLocal(new Date(y,m,dayNum)); const chips=inMonth?(byDay[ds]||[]):[];
-      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':'task'}${c.pasado?' pasado':''}${c.type==='task'&&c.hecha?' hecha':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'&&calColor('task')==='estado'?`style="--cc:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}>${esc(c.label)}</span>`).join("");
+      const shown=chips.slice(0,3).map((c,idx)=>`<span class="chipcal ${c.type==='event'?'ev':c.type==='google'?'gcal':c.type==='rec'?'rec':'task'}${c.pasado?' pasado':''}${c.type==='task'&&c.hecha?' hecha':''}${c.type==='task'&&c.lim?' lim':''}${c.venc?' venc':''}${c.desde?' corrida':''}"${c.type==='google'?' title="De tu Google Calendar · solo lo ves vos"':c.type==='rec'?' title="Recordatorio · solo lo ves vos"':''} ${c.type==='task'&&calColor('task')==='estado'?`style="--cc:${c.color}"`:''} data-cell="${ds}" data-idx="${idx}"${c.type==="task"?` data-tipitem="${esc(c.taskId)}"`:""}${c.desde?` title="Era para el ${esc(dmy(c.desde))}: se corre a hoy hasta que la termines"`:c.soloLim?` title="Fecha límite"`:""}>${esc(c.label)}</span>`).join("");
       const more=chips.length>3?`<span class="calmore">+${chips.length-3} más</span>`:"";
       // En el teléfono los chips no entran: un puntito dice que ese día hay algo.
       const hay=chips.length?`<span class="calhay" aria-hidden="true">${chips.length}</span>`:"";
@@ -2929,7 +2944,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(c.type==="event"){ const ev=c.ev; hora=ev.time?horaEv(ev):"todo el día"; marca="background:"+colorDe("event");
         const mio=(ev.rsvp||{})[me]; meta=(c.pasado?"terminó · ":"")+(mio==="yes"?"vas":mio==="no"?"no vas":puedeResponder(ev)?"sin responder":"no estás invitado")+(esParaTodos(ev)?" · todo el equipo":" · "+invitadosDe(ev).join(", ")); }
       else if(c.type==="task"){ hora=c.hora||"—"; marca="background:transparent;border:2px solid "+(colorDe("task")||c.color)+";border-radius:3px";
-        const n=c.node?N(c.node):null; meta="Tarea · "+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:"")); }
+        const n=c.node?N(c.node):null; meta=(c.soloLim?(c.venc?"Venció · ":"Vence este día · "):c.lim?"Para este día y vence · ":"Tarea · ")+(c.desde?"era del "+dmy(c.desde)+" · ":"")+(STATUS[c.estado]?STATUS[c.estado].l.toLowerCase():"")+" · "+(c.priv?"privada":(n?n.name:""));
+        if(c.soloLim)hora="límite"; }
       else if(c.type==="rec"){ hora=c.hora||"—"; marca="border-radius:2px;width:4px;height:14px;margin-top:3px;background:"+colorDe("rec"); meta="Recordatorio · solo lo ves vos"+(c.rec.hecho?" · hecho":"")+(c.rec.aviso?" · con aviso":"")+(c.rec.repite?" · "+recRepiteTxt(c.rec):""); }
       else { hora=c.hora||"todo el día"; marca="border:1px dashed "+colorDe("google"); meta="Tu Google Calendar · solo lo ves vos"; }
       const tildable=c.type==="task"||c.type==="rec", hecho=c.type==="task"?!!c.hecha:c.type==="rec"?!!c.rec.hecho:false;
@@ -2967,6 +2983,21 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return corto?`<span class="ltema">${esc(corto)}</span>`:""; }
   // La hora, cuando la tiene. Sin hora no se muestra nada: la fecha sola ya
   // vive en el calendario y en la tarjeta.
+  // Dos fechas por tarea. `due` es "para el": el día que la querés encarar.
+  // `limite`, opcional, es el día que tiene que estar terminada, y es la
+  // ÚNICA que vence. Lo planeado para un día que ya pasó se corre solo a hoy
+  // mientras siga abierto: no se reescribe la fecha guardada (no ensucia el
+  // estado compartido y queda cuándo se había planeado), se calcula al mostrar.
+  const hoyYMD=()=>ymdLocal(new Date());
+  function paraEl(k,hoy){ hoy=hoy||hoyYMD(); return k&&k.due?(!k.done&&k.due<hoy?hoy:k.due):""; }
+  function corrida(k,hoy){ hoy=hoy||hoyYMD(); return !!(k&&k.due&&!k.done&&k.due<hoy); }
+  function vencida(k,hoy){ hoy=hoy||hoyYMD(); return !!(k&&k.limite&&!k.done&&k.limite<hoy); }
+  const dmy=ds=>{ const p=String(ds||"").split("-"); return p.length===3?p[2]+"/"+p[1]:""; };
+  const diasHasta=(ds,hoy)=>Math.round((new Date(ds+"T00:00")-new Date((hoy||hoyYMD())+"T00:00"))/DAY);
+  // El límite a la vista: rojo si venció, ámbar si faltan 3 días o menos.
+  function limTag(k){ if(!k||!k.limite||k.done)return ""; const d=diasHasta(k.limite);
+    const txt=d<0?"venció "+dmy(k.limite):d===0?"vence hoy":d===1?"vence mañana":"vence "+dmy(k.limite);
+    return `<span class="llim${d<0?" mal":d<=3?" ojo":""}" title="Fecha límite: ${esc(k.limite)}">${ICO.bandera||"⚑"} ${esc(txt)}</span>`; }
   function cuandoTag(k){ return k&&k.dueTime?`<span class="lhora" title="${esc(k.due||"")}">${esc(k.dueTime)}</span>`:""; }
   // Con quién compartís la tarea: las fotos de los otros responsables, o
   // "Tarea grupal" cuando está todo el equipo. Va justo antes de la prioridad.
@@ -3024,8 +3055,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       wireSemana(box,()=>{ renderPanel(); refreshChrome(); }); wireFocoSeg(); wireFocoSearch(); return; }
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
-        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${etiqTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
-      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${etiqTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'))
+        privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${limTag(k)}${etiqTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
+      (groups.length?groups.map(g=>`<div class="card" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:${cssv(STATUS[g.s].v)}"></span>${STATUS[g.s].l} · ${g.arr.length}</div>${g.arr.map(x=>`<div class="listline${seenSet.has(x.k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${limTag(x.k)}${seenSet.has(x.k.id)?"":'<span class="nuevo">nueva</span>'}${etiqTag(x.k)}${compartidaTag(x.k)}${prioTag(x.k)}</div>`).join("")}</div>`).join(""):(privs.length?"":'<div class="ph" style="margin-top:14px">Sin tareas a tu nombre por ahora.</div>'))
       +focoEtiquetasHTML(me,pasa,seenSet);
     wireLineasTarea(box,me);
     document.getElementById("newPrivBtn").addEventListener("click",()=>openNewTask(true));
@@ -3051,8 +3082,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(!res.length)return `<div class="ph" style="margin-top:14px">Nada tuyo con «${esc(focoQuery.trim())}». <span style="color:var(--ink-faint)">Para buscar en las de todo el equipo, usá el buscador de Tareas.</span></div>`;
     const fila=({x,priv})=>{ const k=x.k, arch=k.archived?'<span class="ltema">archivada</span>':"";
       return priv
-        ? `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span><span class="ltema">privada</span>${arch}${cuandoTag(k)}${prioTag(k)}</div>`
-        : `<div class="listline${k.archived||seenSet.has(k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span>${lineaTema(x.node)}${arch}${cuandoTag(k)}<span class="lest" style="--sc:${cssv(STATUS[k.status].v)}" title="${esc(STATUS[k.status].l)}"></span>${compartidaTag(k)}${prioTag(k)}</div>`; };
+        ? `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span><span class="ltema">privada</span>${arch}${cuandoTag(k)}${limTag(k)}${prioTag(k)}</div>`
+        : `<div class="listline${k.archived||seenSet.has(k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span>${lineaTema(x.node)}${arch}${cuandoTag(k)}${limTag(k)}<span class="lest" style="--sc:${cssv(STATUS[k.status].v)}" title="${esc(STATUS[k.status].l)}"></span>${compartidaTag(k)}${prioTag(k)}</div>`; };
     return `<div class="card" style="margin-top:14px"><div class="lab" style="margin-bottom:6px">Resultados · ${res.length}</div>${res.map(fila).join("")}</div>`; }
   function wireFocoSearch(){ const i=document.getElementById("focoSearch"); if(!i)return;
     i.addEventListener("input",()=>{ focoQuery=i.value; renderMyTasks(); });
@@ -3062,8 +3093,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
   function focoEtiquetasHTML(me,pasa,seenSet){ const lista=etiqLista(me); if(!lista.length)return "";
     const equipo=new Map(activeItems().map(x=>[x.k.id,x])), privs=new Map(privL(me).filter(k=>!k.archived).map(k=>[k.id,k]));
     return etiqTodas().map(t=>{ const ids=lista.filter(e=>e.tags.includes(t)).map(e=>e.id);
-      const filas=ids.map(id=>{ const x=equipo.get(id); if(x&&pasa(x.k))return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}<span class="lest" style="--sc:${cssv(STATUS[x.k.status].v)}" title="${esc(STATUS[x.k.status].l)}"></span>${compartidaTag(x.k)}${prioTag(x.k)}</div>`;
-        const k=privs.get(id); if(k&&pasa(k))return `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span><span class="ltema">privada</span>${cuandoTag(k)}${prioTag(k)}</div>`;
+      const filas=ids.map(id=>{ const x=equipo.get(id); if(x&&pasa(x.k))return `<div class="listline" data-node="${x.node.id}" data-task="${x.k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${x.k.id}" ${x.k.done?"checked":""} title="Marcar terminada"><span class="lt ${x.k.done?"done":""}">${esc(x.k.title||"Tarea")}</span>${lineaTema(x.node)}${cuandoTag(x.k)}${limTag(x.k)}<span class="lest" style="--sc:${cssv(STATUS[x.k.status].v)}" title="${esc(STATUS[x.k.status].l)}"></span>${compartidaTag(x.k)}${prioTag(x.k)}</div>`;
+        const k=privs.get(id); if(k&&pasa(k))return `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span><span class="ltema">privada</span>${cuandoTag(k)}${limTag(k)}${prioTag(k)}</div>`;
         return ""; }).filter(Boolean);
       if(!filas.length)return "";
       return `<div class="card focoetiq" style="margin-top:14px"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span class="etiqmarca"></span>${esc(t)} · ${filas.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— tu etiqueta, solo la ves vos</span></div>${filas.join("")}</div>`; }).join(""); }
@@ -3145,7 +3176,7 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     if(state.me&&ownersOf(k).includes(state.me)){ state.tasksSeen=state.tasksSeen||{};
       const seen=state.tasksSeen[state.me]||[]; if(!seen.includes(taskId)){ state.tasksSeen[state.me]=seen.concat([taskId]); save(); updateAvisos(); } }
     drawer.classList.remove("on"); panelOpen=false;
-    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k); document.getElementById("tRepite").value=REPITE[k.repite]?k.repite:"";
+    tTitle.value=k.title||""; tStatus.value=k.status; tPrio.value=k.prio; tDue.value=k.due||""; tDueTime.value=k.dueTime||""; syncLimite(k); tObj.value=k.objetivo||""; tNotas.value=k.notas||""; syncTaskDone(k); document.getElementById("tRepite").value=REPITE[k.repite]?k.repite:"";
     avEdit=null; const avIn=document.getElementById("tAvInput"); if(avIn){ avIn.value=""; }
     document.getElementById("tKind").textContent=nodeId==="__priv"?"Tarea privada":"Tarea";
     renderTOwners(); renderTBelong(); renderTFiles(); renderTAvances(); renderTEtiq();
@@ -3238,6 +3269,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     // si se borra la fecha, se va con ella.
     if(!k.due){ k.dueTime=""; tDueTime.value=""; }
     save();renderActive();} });
+  // La fecha límite está escondida detrás de un botón: la mayoría de las
+  // tareas solo tienen el día para encararlas.
+  const tLimite=document.getElementById("tLimite"), tLimC=document.getElementById("tLimC"), tLimAdd=document.getElementById("tLimAdd");
+  function syncLimite(k){ const hay=!!(k&&k.limite); tLimite.value=hay?k.limite:""; tLimC.hidden=!hay; tLimAdd.hidden=hay; }
+  tLimAdd.addEventListener("click",()=>{ tLimC.hidden=false; tLimAdd.hidden=true; tLimite.focus(); try{ tLimite.showPicker(); }catch(e){} });
+  tLimite.addEventListener("change",()=>{ const k=curTask(); if(!k)return;
+    if(tLimite.value)k.limite=tLimite.value; else delete k.limite;
+    if(!k.limite)syncLimite(k); save(); renderActive(); });
   tDueTime.addEventListener("change",()=>{ const k=curTask(); if(!k)return;
     if(tDueTime.value&&!k.due){ tDueTime.value=""; note("Poné primero la fecha: una hora sola no se puede ubicar en el calendario."); return; }
     k.dueTime=tDueTime.value; save(); renderActive(); });
@@ -3294,15 +3333,17 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     const preP=(f.people.length===1&&f.people[0]!=="__none")?f.people[0]:(state.me||"");
     ntOwnersArr=preP?[preP]:[]; renderNtOwners();
     document.getElementById("ntDue").value=o.due||""; document.getElementById("ntDueTime").value=o.dueTime||"";
+    document.getElementById("ntLimite").value=""; document.getElementById("ntLimC").hidden=true; document.getElementById("ntLimAdd").hidden=false;
     document.getElementById("ntStatus").innerHTML=STORD.filter(s=>s!=="listo").map(s=>`<option value="${s}"${s==="sin"?" selected":""}>${STATUS[s].l}</option>`).join("");
     document.getElementById("ntPrio").innerHTML=`<option value="" selected>— sin prioridad —</option>`+PRORD.map(v=>`<option value="${v}">${PRIO[v].l}</option>`).join("");
     ntModal.classList.add("on"); setTimeout(()=>document.getElementById("ntTitle").focus(),40); }
   let ntMesa=null;   // el pendiente de la mesa del que se desprende, si viene de ahí
+  document.getElementById("ntLimAdd").addEventListener("click",()=>{ document.getElementById("ntLimC").hidden=false; document.getElementById("ntLimAdd").hidden=true; const i=document.getElementById("ntLimite"); i.focus(); try{ i.showPicker(); }catch(e){} });
   function closeNT(){ ntModal.classList.remove("on"); ntMesa=null; }
   function createNT(){ const dest=document.getElementById("ntNode").value; const priv=dest==="__priv"; const n=priv?null:N(dest);
     if(!priv&&!n){ note("Elegí a qué tema pertenece."); return; }
     const title=document.getElementById("ntTitle").value.trim(); if(!title){ note("Poné un título para la tarea."); return; }
-    const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.dueTime=document.getElementById("ntDueTime").value; k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
+    const k=newTask(); k.title=title; k.owners=ntOwnersArr.slice(); k.due=document.getElementById("ntDue").value; k.dueTime=document.getElementById("ntDueTime").value; { const l=document.getElementById("ntLimite").value; if(l)k.limite=l; } k.prio=document.getElementById("ntPrio").value; setStatus(k,document.getElementById("ntStatus").value);
     if(priv){ const arr=privList(); if(!arr){ note("No pudimos identificarte para crear una tarea privada."); return; }
       k.priv=true; if(!k.owners.length&&state.me)k.owners=[state.me]; arr.push(k); save(); refreshChrome(); closeNT(); renderActive(); openTask("__priv",k.id); return; }
     const it=ntMesa&&mesaItem(ntMesa); if(it){ k.mesaDe=it.id; if(!it.tareas.includes(k.id))it.tareas.push(k.id); }

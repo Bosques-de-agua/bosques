@@ -2074,3 +2074,13 @@ button.rmn:hover,.rocmeta.foco button.rmn{box-shadow:0 0 0 3px color-mix(in srgb
 .diachk{flex:none;width:15px;height:15px;margin:3px 0 0;cursor:pointer;accent-color:var(--dc,var(--s-listo))}
 .diarow.hecho .diacuerpo b{color:var(--ink-faint);text-decoration:line-through}
 .diarow.hecho .diameta{opacity:.7}
+
+/* Fecha límite: botón para sumarla y la marca en renglones y tarjetas */
+.pctl .c.limadd{flex:0 0 auto;min-width:0;align-self:flex-end}
+.pctl .c[hidden],.pctl .c.limadd:has(> [hidden]){display:none}
+.llim{flex:none;font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+.llim.ojo{color:var(--s-espera)}
+.llim.mal{color:var(--p-alta);font-weight:600}
+.chipcal.task.lim{border-style:dashed}
+.chipcal.task.venc{--cc:var(--p-alta);color:var(--p-alta)}
+.chipcal.task.corrida{font-style:italic}

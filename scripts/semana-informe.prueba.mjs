@@ -16,7 +16,7 @@ const AHORA = fin.getTime() + 60000;             // el lunes siguiente
 const tarea = (id, o = {}) => ({
   id, title: o.title || id, owners: o.owners || [], status: o.status || "sin",
   done: o.done || false, doneAt: o.doneAt || null, archived: false,
-  avances: o.avances || [], due: o.due || "", prio: o.prio || "",
+  avances: o.avances || [], due: o.due || "", ...(o.limite ? { limite: o.limite } : {}), prio: o.prio || "",
 });
 const foto = (items) => ({
   nodes: {
@@ -36,9 +36,9 @@ const cierre = foto([
   tarea("a", { title: "Ya estaba y sigue abierta", status: "espera", avances: [{ id: "x", by: "Nico", ts: ANTES, text: "vieja" }, { id: "y", by: "Nico", ts: EN, text: "avance de la semana" }] }),
   tarea("b", { title: "Se termina esta semana", status: "listo", done: true, doneAt: EN, owners: ["Juampi"] }),
   tarea("c", { title: "Estaba terminada y la reabren", status: "curso" }),
-  tarea("d", { title: "Quieta hace mucho", status: "curso", owners: ["Lucas"], prio: "alta" }),
+  tarea("d", { title: "Quieta hace mucho", status: "curso", owners: ["Lucas"], prio: "alta", due: "2026-09-24" }),
   tarea("e", { title: "Nueva y terminada en la misma semana", status: "listo", done: true, doneAt: EN, owners: ["Nico"] }),
-  Object.assign(tarea("f", { title: "Nueva, vencida y sin dueño", due: "2026-09-25" }), { _n: "n2" }),
+  Object.assign(tarea("f", { title: "Nueva, vencida y sin dueño", limite: "2026-09-25" }), { _n: "n2" }),
 ]);
 cierre.chat.team = [{ from: "Nico", ts: EN, text: "Mensaje de la semana" }, { from: "Lucas", ts: ANTES, text: "Mensaje viejo" }];
 cierre.chat.dm = { "Lucas ~ Nico": [{ from: "Nico", ts: EN, text: "ESTO NO TIENE QUE APARECER" }] };
@@ -60,7 +60,8 @@ ok(cuentas.reabiertas === 1 && texto.includes("Estaba terminada y la reabren"), 
 ok(cuentas.avances === 1 && texto.includes("avance de la semana") && !texto.includes(": vieja"), "cuenta solo el avance de la semana");
 ok(cuentas.cambios >= 1 && texto.includes("en curso → en espera"), "anota el cambio de estado");
 ok(texto.includes("Quieta hace mucho") && texto.includes("nunca tuvo un avance"), "marca la que está quieta");
-ok(cuentas.vencidas === 1 && texto.includes("vencía 2026-09-25"), "marca la vencida");
+ok(cuentas.vencidas === 1 && texto.includes("vencía 2026-09-25"), "marca la vencida (por fecha límite)");
+ok(cuentas.atrasadas === 1 && texto.includes("era para el 2026-09-24") && !texto.includes("vencía 2026-09-24"), "lo planeado y atrasado NO cuenta como vencido");
 ok(texto.includes("Informes") && texto.includes("Área Natural › Informes"), "la ruta del tema sale completa");
 ok(cuentas.eventos === 1 && texto.includes("Reunión de equipo"), "toma el evento de la semana");
 ok(cuentas.mensajes === 1, "cuenta solo el mensaje de la semana", "mensajes: " + cuentas.mensajes);
