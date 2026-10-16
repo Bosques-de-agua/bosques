@@ -2976,7 +2976,14 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
     return `<span class="lcomp" title="La compartís con ${esc(otros.join(", "))}">${otros.map(o=>avatarMarkup(o,"lav")).join("")}</span>`; }
   function prioTag(k){ const pr=prioOf(k); return pr?`<span class="ptag" style="background:color-mix(in srgb,${cssv(pr.v)} 20%,transparent);color:${cssv(pr.v)}"><span class="pdot" style="background:${cssv(pr.v)}"></span>${pr.l}</span>`:`<span class="ptag none">— sin prioridad</span>`; }
   function renderMyTasks(){ const box=document.getElementById("myTasks"); if(!box)return; const me=state.me;
-    const foco=objFocoGuardar(box); renderMyTasksAdentro(box,me); objFocoReponer(box,foco); }
+    const foco=objFocoGuardar(box);
+    // El buscador vive adentro de lo que se redibuja: si estabas escribiendo,
+    // se le devuelve el foco y el cursor (un cambio de un compañero también
+    // redibuja, y no te puede sacar del campo a mitad de palabra).
+    const bus=document.activeElement&&document.activeElement.id==="focoSearch"?[document.activeElement.selectionStart,document.activeElement.selectionEnd]:null;
+    renderMyTasksAdentro(box,me); objFocoReponer(box,foco);
+    if(bus){ const i=document.getElementById("focoSearch"); if(i){ i.focus(); try{ i.setSelectionRange(bus[0],bus[1]); }catch(e){} } } }
+  let focoQuery="";
   function renderMyTasksAdentro(box,me){
     if(!me){ box.innerHTML=`<div class="ph"><b>¿Quién sos?</b><div style="margin-top:6px;font-size:13px">Probá recargar la página.</div></div>`; return; }
     const allMine=activeItems().filter(x=>ownersOf(x.k).includes(me));
@@ -3001,7 +3008,8 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       ? `${misTemas.length?`${misTemas.length} tema${misTemas.length===1?"":"s"} a tu cargo`:"ningún tema a tu cargo"}`
       : vf==="semana" ? "lo tuyo de los últimos y los próximos 7 días"
       : `${allMine.length} tarea${allMine.length===1?"":"s"} a tu nombre${allPriv.length?` · ${allPriv.length} privada${allPriv.length===1?"":"s"}`:""}${news.length?` · <span class="newchip" id="ackNew">${news.length} nueva${news.length===1?"":"s"}</span>`:""}`;
-    const cabecera=objFocoHTML(me)+`<div class="myfoco"><span class="mfl"><b>Tu foco</b>${seg}<span class="mfc">${resumen}</span></span><span class="mfr">${vf==="tareas"?`<button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}`:""}</span></div>`;
+    const cabecera=objFocoHTML(me)+`<div class="myfoco"><span class="mfl"><b>Tu foco</b>${seg}<span class="mfc">${resumen}</span></span><span class="mfr"><input class="srch focosrch" id="focoSearch" type="search" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Buscar en lo tuyo…" value="${esc(focoQuery)}">${vf==="tareas"&&!focoQuery.trim()?`<button class="rowbtn" id="newPrivBtn">${ICO.candado} tarea privada</button>${filtBtn}`:""}</span></div>`;
+    if(focoQuery.trim()){ box.innerHTML=cabecera+focoResultadosHTML(me,seenSet); wireLineasTarea(box,me); wireFocoSeg(); wireFocoSearch(); return; }
     if(vf==="temas"){ box.innerHTML=cabecera+temasDelFoco(misTemas,me);
       // El renglón abre y cierra tus tareas de ese tema; el ↗ va a la ficha.
       // Si no tenés ninguna adentro no hay nada que abrir, así que el renglón
@@ -3011,9 +3019,9 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
         const id=r.dataset.tema;
         if(!r.classList.contains("conmias")){ openPanel(id); return; }
         if(focoOpen.has(id))focoOpen.delete(id); else focoOpen.add(id); renderMyTasks(); }));
-      wireLineasTarea(box,me); wireFocoSeg(); return; }
+      wireLineasTarea(box,me); wireFocoSeg(); wireFocoSearch(); return; }
     if(vf==="semana"){ box.innerHTML=cabecera+`<div class="semana focosem">${semanaHTML(me)}</div>`;
-      wireSemana(box,()=>{ renderPanel(); refreshChrome(); }); wireFocoSeg(); return; }
+      wireSemana(box,()=>{ renderPanel(); refreshChrome(); }); wireFocoSeg(); wireFocoSearch(); return; }
     box.innerHTML=cabecera+
       (privs.length?`<div class="card" style="margin-top:14px;border-left:4px solid var(--accent-priv)"><div class="lab" style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent-priv)"></span>Privadas · ${privs.length} <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">— solo las ves vos</span></div>`+
         privs.map(k=>`<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${esc(k.title||"Tarea")}</span>${cuandoTag(k)}${etiqTag(k)}${prioTag(k)}</div>`).join("")+`</div>`:"")+
@@ -3028,7 +3036,27 @@ export function startApp({ seed, priv, yo, team, pushRemoteState, pushPrivateSta
       if(cb.checked){ if(i<0)pf.push(v); } else if(i>=0)pf.splice(i,1); save(); renderMyTasks(); document.getElementById("panelFilt").querySelector(".fmenu").classList.add("on"); }));
     const pfc=pfm.querySelector(".fclear"); if(pfc)pfc.addEventListener("click",()=>{ state.panelFilter=[]; save(); renderMyTasks(); });
     const ack=document.getElementById("ackNew"); if(ack)ack.addEventListener("click",()=>{ state.tasksSeen[me]=allMine.map(x=>x.k.id); save(); renderMyTasks(); updateAvisos(); });
-    wireFocoSeg(); }
+    wireFocoSeg(); wireFocoSearch(); }
+  // Buscar en lo tuyo: tus tareas (de un tema o privadas), por el nombre o
+  // por el tema. Busca sin importar la pestaña ni el filtro de prioridad,
+  // y también entre las terminadas y las archivadas, que van al final: lo
+  // que uno busca rápido muchas veces es algo que ya cerró.
+  function focoResultadosHTML(me,seenSet){ const q=norm(focoQuery.trim());
+    const hl=txt=>{ const raw=String(txt||"Tarea"), i=norm(raw).indexOf(q); if(i<0)return esc(raw); return esc(raw.slice(0,i))+"<mark>"+esc(raw.slice(i,i+q.length))+"</mark>"+esc(raw.slice(i+q.length)); };
+    const temaDe=n=>norm(pathOf(n.id).map(z=>z.name).join(" "));
+    const eq=allItems().filter(x=>ownersOf(x.k).includes(me)&&(norm(x.k.title).includes(q)||temaDe(x.node).includes(q))).map(x=>({x,priv:false}));
+    const pv=privL(me).filter(k=>norm(k.title).includes(q)).map(k=>({x:{k,node:null},priv:true}));
+    const peso=r=>r.x.k.archived?2:r.x.k.done?1:0;
+    const res=[...eq,...pv].sort((a,b)=>peso(a)-peso(b)||(norm(a.x.k.title).indexOf(q)<0)-(norm(b.x.k.title).indexOf(q)<0)||String(a.x.k.title||"").localeCompare(String(b.x.k.title||"")));
+    if(!res.length)return `<div class="ph" style="margin-top:14px">Nada tuyo con «${esc(focoQuery.trim())}». <span style="color:var(--ink-faint)">Para buscar en las de todo el equipo, usá el buscador de Tareas.</span></div>`;
+    const fila=({x,priv})=>{ const k=x.k, arch=k.archived?'<span class="ltema">archivada</span>':"";
+      return priv
+        ? `<div class="listline" data-priv="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donepriv="${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span><span class="ltema">privada</span>${arch}${cuandoTag(k)}${prioTag(k)}</div>`
+        : `<div class="listline${k.archived||seenSet.has(k.id)?"":" isnew"}" data-node="${x.node.id}" data-task="${k.id}" style="cursor:pointer"><input type="checkbox" class="lchk" data-donetask="${x.node.id}|${k.id}" ${k.done?"checked":""} title="Marcar terminada"><span class="lt ${k.done?"done":""}">${hl(k.title)}</span>${lineaTema(x.node)}${arch}${cuandoTag(k)}<span class="lest" style="--sc:${cssv(STATUS[k.status].v)}" title="${esc(STATUS[k.status].l)}"></span>${compartidaTag(k)}${prioTag(k)}</div>`; };
+    return `<div class="card" style="margin-top:14px"><div class="lab" style="margin-bottom:6px">Resultados · ${res.length}</div>${res.map(fila).join("")}</div>`; }
+  function wireFocoSearch(){ const i=document.getElementById("focoSearch"); if(!i)return;
+    i.addEventListener("input",()=>{ focoQuery=i.value; renderMyTasks(); });
+    i.addEventListener("keydown",e=>{ if(e.key==="Escape"&&focoQuery){ e.preventDefault(); focoQuery=""; renderMyTasks(); } }); }
   // Un grupo por cada etiqueta tuya, con todas sus tareas juntas (tuyas o no,
   // de un tema o privadas), aunque sigan también en su grupo de estado.
   function focoEtiquetasHTML(me,pasa,seenSet){ const lista=etiqLista(me); if(!lista.length)return "";

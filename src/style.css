@@ -228,6 +228,8 @@
   .myfoco .mfl{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .myfoco .mfr{display:flex;align-items:center;gap:8px;margin-left:auto}
   .myfoco .mfc{min-width:0}
+  .myfoco .focosrch{min-width:150px;flex:0 1 220px;padding:5px 10px}
+  @media (max-width:700px){ .myfoco .mfr{width:100%;margin-left:0} .myfoco .focosrch{flex:1 1 auto} }
   /* Las dos lecturas de Tu foco: lo que tenés que hacer y de lo que estás a cargo. */
   .focoseg{flex:none}
   .focoseg .segn{margin-left:6px;font-size:10.5px;font-weight:700;color:var(--ink-faint);background:var(--surface-3);border-radius:var(--r-pill);padding:1px 6px}
